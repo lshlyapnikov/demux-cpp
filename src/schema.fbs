@@ -1,0 +1,27 @@
+namespace ShmSequencer;
+
+struct Header {
+  sesion: [uint8:10];
+  sequence_number: uint64;
+  message_count: uint16;
+}
+
+table DownstreamPacket {
+  header: Header (required);
+  message_length: uint16;
+  message_data: [uint8] (required); // can be empty
+}
+
+table UpstreamPacket {
+  header: Header (required);
+  message_length: uint16;
+  message_data: [uint8] (required); // can be empty
+}
+
+table RequestPacket {
+  header: Header (required);
+}
+
+root_type DownstreamPacket;
+root_type UpstreamPacket;
+root_type RequestPacket;

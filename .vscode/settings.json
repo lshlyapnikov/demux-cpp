@@ -1,0 +1,8 @@
+{
+  "my.terminal.run.cmd1": "clear; cmake --build ./build",
+  "my.terminal.run.cmd2": "clear; ~/local/flatbuffers/build/flatc -o ./src/ --cpp ./src/schema.fbs",
+  "my.terminal.run.cmd3": "clear; ./bin/run-clang-tidy.sh",
+  "files.associations": {
+    "iostream": "cpp"
+  }
+}
