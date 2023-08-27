@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 project(shm-sequencer VERSION 0.1.0 LANGUAGES CXX)
 
-set(CMAKE_VERBOSE_MAKEFILE ON)
+# set(CMAKE_VERBOSE_MAKEFILE ON)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
@@ -28,26 +28,65 @@ set(FETCHCONTENT_QUIET OFF)
 # )
 # FetchContent_MakeAvailable(flatbuffers)
 
+include(FetchContent)
+FetchContent_Declare(
+  googletest
+  URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+
 include_directories(
   ${Boost_INCLUDE_DIR}
   ${FLATBUF_ROOT}/include
 )
 
-find_program(CLANG_TIDY_EXE NAMES "clang-tidy" REQUIRED)
-set(CLANG_TIDY_COMMAND "${CLANG_TIDY_EXE}" "-checks=*,-fuchsia-*")
+find_program(
+  CLANG_TIDY_EXE 
+  NAMES "clang-tidy" REQUIRED
+)
+set(
+  CLANG_TIDY_COMMAND
+  "${CLANG_TIDY_EXE}" "-checks=*,-fuchsia-*"
+)
 
-add_library(sequencer OBJECT src/sequencer.cpp)
-set_target_properties(sequencer PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
+add_library(
+  sequencer
+  OBJECT src/sequencer.cpp
+)
+set_target_properties(
+  sequencer
+  PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}"
+)
 
-add_executable(${PROJECT_NAME} src/main.cpp)
-set_target_properties(${PROJECT_NAME} PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
-target_link_libraries(${PROJECT_NAME} sequencer)
+add_executable(
+  ${PROJECT_NAME}
+  src/main.cpp
+)
+set_target_properties(
+  ${PROJECT_NAME}
+  PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}"
+)
+target_link_libraries(
+  ${PROJECT_NAME}
+  sequencer
+)
 
 # include(CTest)
 enable_testing()
 
-add_executable(sequencer_test test/sequencer_test.cpp)
-# target_include_directories(sequencer_test PRIVATE src)
-# set_target_properties(sequencer_test PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
-target_link_libraries(sequencer_test Boost::unit_test_framework)
-add_test(sequencer_test sequencer_test)
+add_executable(
+  sequencer_test
+  test/sequencer_test.cpp
+)
+set_target_properties(
+  sequencer_test
+  PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}"
+)
+target_link_libraries(
+  sequencer_test
+  GTest::gtest_main
+)
+
+include(GoogleTest)
+gtest_discover_tests(sequencer_test)

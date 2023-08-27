@@ -11,4 +11,4 @@ __root="$(cd "$(dirname "${__dir}")" && pwd)"
 ###
 
 cd "${__root}"
-cppcheck --enable=all ./src
+~/local/flatbuffers/build/flatc -o ./src/ --cpp ./src/schema.fbs
