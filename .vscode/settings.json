@@ -63,5 +63,5 @@
     "typeinfo": "cpp",
     "variant": "cpp"
   },
-  "cSpell.words": ["NOLINTNEXTLINE"]
+  "cSpell.words": ["Interprocess", "NOLINTNEXTLINE"]
 }
