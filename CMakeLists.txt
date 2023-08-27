@@ -1,22 +1,20 @@
 cmake_minimum_required(VERSION 3.14)
 project(shm-sequencer VERSION 0.1.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED YES)
-
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
-# dependencies
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED YES)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# include(CTest)
-# enable_testing()
+# dependencies
 
 set(CMAKE_THREAD_PREFER_PTHREAD ON)
 find_package(Threads REQUIRED)
 
 set(BOOST_ROOT $ENV{HOME}/local/boost-installed)
-find_package(Boost 1.83.0 REQUIRED)
+set(Boost_USE_STATIC_LIBS ON)
+find_package(Boost 1.83.0 REQUIRED COMPONENTS unit_test_framework)
 
 set(FLATBUF_ROOT $ENV{HOME}/local/flatbuffers)
 
@@ -35,16 +33,21 @@ include_directories(
   ${FLATBUF_ROOT}/include
 )
 
-# find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck)
-# if(CMAKE_CXX_CPPCHECK)
-# 	list(APPEND CMAKE_CXX_CPPCHECK
-#     "--enable=all"
-#     "--suppress=missingIncludeSystem"
-#     "--suppress=toomanyconfigs"
-#   )
-# endif()
-
-find_program(CLANG_TIDY_EXE NAMES "clang-tidy")
+find_program(CLANG_TIDY_EXE NAMES "clang-tidy" REQUIRED)
 set(CLANG_TIDY_COMMAND "${CLANG_TIDY_EXE}" "-checks=*,-fuchsia-*")
 
-add_subdirectory(src)
+add_library(sequencer OBJECT src/sequencer.cpp)
+set_target_properties(sequencer PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
+
+add_executable(${PROJECT_NAME} src/main.cpp)
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
+target_link_libraries(${PROJECT_NAME} sequencer)
+
+# include(CTest)
+enable_testing()
+
+add_executable(sequencer_test test/sequencer_test.cpp)
+# target_include_directories(sequencer_test PRIVATE src)
+# set_target_properties(sequencer_test PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
+target_link_libraries(sequencer_test Boost::unit_test_framework)
+add_test(sequencer_test sequencer_test)
