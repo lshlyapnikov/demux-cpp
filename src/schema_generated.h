@@ -28,54 +28,26 @@ struct RequestPacketBuilder;
 
 FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(8) Header FLATBUFFERS_FINAL_CLASS {
  private:
-  uint8_t sesion_[10];
-  int16_t padding0__;  int32_t padding1__;
   uint64_t sequence_number_;
   uint16_t message_count_;
-  int16_t padding2__;  int32_t padding3__;
+  int16_t padding0__;  int32_t padding1__;
 
  public:
   Header()
-      : sesion_(),
-        padding0__(0),
-        padding1__(0),
-        sequence_number_(0),
+      : sequence_number_(0),
         message_count_(0),
-        padding2__(0),
-        padding3__(0) {
+        padding0__(0),
+        padding1__(0) {
     (void)padding0__;
     (void)padding1__;
-    (void)padding2__;
-    (void)padding3__;
   }
   Header(uint64_t _sequence_number, uint16_t _message_count)
-      : sesion_(),
+      : sequence_number_(::flatbuffers::EndianScalar(_sequence_number)),
+        message_count_(::flatbuffers::EndianScalar(_message_count)),
         padding0__(0),
-        padding1__(0),
-        sequence_number_(::flatbuffers::EndianScalar(_sequence_number)),
-        message_count_(::flatbuffers::EndianScalar(_message_count)),
-        padding2__(0),
-        padding3__(0) {
+        padding1__(0) {
     (void)padding0__;
     (void)padding1__;
-    (void)padding2__;
-    (void)padding3__;
-  }
-  Header(::flatbuffers::span<const uint8_t, 10> _sesion, uint64_t _sequence_number, uint16_t _message_count)
-      : padding0__(0),
-        padding1__(0),
-        sequence_number_(::flatbuffers::EndianScalar(_sequence_number)),
-        message_count_(::flatbuffers::EndianScalar(_message_count)),
-        padding2__(0),
-        padding3__(0) {
-    ::flatbuffers::CastToArray(sesion_).CopyFromSpan(_sesion);
-    (void)padding0__;
-    (void)padding1__;
-    (void)padding2__;
-    (void)padding3__;
-  }
-  const ::flatbuffers::Array<uint8_t, 10> *sesion() const {
-    return &::flatbuffers::CastToArray(sesion_);
   }
   uint64_t sequence_number() const {
     return ::flatbuffers::EndianScalar(sequence_number_);
@@ -84,7 +56,7 @@ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(8) Header FLATBUFFERS_FINAL_CLASS {
     return ::flatbuffers::EndianScalar(message_count_);
   }
 };
-FLATBUFFERS_STRUCT_END(Header, 32);
+FLATBUFFERS_STRUCT_END(Header, 16);
 
 struct DownstreamPacket FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef DownstreamPacketBuilder Builder;

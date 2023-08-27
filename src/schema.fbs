@@ -1,7 +1,7 @@
 namespace ShmSequencer;
 
 struct Header {
-  sesion: [uint8:10];
+  // sesion: [uint8:10];
   sequence_number: uint64;
   message_count: uint16;
 }

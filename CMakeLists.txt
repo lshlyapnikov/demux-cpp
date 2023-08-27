@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.14)
-project(shm-sequencer VERSION 0.1.0)
+project(shm-sequencer VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-# set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_VERBOSE_MAKEFILE ON)
 
 # dependencies
 
@@ -31,8 +31,20 @@ set(FETCHCONTENT_QUIET OFF)
 # FetchContent_MakeAvailable(flatbuffers)
 
 include_directories(
-  ${Boost_INCLUDE_DIR} 
+  ${Boost_INCLUDE_DIR}
   ${FLATBUF_ROOT}/include
 )
+
+# find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck)
+# if(CMAKE_CXX_CPPCHECK)
+# 	list(APPEND CMAKE_CXX_CPPCHECK
+#     "--enable=all"
+#     "--suppress=missingIncludeSystem"
+#     "--suppress=toomanyconfigs"
+#   )
+# endif()
+
+find_program(CLANG_TIDY_EXE NAMES "clang-tidy")
+set(CLANG_TIDY_COMMAND "${CLANG_TIDY_EXE}" "-checks=*,-fuchsia-*")
 
 add_subdirectory(src)

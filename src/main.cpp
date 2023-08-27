@@ -1,10 +1,17 @@
 #include "./schema_generated.h"
+#include "./sequencer.h"
 #include <boost/interprocess/shared_memory_object.hpp>
 #include <iostream>
 
-using namespace ShmSequencer;
+using ShmSequencer::Sequencer;
 
-int main(int argc, char **argv)
+auto main() -> int
 {
-  std::cout << "Hello, from main!\n";
+  Sequencer<3> sequencer;
+  sequencer.start();
+  sequencer.stop();
+
+  sequencer.print_status(std::cout);
+
+  return 0;
 }
