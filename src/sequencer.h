@@ -32,7 +32,7 @@ namespace ShmSequencer
 
   private:
     uint64_t downstream_sequence_number;
-    std::array<uint64_t, 3> upstream_sequence_numbers;
+    std::array<uint64_t, N> upstream_sequence_numbers;
   };
 
   template <size_t const N>
@@ -50,7 +50,7 @@ namespace ShmSequencer
   template <size_t const N>
   auto Sequencer<N>::print_status(std::ostream &output) const noexcept -> void
   {
-    output << "ShmSequencer{downstream_sequence_number=" << this->downstream_sequence_number
+    output << "Sequencer{downstream_sequence_number=" << this->downstream_sequence_number
            << ",upstream_sequence_numbers=[";
     bool first = true;
     for (const uint &x : this->upstream_sequence_numbers)
@@ -65,7 +65,7 @@ namespace ShmSequencer
         output << "," << x;
       }
     }
-    output << "]}" << std::endl;
+    output << "]}";
   }
 }
 

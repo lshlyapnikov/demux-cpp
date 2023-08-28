@@ -1,6 +1,6 @@
 {
   "my.terminal.run.cmd1": "clear; cmake --build ./build",
-  "my.terminal.run.cmd2": "clear; cmake --build ./build --target test",
+  "my.terminal.run.cmd2": "clear; cmake --build ./build && ./build/sequencer_test",
   "my.terminal.run.cmd3": "clear; ./bin/run-clang-tidy.sh",
   "files.associations": {
     "iostream": "cpp",
@@ -61,7 +61,8 @@
     "thread": "cpp",
     "cinttypes": "cpp",
     "typeinfo": "cpp",
-    "variant": "cpp"
+    "variant": "cpp",
+    "strstream": "cpp"
   },
-  "cSpell.words": ["Interprocess", "NOLINTNEXTLINE"]
+  "cSpell.words": ["Interprocess", "NOLINTNEXTLINE", "STREQ"]
 }

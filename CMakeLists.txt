@@ -1,11 +1,16 @@
 cmake_minimum_required(VERSION 3.14)
 project(shm-sequencer VERSION 0.1.0 LANGUAGES CXX)
 
+# Uncomment this for verbose CMake output
 # set(CMAKE_VERBOSE_MAKEFILE ON)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# https://github.com/cpp-best-practices/cppbestpractices/blob/master/02-Use_the_Tools_Available.md#gcc--clang + -Werror
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Werror")
+
 
 # dependencies
 
@@ -79,13 +84,14 @@ add_executable(
   sequencer_test
   test/sequencer_test.cpp
 )
-set_target_properties(
-  sequencer_test
-  PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}"
-)
+# set_target_properties(
+#   sequencer_test
+#   PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}"
+# )
 target_link_libraries(
   sequencer_test
   GTest::gtest_main
+  sequencer
 )
 
 include(GoogleTest)
