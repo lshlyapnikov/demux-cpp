@@ -3,8 +3,9 @@
 
 #include <variant>
 #include <optional>
-#include <array>
+#include <vector>
 #include <ostream>
+#include <algorithm>
 
 using std::uint64_t;
 
@@ -17,13 +18,15 @@ namespace ShmSequencer
     SharedMemoryRead
   };
 
-  template <size_t const N>
   class Sequencer
   {
   public:
-    Sequencer() : downstream_sequence_number(1)
+    Sequencer(const uint16_t client_num_, const uint32_t queue_size_ = 256) : client_num(client_num_),
+                                                                              queue_size(queue_size_),
+                                                                              upstream_sequence_numbers(client_num_),
+                                                                              downstream_sequence_number(1)
     {
-      this->upstream_sequence_numbers.fill(1);
+      std::fill(this->upstream_sequence_numbers.begin(), this->upstream_sequence_numbers.end(), 1);
     };
 
     auto start() noexcept -> std::optional<SequencerError>;
@@ -31,42 +34,11 @@ namespace ShmSequencer
     auto print_status(std::ostream &output) const noexcept -> void;
 
   private:
+    const uint16_t client_num;
+    const uint32_t queue_size;
+    std::vector<uint64_t> upstream_sequence_numbers;
     uint64_t downstream_sequence_number;
-    std::array<uint64_t, N> upstream_sequence_numbers;
   };
-
-  template <size_t const N>
-  auto Sequencer<N>::start() noexcept -> std::optional<SequencerError>
-  {
-    return std::nullopt;
-  }
-
-  template <size_t const N>
-  auto Sequencer<N>::stop() noexcept -> std::optional<SequencerError>
-  {
-    return std::nullopt;
-  }
-
-  template <size_t const N>
-  auto Sequencer<N>::print_status(std::ostream &output) const noexcept -> void
-  {
-    output << "Sequencer{downstream_sequence_number=" << this->downstream_sequence_number
-           << ",upstream_sequence_numbers=[";
-    bool first = true;
-    for (const uint &x : this->upstream_sequence_numbers)
-    {
-      if (first)
-      {
-        output << x;
-        first = false;
-      }
-      else
-      {
-        output << "," << x;
-      }
-    }
-    output << "]}";
-  }
 }
 
 #endif // __SEQUENCER_H__

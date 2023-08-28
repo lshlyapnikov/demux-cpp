@@ -62,7 +62,12 @@
     "cinttypes": "cpp",
     "typeinfo": "cpp",
     "variant": "cpp",
-    "strstream": "cpp"
+    "strstream": "cpp",
+    "any": "cpp",
+    "forward_list": "cpp",
+    "source_location": "cpp",
+    "iomanip": "cpp",
+    "mutex": "cpp"
   },
   "cSpell.words": ["Interprocess", "NOLINTNEXTLINE", "STREQ"]
 }

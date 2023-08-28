@@ -7,7 +7,7 @@ using ShmSequencer::Sequencer;
 
 auto main() -> int
 {
-  Sequencer<3> sequencer;
+  Sequencer sequencer(3);
   sequencer.start();
   sequencer.stop();
 
