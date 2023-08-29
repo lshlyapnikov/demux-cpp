@@ -8,32 +8,44 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# https://github.com/cpp-best-practices/cppbestpractices/blob/master/02-Use_the_Tools_Available.md#gcc--clang + -Werror
+# https://github.com/cpp-best-practices/cppbestpractices/blob/master/02-Use_the_Tools_Available.md#gcc--clang
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Werror")
 
+#
+# tools
+#
 
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    message("Found ccache: ${CCACHE_PROGRAM}")
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+endif()
+
+find_program(
+  CLANG_TIDY_EXE 
+  NAMES "clang-tidy" REQUIRED
+)
+set(
+  CLANG_TIDY_COMMAND
+  "${CLANG_TIDY_EXE}" "-checks=*,-fuchsia-*"
+)
+
+#
 # dependencies
+#
 
 set(CMAKE_THREAD_PREFER_PTHREAD ON)
 find_package(Threads REQUIRED)
 
 set(BOOST_ROOT $ENV{HOME}/local/boost-installed)
 set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.83.0 REQUIRED COMPONENTS unit_test_framework)
+find_package(Boost 1.83.0 REQUIRED COMPONENTS log)
 
 set(FLATBUF_ROOT $ENV{HOME}/local/flatbuffers)
 
 include(FetchContent)
 set(FETCHCONTENT_QUIET OFF)
 
-# FetchContent_Declare(
-#   flatbuffers
-#   URL https://github.com/google/flatbuffers/releases/download/v23.5.26/Linux.flatc.binary.g++-10.zip
-#   DOWNLOAD_NO_EXTRACT OFF
-# )
-# FetchContent_MakeAvailable(flatbuffers)
-
-include(FetchContent)
 FetchContent_Declare(
   googletest
   URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
@@ -46,14 +58,9 @@ include_directories(
   ${FLATBUF_ROOT}/include
 )
 
-find_program(
-  CLANG_TIDY_EXE 
-  NAMES "clang-tidy" REQUIRED
-)
-set(
-  CLANG_TIDY_COMMAND
-  "${CLANG_TIDY_EXE}" "-checks=*,-fuchsia-*"
-)
+#
+# artifacts
+#
 
 add_library(
   sequencer
@@ -75,9 +82,9 @@ set_target_properties(
 target_link_libraries(
   ${PROJECT_NAME}
   sequencer
+  Boost::log
 )
 
-# include(CTest)
 enable_testing()
 
 add_executable(
@@ -90,8 +97,9 @@ add_executable(
 # )
 target_link_libraries(
   sequencer_test
-  GTest::gtest_main
   sequencer
+  GTest::gtest_main
+  Boost::log
 )
 
 include(GoogleTest)

@@ -22,6 +22,12 @@ $ cmake --build ./build
 cmake --build ./build --target test
 ```
 
+### Profile with Valgrind
+
+```
+$ valgrind --leak-check=full --show-leak-kinds=all ./build/shm-sequencer
+```
+
 ## Links
 
 - [C++ Best Practices](https://github.com/cpp-best-practices/cppbestpractices/blob/master/00-Table_of_Contents.md)
