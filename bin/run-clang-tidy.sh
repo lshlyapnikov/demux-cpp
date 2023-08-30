@@ -11,4 +11,5 @@ __root="$(cd "$(dirname "${__dir}")" && pwd)"
 ###
 
 cd "${__root}"
-clang-tidy -checks=*,-fuchsia-* -p=./build ./src/*.cpp
+#clang-tidy -checks=*,-fuchsia-* -p=./build ./src/*.cpp
+clang-tidy -p=./build ./src/*.cpp

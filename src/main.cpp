@@ -17,10 +17,6 @@ void init_logging() {
   logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::info);
 }
 
-// auto test(const size_t size) -> uint8_t* {
-//   return new uint8_t[size];
-// }
-
 auto main() -> int {
   init_logging();
 

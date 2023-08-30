@@ -27,7 +27,7 @@ find_program(
 )
 set(
   CLANG_TIDY_COMMAND
-  "${CLANG_TIDY_EXE}" "-checks=*,-fuchsia-*"
+  "${CLANG_TIDY_EXE}"
 )
 
 #
