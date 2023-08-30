@@ -6,11 +6,14 @@
 
 namespace ShmSequencer {
 
-inline auto busy_wait_sequence_number_increase(const std::atomic<uint64_t>& actual, const uint64_t processed)
-    -> uint64_t {
+/// @brief consider using https://en.cppreference.com/w/cpp/atomic/atomic/wait
+/// @param actual
+/// @param old
+/// @return
+inline auto wait_for_change(const std::atomic<uint64_t>& actual, const uint64_t old) -> uint64_t {
   while (true) {
     const uint64_t x = actual.load();
-    if (x > processed) {
+    if (x != old) {
       return x;
     }
   }

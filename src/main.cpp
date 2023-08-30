@@ -82,5 +82,9 @@ auto main() -> int {
 
   // auto x1 = new (buf.data()) ShmSequencer::DownstreamPacket<256>();
 
+  std::atomic<uint64_t> actual(1);
+  actual.store(1024);
+  ShmSequencer::wait_for_change(actual, 1024);
+
   return 0;
 }
