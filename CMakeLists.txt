@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.14)
 project(shm-sequencer VERSION 0.1.0 LANGUAGES CXX)
 
 # Uncomment this for verbose CMake output
-set(CMAKE_VERBOSE_MAKEFILE ON)
+# set(CMAKE_VERBOSE_MAKEFILE ON)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)

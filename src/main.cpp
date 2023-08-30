@@ -5,9 +5,9 @@
 #include <boost/log/expressions.hpp>
 #include <boost/log/trivial.hpp>
 #include <iostream>
+#include "./atomic_util.h"
 #include "./domain.h"
 #include "./sequencer.h"
-#include "./util.h"
 
 using ShmSequencer::Sequencer;
 
@@ -64,23 +64,25 @@ auto main() -> int {
     uint8_t y;
   };
 
-  std::cout << std::boolalpha << "std::atomic<A> is lock free? " << std::atomic<A>{}.is_lock_free() << '\n'
-            << "std::atomic<B> is lock free? " << std::atomic<B>{}.is_lock_free() << '\n';
-
-  std::atomic<uint64_t> ax(10);
-  std::cout << std::boolalpha << "ax is lock free? " << ax.is_lock_free() << '\n'
-            << "std::atomic<C> is lock free? " << std::atomic<C>{}.is_lock_free() << '\n'
-            << "std::atomic<D> is lock free? " << std::atomic<D>{}.is_lock_free() << '\n'
-            << "std::atomic<E> is lock free? " << std::atomic<E>{}.is_lock_free() << '\n';
-
+  std::cout << "--------------------" << std::endl;
+  {
+    std::cout << std::boolalpha << "std::atomic<A> is lock free? " << std::atomic<A>{}.is_always_lock_free << '\n'
+              << "std::atomic<B> is lock free? " << std::atomic<B>{}.is_always_lock_free << '\n';
+    std::cout << std::boolalpha << "ax is lock free? " << std::atomic<uint64_t>{}.is_always_lock_free << '\n'
+              << "std::atomic<C> is lock free? " << std::atomic<C>{}.is_always_lock_free << '\n'
+              << "std::atomic<D> is lock free? " << std::atomic<D>{}.is_always_lock_free << '\n'
+              << "std::atomic<E> is lock free? " << std::atomic<E>{}.is_always_lock_free << '\n';
+  }
+  std::cout << "--------------------" << std::endl;
   // std::array<uint8_t, 1024> buf{};
   // arr.fill(0);
 
   // auto x1 = new (buf.data()) ShmSequencer::DownstreamPacket<256>();
 
   std::atomic<uint64_t> actual(1);
-  actual.store(1024);
-  ShmSequencer::wait_for_change(actual, 1024);
+  // actual.store(1024);
+  const uint64_t y = ShmSequencer::wait_and_acquire(actual, 1024);
+  std::cout << "y: " << y << std::endl;
 
   return 0;
 }
