@@ -81,6 +81,7 @@ set_target_properties(
 )
 target_link_libraries(
   ${PROJECT_NAME}
+  PRIVATE atomic
   sequencer
   Boost::log
 )
@@ -97,10 +98,10 @@ add_executable(
 # )
 target_link_libraries(
   sequencer_test
+  PRIVATE atomic
   sequencer
   GTest::gtest_main
   Boost::log
 )
-
 include(GoogleTest)
 gtest_discover_tests(sequencer_test)

@@ -1,5 +1,5 @@
-#ifndef __SEQUENCER_H__
-#define __SEQUENCER_H__
+#ifndef __SHM_SEQUENCER_SEQUENCER_H__
+#define __SHM_SEQUENCER_SEQUENCER_H__
 
 #include <algorithm>
 #include <optional>
@@ -44,4 +44,4 @@ auto operator<<(std::ostream& os, const Sequencer& obj) -> std::ostream&;
 
 }  // namespace ShmSequencer
 
-#endif  // __SEQUENCER_H__
+#endif  // __SHM_SEQUENCER_SEQUENCER_H__
