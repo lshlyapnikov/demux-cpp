@@ -2,13 +2,13 @@
 
 namespace ShmSequencer {
 
-auto Sequencer::start() noexcept -> std::optional<SequencerError> {
-  return std::nullopt;
-}
+// auto Sequencer::start() noexcept -> std::optional<SequencerError> {
+//   return std::nullopt;
+// }
 
-auto Sequencer::stop() noexcept -> std::optional<SequencerError> {
-  return std::nullopt;
-}
+// auto Sequencer::stop() noexcept -> std::optional<SequencerError> {
+//   return std::nullopt;
+// }
 
 auto Sequencer::print_status(std::ostream& output) const noexcept -> void {
   output << "Sequencer{downstream_sequence_number=" << this->downstream_sequence_number

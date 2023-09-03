@@ -7,6 +7,7 @@
 #include <iostream>
 #include "./atomic_util.h"
 #include "./domain.h"
+#include "./multiplexer.h"
 #include "./sequencer.h"
 
 using ShmSequencer::Sequencer;
@@ -28,6 +29,7 @@ auto main() -> int {
   BOOST_LOG_TRIVIAL(debug) << "...";
   BOOST_LOG_TRIVIAL(info) << "...";
 
+  /*
   std::array<uint8_t, 8> arr{};
   arr.fill(0);
 
@@ -83,6 +85,6 @@ auto main() -> int {
   // actual.store(1024);
   const uint64_t y = ShmSequencer::wait_and_acquire(actual, 1024);
   std::cout << "y: " << y << std::endl;
-
+  */
   return 0;
 }

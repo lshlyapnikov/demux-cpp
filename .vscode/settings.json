@@ -69,7 +69,18 @@
     "iomanip": "cpp",
     "mutex": "cpp",
     "complex": "cpp",
-    "typeindex": "cpp"
+    "typeindex": "cpp",
+    "compare": "cpp",
+    "concepts": "cpp",
+    "ranges": "cpp",
+    "span": "cpp",
+    "stop_token": "cpp"
   },
-  "cSpell.words": ["Interprocess", "NOLINTNEXTLINE", "STREQ", "Valgrind"]
+  "cSpell.words": [
+    "Interprocess",
+    "NOLINTNEXTLINE",
+    "STREQ",
+    "tparam",
+    "Valgrind"
+  ]
 }
