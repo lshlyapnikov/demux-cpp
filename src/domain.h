@@ -1,5 +1,5 @@
-#ifndef __SHM_SEQUENCER_DOMAIN_H__
-#define __SHM_SEQUENCER_DOMAIN_H__
+#ifndef SHM_SEQUENCER_DOMAIN_H
+#define SHM_SEQUENCER_DOMAIN_H
 
 #include <array>
 #include <atomic>
@@ -43,4 +43,4 @@ struct Client {
 
 }  // namespace ShmSequencer
 
-#endif  // __SHM_SEQUENCER_DOMAIN_H__
+#endif  // SHM_SEQUENCER_DOMAIN_H

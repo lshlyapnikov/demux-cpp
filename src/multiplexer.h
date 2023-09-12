@@ -1,5 +1,5 @@
-#ifndef __SHM_SEQUENCER_MULTIPLEXER_H__
-#define __SHM_SEQUENCER_MULTIPLEXER_H__
+#ifndef SHM_SEQUENCER_MULTIPLEXER_H
+#define SHM_SEQUENCER_MULTIPLEXER_H
 
 #include <algorithm>
 #include <cassert>
@@ -83,4 +83,4 @@ struct MultiplexerSubscriber {
 
 }  // namespace ShmSequencer
 
-#endif  // __SHM_SEQUENCER_MULTIPLEXER_H__
+#endif  // SHM_SEQUENCER_MULTIPLEXER_H

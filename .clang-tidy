@@ -1,3 +1,4 @@
 ---
 Checks: "*,-abseil-*,-altera-*,-android-*,-darwin-*,-fuchsia-*,-linuxkernel-*,-llvm-*,-llvmlibc-*,-objc-*,-openmp-*,-zircon-*,-readability-identifier-length"
+#Checks: "clang-analyzer-*"
 WarningsAsErrors: true

@@ -5,7 +5,7 @@
 
 using ShmSequencer::Packet;
 
-TEST(multiplexer_test, Packet) {
+TEST(MultiplexerTest, Packet) {
   const size_t M = 8;
   Packet<M> packet;
 
@@ -21,7 +21,7 @@ TEST(multiplexer_test, Packet) {
   EXPECT_EQ(dst, expected);
 }
 
-TEST(multiplexer_test, rapidcheck_test) {
+TEST(MultiplexerTest, Rapidcheck) {
   rc::check("double reversal yields the original value", [](const std::array<int, 8>& l0) {
     auto l1 = l0;
 

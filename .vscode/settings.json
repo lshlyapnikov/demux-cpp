@@ -1,7 +1,7 @@
 {
-  "my.terminal.run.cmd1": "clear; cmake --build ./build",
+  "my.terminal.run.cmd1": "clear; scan-build-17 cmake --build ./build",
   "my.terminal.run.cmd2": "clear; cmake --build ./build && ./build/multiplexer_test",
-  "my.terminal.run.cmd3": "clear; ./bin/run-all-checks.sh",
+  "my.terminal.run.cmd3": "clear; ./bin/run-clang-tidy.sh",
   "files.associations": {
     "iostream": "cpp",
     "optional": "cpp",

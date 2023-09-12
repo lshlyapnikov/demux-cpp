@@ -1,8 +1,11 @@
-#ifndef __SHM_SEQUENCER_ATOMIC_UTIL_H__
-#define __SHM_SEQUENCER_ATOMIC_UTIL_H__
+#ifndef SHM_SEQUENCER_ATOMIC_UTIL_H
+#define SHM_SEQUENCER_ATOMIC_UTIL_H
 
 #include <atomic>
+#include <cstdint>
 #include "./domain.h"
+
+using std::uint64_t;
 
 namespace ShmSequencer {
 
@@ -30,4 +33,4 @@ inline auto set_and_release(std::atomic<uint64_t>& actual, const uint64_t new_on
 
 }  // namespace ShmSequencer
 
-#endif  // __SHM_SEQUENCER_ATOMIC_UTIL_H__
+#endif  // SHM_SEQUENCER_ATOMIC_UTIL_H
