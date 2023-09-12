@@ -10,4 +10,4 @@ __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ###
 
 cd "${__dir}"
-./run-cppcheck.sh && ./run-scan-build.sh && ./run-clang-tidy.sh
+./run-cppcheck.sh && ./run-clang-tidy.sh

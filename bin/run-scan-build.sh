@@ -12,6 +12,6 @@ __root="$(cd "$(dirname "${__dir}")" && pwd)"
 
 cd "${__root}"
 echo ""
-echo "Running clang scan-build..."
+echo "Running scan-build (AKA clang analyzer, subset of clang-tidy)..."
 
 scan-build-17 cmake --build ./build
