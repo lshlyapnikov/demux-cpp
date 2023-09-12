@@ -2,9 +2,10 @@
 #define SHM_SEQUENCER_MULTIPLEXER_H
 
 #include <algorithm>
+#include <array>
 #include <cassert>
+#include <cstdint>
 #include <cstring>
-#include "./domain.h"
 
 namespace ShmSequencer {
 
@@ -26,7 +27,7 @@ class Packet {
     return this->size_;
   }
 
-  auto size() const noexcept -> uint16_t { return this->size_; }
+  [[nodiscard]] auto size() const noexcept -> uint16_t { return this->size_; }
 
  private:
   uint16_t size_{0};

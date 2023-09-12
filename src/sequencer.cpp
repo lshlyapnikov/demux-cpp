@@ -1,5 +1,4 @@
 #include "./sequencer.h"
-#include <cstdint>
 #include <iostream>
 
 namespace ShmSequencer {

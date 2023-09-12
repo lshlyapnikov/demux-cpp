@@ -1,7 +1,11 @@
 #include "../src/multiplexer.h"
 #include <gtest/gtest.h>
-#include <rapidcheck.h>
-#include <sstream>
+#include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
 
 using ShmSequencer::Packet;
 
@@ -9,18 +13,19 @@ TEST(MultiplexerTest, Packet) {
   const size_t M = 8;
   Packet<M> packet;
 
-  std::array<uint8_t, M> src = {1, 2, 3, 4, 5, 6, 7, 8};
+  const std::array<uint8_t, M> src = {1, 2, 3, 4, 5, 6, 7, 8};
   packet.copy_from(src, 3);
   ASSERT_EQ(3, packet.size());
 
   std::array<uint8_t, M> dst{0, 0, 0, 0, 0, 0, 0, 0};
-  uint16_t result = packet.copy_into(dst);
+  const uint16_t result = packet.copy_into(dst);
   ASSERT_EQ(result, 3);
 
   const std::array<uint8_t, M> expected = {1, 2, 3, 0, 0, 0, 0, 0};
   EXPECT_EQ(dst, expected);
 }
 
+// NOLINTBEGIN(misc-include-cleaner)
 TEST(MultiplexerTest, Rapidcheck) {
   rc::check("double reversal yields the original value", [](const std::array<int, 8>& l0) {
     auto l1 = l0;
@@ -34,4 +39,5 @@ TEST(MultiplexerTest, Rapidcheck) {
     std::reverse(begin(l1), end(l1));
     RC_ASSERT(l0 == l1);
   });
+  // NOLINTEND(misc-include-cleaner)
 }

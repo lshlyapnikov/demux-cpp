@@ -3,14 +3,15 @@
 
 #include <array>
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
+
+namespace ShmSequencer {
 
 using std::size_t;
 using std::uint16_t;
 using std::uint64_t;
 using std::uint8_t;
-
-namespace ShmSequencer {
 
 struct Header {
   std::atomic<uint64_t> sequence_number;

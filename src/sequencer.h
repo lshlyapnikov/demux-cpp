@@ -1,15 +1,16 @@
-#ifndef __SHM_SEQUENCER_SEQUENCER_H__
-#define __SHM_SEQUENCER_SEQUENCER_H__
+#ifndef SHM_SEQUENCER_SEQUENCER_H
+#define SHM_SEQUENCER_SEQUENCER_H
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <ostream>
-#include <variant>
 #include <vector>
 
-using std::uint64_t;
-
 namespace ShmSequencer {
+
+using std::uint64_t;
 
 enum SequencerError { SharedMemoryCreate, SharedMemoryWrite, SharedMemoryRead };
 
@@ -21,8 +22,7 @@ class Sequencer {
       : client_num(client_num_),
         max_message_size(max_message_size_),
         downstream_queue_size(downstream_queue_size_),
-        upstream_sequence_numbers(client_num_),
-        downstream_sequence_number(1) {
+        upstream_sequence_numbers(client_num_) {
     std::fill(this->upstream_sequence_numbers.begin(), this->upstream_sequence_numbers.end(), 1);
   };
 
@@ -31,11 +31,11 @@ class Sequencer {
   auto print_status(std::ostream& output) const noexcept -> void;
 
  private:
-  const size_t client_num;
-  const size_t max_message_size;
-  const uint32_t downstream_queue_size;
+  size_t client_num;
+  size_t max_message_size;
+  uint32_t downstream_queue_size;
   std::vector<uint64_t> upstream_sequence_numbers;
-  uint64_t downstream_sequence_number;
+  uint64_t downstream_sequence_number{1};
 };
 
 auto operator<<(std::ostream& os, const SequencerError& obj) -> std::ostream&;
@@ -44,4 +44,4 @@ auto operator<<(std::ostream& os, const Sequencer& obj) -> std::ostream&;
 
 }  // namespace ShmSequencer
 
-#endif  // __SHM_SEQUENCER_SEQUENCER_H__
+#endif  // SHM_SEQUENCER_SEQUENCER_H

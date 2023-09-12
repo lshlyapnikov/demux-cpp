@@ -3,11 +3,10 @@
 
 #include <atomic>
 #include <cstdint>
-#include "./domain.h"
-
-using std::uint64_t;
 
 namespace ShmSequencer {
+
+using std::uint64_t;
 
 // multiple threads can wait for the update.
 //
