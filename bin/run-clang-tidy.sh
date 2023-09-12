@@ -11,5 +11,8 @@ __root="$(cd "$(dirname "${__dir}")" && pwd)"
 ###
 
 cd "${__root}"
+echo ""
+echo "Running clang-tidy..."
+
 #clang-tidy -checks=*,-fuchsia-* -p=./build ./src/*.cpp
-clang-tidy -p=./build ./src/*.cpp
+clang-tidy-17 -p=./build ./src/*.cpp

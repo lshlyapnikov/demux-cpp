@@ -1,13 +1,10 @@
-#include <atomic>
-#include <boost/interprocess/ipc/message_queue.hpp>
-#include <boost/interprocess/shared_memory_object.hpp>
-#include <boost/log/core.hpp>
-#include <boost/log/expressions.hpp>
+#include <boost/log/core.hpp>         // NOLINT(misc-include-cleaner)
+#include <boost/log/expressions.hpp>  // NOLINT(misc-include-cleaner)
 #include <boost/log/trivial.hpp>
-#include <iostream>
-#include "./atomic_util.h"
-#include "./domain.h"
-#include "./multiplexer.h"
+// #include <iostream>
+// #include "./atomic_util.h"
+// #include "./domain.h"
+// #include "./multiplexer.h"
 #include "./sequencer.h"
 
 using ShmSequencer::Sequencer;
@@ -15,6 +12,7 @@ using ShmSequencer::Sequencer;
 namespace logging = boost::log;
 
 void init_logging() {
+  // NOLINTNEXTLINE(misc-include-cleaner)
   logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::info);
 }
 

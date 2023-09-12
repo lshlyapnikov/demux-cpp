@@ -11,4 +11,7 @@ __root="$(cd "$(dirname "${__dir}")" && pwd)"
 ###
 
 cd "${__root}"
-cppcheck --enable=all ./src
+echo ""
+echo "Running cppcheck..."
+
+cppcheck --error-exitcode=10 --enable=all ./src

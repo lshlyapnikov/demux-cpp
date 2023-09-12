@@ -1,30 +1,36 @@
 #ifndef __SHM_SEQUENCER_MULTIPLEXER_H__
 #define __SHM_SEQUENCER_MULTIPLEXER_H__
 
+#include <algorithm>
 #include <cassert>
 #include <cstring>
 #include "./domain.h"
+
+namespace ShmSequencer {
 
 /// @brief Packet. Access has to be synchronized with an external atomic guard.
 /// @tparam M max packet size.
 template <const uint16_t M>
 class Packet {
  public:
-  auto write(const std::array<uint16_t, M>& src, uint16_t src_size) noexcept -> void {
+  auto copy_from(const std::array<uint8_t, M>& src, const uint16_t src_size) noexcept -> void {
     assert(src_size <= M);
-    this->size = src_size;
-    std::memcpy(this->buffer.data, src.data, src_size);
-    this->size = src_size;
+    // std::memcpy(this->buffer_.data(), src.data(), src_size);
+    std::copy_n(std::begin(src), src_size, std::begin(this->buffer_));
+    this->size_ = src_size;
   }
 
-  [[nodiscard]] auto read(std::array<uint16_t, M>& dst) const noexcept -> uint16_t {
-    std::memcpy(dst.data, this->buffer.data, this->size);
-    return this->size;
+  [[nodiscard]] auto copy_into(std::array<uint8_t, M>& dst) const noexcept -> uint16_t {
+    // std::memcpy(dst.data(), this->buffer_.data(), this->size_);
+    std::copy_n(std::begin(this->buffer_), this->size_, std::begin(dst));
+    return this->size_;
   }
+
+  auto size() const noexcept -> uint16_t { return this->size_; }
 
  private:
-  uint16_t size{0};
-  std::array<uint8_t, M> buffer;
+  uint16_t size_{0};
+  std::array<uint8_t, M> buffer_;
 };
 
 /// @brief Multiplexer publisher.
@@ -32,7 +38,24 @@ class Packet {
 /// @tparam M max packet size.
 template <const size_t N, const uint16_t M>
 struct MultiplexerPublisher {
-  std::array<Packet<M>, N> buffer;
+  auto send(const Packet<M>& packet) noexcept -> bool {
+    const size_t required_space = sizeof(packet.size) + packet.size;
+    const size_t new_offset = this->offset + required_space;
+    if (new_offset <= BUFFER_SIZE) {
+      void* dst_address = this->buffer.data() + this->offset;
+      std::memcpy(dst_address, &packet, required_space);
+      this->offset = new_offset;
+    } else {
+      return false;
+    }
+  }
+
+  auto roll_over() noexcept { this->offset = 0; }
+
+ private:
+  static const size_t BUFFER_SIZE = M * N + 2 * N;
+  size_t offset{0};
+  std::array<uint8_t, BUFFER_SIZE> buffer;
 };
 
 /// @brief Multiplexer subscriber.
@@ -40,7 +63,24 @@ struct MultiplexerPublisher {
 /// @tparam M max packet size.
 template <const size_t N, const uint16_t M>
 struct MultiplexerSubscriber {
-  std::array<Packet<M>, N> buffer;
+  auto receive(Packet<M>* packet) noexcept -> bool {
+    const size_t required_space = sizeof(packet->size) + packet->size;
+    const size_t new_offset = this->offset + required_space;
+    if (new_offset <= BUFFER_SIZE) {
+      void* dst_address = this->buffer.data + this->offset;
+      std::memcpy(dst_address, &packet, required_space);
+      this->offset = new_offset;
+    } else {
+      return false;
+    }
+  }
+
+ private:
+  static const size_t BUFFER_SIZE = M * N + 2 * N;
+  size_t offset{0};
+  std::array<uint8_t, BUFFER_SIZE> buffer;
 };
+
+}  // namespace ShmSequencer
 
 #endif  // __SHM_SEQUENCER_MULTIPLEXER_H__

@@ -1,4 +1,3 @@
 ---
-Checks: "*,-fuchsia-*,-llvm-*,-llvmlibc-*"
-WarningsAsErrors: ""
-HeaderFilterRegex: ""
+Checks: "*,-abseil-*,-altera-*,-android-*,-darwin-*,-fuchsia-*,-linuxkernel-*,-llvm-*,-llvmlibc-*,-objc-*,-openmp-*,-zircon-*,-readability-identifier-length"
+WarningsAsErrors: true

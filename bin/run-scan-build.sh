@@ -11,15 +11,7 @@ __root="$(cd "$(dirname "${__dir}")" && pwd)"
 ###
 
 cd "${__root}"
-
-[ -d ./build ] && rm -rf ./build
-mkdir ./build
-
-cd ./build
-cmake -DCMAKE_BUILD_TYPE=Debug ../
-cd ../
-
 echo ""
-echo "Use: "
-echo "cmake --build ./build"
-echo ""
+echo "Running clang scan-build..."
+
+scan-build-17 cmake --build ./build

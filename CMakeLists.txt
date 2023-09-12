@@ -1,8 +1,18 @@
 cmake_minimum_required(VERSION 3.14)
 project(shm-sequencer VERSION 0.1.0 LANGUAGES CXX)
 
-# Uncomment this for verbose CMake output
-# set(CMAKE_VERBOSE_MAKEFILE ON)
+#set(CMAKE_VERBOSE_MAKEFILE ON) # verbose CMake output
+
+message("CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
+
+IF(CMAKE_BUILD_TYPE MATCHES Debug)
+  message("Debug build.")
+ELSEIF(CMAKE_BUILD_TYPE MATCHES Release)
+  message("Release build.")
+ELSE()
+  message("Defaulting to Release build.")
+  SET(CMAKE_BUILD_TYPE Release)
+ENDIF()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
@@ -23,7 +33,7 @@ endif()
 
 find_program(
   CLANG_TIDY_EXE 
-  NAMES "clang-tidy" REQUIRED
+  NAMES "clang-tidy-17" REQUIRED
 )
 set(
   CLANG_TIDY_COMMAND
@@ -41,7 +51,7 @@ set(BOOST_ROOT $ENV{HOME}/local/boost-installed)
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost 1.83.0 REQUIRED COMPONENTS log)
 
-set(FLATBUF_ROOT $ENV{HOME}/local/flatbuffers)
+# set(FLATBUF_ROOT $ENV{HOME}/local/flatbuffers)
 
 include(FetchContent)
 set(FETCHCONTENT_QUIET OFF)
@@ -53,9 +63,17 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
+FetchContent_Declare(
+  rapidcheck
+  GIT_REPOSITORY git@github.com:emil-e/rapidcheck.git
+  # GIT_TAG 1c91f40e64d87869250cfb610376c629307bf77d
+)
+FetchContent_MakeAvailable(rapidcheck)
+
 include_directories(
+  # ${FLATBUF_ROOT}/include
   ${Boost_INCLUDE_DIR}
-  ${FLATBUF_ROOT}/include
+  ${rapidcheck_SOURCE_DIR}/include
 )
 
 #
@@ -87,6 +105,7 @@ target_link_libraries(
 )
 
 enable_testing()
+include(GoogleTest)
 
 add_executable(
   sequencer_test
@@ -103,5 +122,22 @@ target_link_libraries(
   GTest::gtest_main
   Boost::log
 )
-include(GoogleTest)
 gtest_discover_tests(sequencer_test)
+
+add_executable(
+  multiplexer_test
+  test/multiplexer_test.cpp
+)
+# set_target_properties(
+#   multiplexer_test
+#   PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}"
+# )
+target_link_libraries(
+  multiplexer_test
+  PRIVATE atomic
+  sequencer
+  GTest::gtest_main
+  Boost::log
+  rapidcheck
+)
+gtest_discover_tests(multiplexer_test)

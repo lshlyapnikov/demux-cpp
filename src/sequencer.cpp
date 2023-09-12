@@ -1,7 +1,10 @@
 #include "./sequencer.h"
+#include <cstdint>
+#include <iostream>
+
+using std::uint64_t;
 
 namespace ShmSequencer {
-
 // auto Sequencer::start() noexcept -> std::optional<SequencerError> {
 //   return std::nullopt;
 // }

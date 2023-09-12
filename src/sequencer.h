@@ -15,9 +15,9 @@ enum SequencerError { SharedMemoryCreate, SharedMemoryWrite, SharedMemoryRead };
 
 class Sequencer {
  public:
-  Sequencer(const size_t client_num_,
-            const size_t max_message_size_ = 1024,
-            const uint32_t downstream_queue_size_ = 256)
+  explicit Sequencer(const size_t client_num_,
+                     const size_t max_message_size_ = 1024,
+                     const uint32_t downstream_queue_size_ = 256)
       : client_num(client_num_),
         max_message_size(max_message_size_),
         downstream_queue_size(downstream_queue_size_),
