@@ -3,24 +3,33 @@
 #include <sstream>
 
 TEST(SequencerTest, PrintStatus2) {
-  std::ostringstream out;
   ShmSequencer::Sequencer const sut(2);
-  sut.print_status(out);
-  EXPECT_STREQ(out.str().c_str(), "Sequencer{downstream_sequence_number=1,upstream_sequence_numbers=[1,1]}");
+  EXPECT_EQ(2, sut.client_number());
+  std::ostringstream out;
+  out << sut;
+  EXPECT_STREQ(out.str().c_str(),
+               "Sequencer{MaxMsgSize=1024,DownstreamQueueSize=256,downstream_sequence_number=1"
+               ",upstream_sequence_numbers=[1,1]}");
 }
 
 TEST(SequencerTest, PrintStatus3) {
+  ShmSequencer::Sequencer<128, 16> const sut(3);
+  EXPECT_EQ(3, sut.client_number());
   std::ostringstream out;
-  ShmSequencer::Sequencer const sut(3);
-  sut.print_status(out);
-  EXPECT_STREQ(out.str().c_str(), "Sequencer{downstream_sequence_number=1,upstream_sequence_numbers=[1,1,1]}");
+  out << sut;
+  EXPECT_STREQ(out.str().c_str(),
+               "Sequencer{MaxMsgSize=128,DownstreamQueueSize=16,downstream_sequence_number=1"
+               ",upstream_sequence_numbers=[1,1,1]}");
 }
 
 TEST(SequencerTest, PrintStatus5) {
+  ShmSequencer::Sequencer<256, 32> const sut(5);
+  EXPECT_EQ(5, sut.client_number());
   std::ostringstream out;
-  ShmSequencer::Sequencer const sut(5);
-  sut.print_status(out);
-  EXPECT_STREQ(out.str().c_str(), "Sequencer{downstream_sequence_number=1,upstream_sequence_numbers=[1,1,1,1,1]}");
+  out << sut;
+  EXPECT_STREQ(out.str().c_str(),
+               "Sequencer{MaxMsgSize=256,DownstreamQueueSize=32,downstream_sequence_number=1"
+               ",upstream_sequence_numbers=[1,1,1,1,1]}");
 }
 
 TEST(SequencerTest, PrintSequenceError) {

@@ -13,6 +13,27 @@ using std::uint16_t;
 using std::uint64_t;
 using std::uint8_t;
 
+// template <class T>
+// class NewType {
+//  public:
+//   NewType(T value) : value_(std::move(value)) {}
+
+//   [[nodiscard]] auto value() const noexcept -> & T { return this->value_; }
+
+//  private:
+//   T value_;
+// };
+
+// class ClientId {
+//  public:
+//   ClientId(uint16_t value) : value_(value) {}
+
+//   auto value() const noexcept -> uint16_t { return this->value_; }
+
+//  private:
+//   uint16_t value_;
+// };
+
 struct Header {
   std::atomic<uint64_t> sequence_number;
   uint16_t message_count;
@@ -34,7 +55,7 @@ struct UpstreamPacket {
 
 template <const size_t N>
 struct Client {
-  const uint16_t id;
+  uint16_t id;
   UpstreamPacket<N> upstream_packet;
 };
 

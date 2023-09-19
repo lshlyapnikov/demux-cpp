@@ -14,4 +14,4 @@ cd "${__root}"
 echo ""
 echo "Running clang-tidy..."
 
-clang-tidy-17 -p=./build ./src/*.cpp ./src/*.h ./test/*.cpp ./test/*.h
+clang-tidy-17 -p=./build ./src/*.cpp ./test/*.cpp

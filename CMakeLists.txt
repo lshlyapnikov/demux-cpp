@@ -15,7 +15,7 @@ ELSE()
 ENDIF()
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED YES)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # https://github.com/cpp-best-practices/cppbestpractices/blob/master/02-Use_the_Tools_Available.md#gcc--clang
@@ -84,19 +84,11 @@ add_library(
   sequencer
   OBJECT src/sequencer.cpp
 )
-set_target_properties(
-  sequencer
-  PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}"
-)
 
 add_executable(
   ${PROJECT_NAME}
   src/main.cpp
 )
-# set_target_properties(
-#   ${PROJECT_NAME}
-#   PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}"
-# )
 target_link_libraries(
   ${PROJECT_NAME}
   PRIVATE atomic
@@ -111,10 +103,6 @@ add_executable(
   sequencer_test
   test/sequencer_test.cpp
 )
-# set_target_properties(
-#   sequencer_test
-#   PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}"
-# )
 target_link_libraries(
   sequencer_test
   PRIVATE atomic

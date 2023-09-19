@@ -17,4 +17,3 @@ echo "Running clang-tidy-diff..."
 git diff -U0 HEAD^ | /usr/bin/clang-tidy-diff-17.py \
   -clang-tidy-binary /usr/bin/clang-tidy-17 \
   -path ./build -p1 -use-color
-

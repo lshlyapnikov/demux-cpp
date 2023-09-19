@@ -10,37 +10,55 @@
 
 namespace ShmSequencer {
 
+using std::optional;
+using std::size_t;
 using std::uint64_t;
 
-enum SequencerError { SharedMemoryCreate, SharedMemoryWrite, SharedMemoryRead };
+const size_t DEFAULT_MAX_MSG_SIZE = 1024;
+const size_t DEFAULT_DOWNSTREAM_QUEUE_SIZE = 256;
 
-class Sequencer {
- public:
-  explicit Sequencer(const size_t client_num_,
-                     const size_t max_message_size_ = 1024,
-                     const uint32_t downstream_queue_size_ = 256)
-      : client_num(client_num_),
-        max_message_size(max_message_size_),
-        downstream_queue_size(downstream_queue_size_),
-        upstream_sequence_numbers(client_num_) {
-    std::fill(this->upstream_sequence_numbers.begin(), this->upstream_sequence_numbers.end(), 1);
-  };
-
-  [[nodiscard]] auto start() noexcept -> std::optional<SequencerError>;
-  [[nodiscard]] auto stop() noexcept -> std::optional<SequencerError>;
-  auto print_status(std::ostream& output) const noexcept -> void;
-
- private:
-  size_t client_num;
-  size_t max_message_size;
-  uint32_t downstream_queue_size;
-  std::vector<uint64_t> upstream_sequence_numbers;
-  uint64_t downstream_sequence_number{1};
-};
+enum SequencerError { SharedMemoryCreate, SharedMemoryWrite, SharedMemoryRead, Unexpected };
 
 auto operator<<(std::ostream& os, const SequencerError& obj) -> std::ostream&;
 
-auto operator<<(std::ostream& os, const Sequencer& obj) -> std::ostream&;
+template <const size_t MaxMsgSize = DEFAULT_MAX_MSG_SIZE,
+          const size_t DownstreamQueueSize = DEFAULT_DOWNSTREAM_QUEUE_SIZE>
+class Sequencer {
+ public:
+  explicit Sequencer(const size_t client_num) : upstream_sequence_numbers_(client_num) {
+    std::fill(this->upstream_sequence_numbers_.begin(), this->upstream_sequence_numbers_.end(), 1);
+  };
+
+  [[nodiscard]] auto start() noexcept -> optional<SequencerError> { return std::nullopt; }
+  [[nodiscard]] auto stop() noexcept -> optional<SequencerError> { return {SequencerError::Unexpected}; }
+  [[nodiscard]] auto client_number() const noexcept -> size_t { return this->upstream_sequence_numbers_.size(); }
+
+  auto print_status(std::ostream& output) const -> std::ostream& {
+    output << "Sequencer{MaxMsgSize=" << MaxMsgSize << ",DownstreamQueueSize=" << DownstreamQueueSize
+           << ",downstream_sequence_number=" << this->downstream_sequence_number_ << ",upstream_sequence_numbers=[";
+    bool first = true;
+    for (const uint64_t& x : this->upstream_sequence_numbers_) {
+      if (first) {
+        output << x;
+        first = false;
+      } else {
+        output << "," << x;
+      }
+    }
+    output << "]}";
+    return output;
+  }
+
+ private:
+  std::vector<uint64_t> upstream_sequence_numbers_;
+  uint64_t downstream_sequence_number_{1};
+};
+
+template <const size_t MaxMsgSize = DEFAULT_MAX_MSG_SIZE,
+          const size_t DownstreamQueueSize = DEFAULT_DOWNSTREAM_QUEUE_SIZE>
+auto operator<<(std::ostream& output, const Sequencer<MaxMsgSize, DownstreamQueueSize>& obj) -> std::ostream& {
+  return obj.print_status(output);
+}
 
 }  // namespace ShmSequencer
 

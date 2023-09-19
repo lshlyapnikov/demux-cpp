@@ -20,7 +20,12 @@ auto main() -> int {
   init_logging();
 
   Sequencer sequencer(3);
-  // sequencer.start();
+  const auto result = sequencer.start();
+  if (result.has_value()) {
+    BOOST_LOG_TRIVIAL(error) << "Cannot start sequencer: " << result.value();
+    return 1;
+  }
+
   // sequencer.stop();
 
   BOOST_LOG_TRIVIAL(info) << "Starting sequencer: " << sequencer;
@@ -64,7 +69,7 @@ auto main() -> int {
     uint8_t y;
   };
 
-  std::cout << "--------------------" << std::endl;
+  std::cout << "--------------------" << '\n';
   {
     std::cout << std::boolalpha << "std::atomic<A> is lock free? " << std::atomic<A>{}.is_always_lock_free << '\n'
               << "std::atomic<B> is lock free? " << std::atomic<B>{}.is_always_lock_free << '\n';
@@ -73,7 +78,7 @@ auto main() -> int {
               << "std::atomic<D> is lock free? " << std::atomic<D>{}.is_always_lock_free << '\n'
               << "std::atomic<E> is lock free? " << std::atomic<E>{}.is_always_lock_free << '\n';
   }
-  std::cout << "--------------------" << std::endl;
+  std::cout << "--------------------" << '\n';
   // std::array<uint8_t, 1024> buf{};
   // arr.fill(0);
 
@@ -82,7 +87,7 @@ auto main() -> int {
   std::atomic<uint64_t> actual(1);
   // actual.store(1024);
   const uint64_t y = ShmSequencer::wait_and_acquire(actual, 1024);
-  std::cout << "y: " << y << std::endl;
+  std::cout << "y: " << y << '\n';
   */
   return 0;
 }
