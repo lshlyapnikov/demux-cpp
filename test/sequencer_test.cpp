@@ -49,4 +49,10 @@ TEST(SequencerTest, PrintSequenceError) {
 
   out << ShmSequencer::SequencerError::SharedMemoryRead;
   EXPECT_STREQ(out.str().c_str(), "SequencerError::SharedMemoryRead");
+
+  out.str("");
+  out.clear();
+
+  out << ShmSequencer::SequencerError::Unexpected;
+  EXPECT_STREQ(out.str().c_str(), "SequencerError::Unexpected");
 }

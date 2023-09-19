@@ -15,7 +15,7 @@ auto operator<<(std::ostream& os, const SequencerError& obj) -> std::ostream& {
       os << "SequencerError::SharedMemoryRead";
       break;
     case Unexpected:
-      os << "SequencerError: Unexpected";
+      os << "SequencerError::Unexpected";
       break;
   }
   return os;
