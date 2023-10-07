@@ -19,7 +19,7 @@ void init_logging() {
 auto main() -> int {
   init_logging();
 
-  Sequencer sequencer(3);
+  Sequencer sequencer(3, "1234567890");
   const auto result = sequencer.start();
   if (result.has_value()) {
     BOOST_LOG_TRIVIAL(error) << "Cannot start sequencer: " << result.value();

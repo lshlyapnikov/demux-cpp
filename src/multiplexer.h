@@ -51,7 +51,7 @@ struct MultiplexerPublisher {
     }
   }
 
-  auto roll_over() noexcept { this->offset = 0; }
+  auto roll_over() noexcept -> void { this->offset = 0; }
 
  private:
   static const size_t BUFFER_SIZE = M * N + 2 * N;
