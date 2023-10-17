@@ -6,8 +6,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
+#include <vector>
 
 using ShmSequencer::Packet;
+using std::uint16_t;
+using std::uint8_t;
+using std::vector;
 
 TEST(MultiplexerTest, Packet) {
   const size_t M = 8;
@@ -18,12 +22,30 @@ TEST(MultiplexerTest, Packet) {
   ASSERT_EQ(3, packet.size());
 
   std::array<uint8_t, M> dst{0, 0, 0, 0, 0, 0, 0, 0};
-  const uint16_t result = packet.copy_into(dst);
+  const uint16_t result = packet.copy_into(&dst);
   ASSERT_EQ(result, 3);
 
   const std::array<uint8_t, M> expected = {1, 2, 3, 0, 0, 0, 0, 0};
   EXPECT_EQ(dst, expected);
 }
+
+// NOLINTBEGIN(misc-include-cleaner,cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
+TEST(MultiplexerTest, RoundtripCopy) {
+  rc::check("copy_from followed by copy_into does not not lose any data",
+            [](const std::array<uint8_t, 256>& a0, const uint8_t size) {
+              Packet<256> p0;
+              p0.copy_from(a0, size);
+
+              std::array<uint8_t, 256> a1{};
+              const uint16_t written_bytes = p0.copy_into(&a1);
+
+              const auto data0 = vector<uint8_t>(std::begin(a0), std::begin(a0) + size);
+              const auto data1 = vector<uint8_t>(std::begin(a1), std::begin(a1) + size);
+
+              RC_ASSERT((written_bytes == size) && (data0 == data1));
+            });
+}
+// NOLINTEND(misc-include-cleaner,cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 
 // NOLINTBEGIN(misc-include-cleaner,cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 TEST(MultiplexerTest, Rapidcheck) {
@@ -39,5 +61,5 @@ TEST(MultiplexerTest, Rapidcheck) {
     std::reverse(begin(l1), end(l1));
     RC_ASSERT(l0 == l1);
   });
-  // NOLINTEND(misc-include-cleaner,cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 }
+// NOLINTEND(misc-include-cleaner,cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)

@@ -21,14 +21,14 @@ class Packet {
  public:
   auto copy_from(const std::array<uint8_t, M>& src, const uint16_t src_size) noexcept -> void {
     assert(src_size <= M);
-    std::memcpy(this->buffer_.data(), src.data(), src_size);
-    // std::copy_n(std::begin(src), src_size, std::begin(this->buffer_));
+    // std::memcpy(this->buffer_.data(), src.data(), src_size);
+    std::copy_n(std::begin(src), src_size, std::begin(this->buffer_));
     this->size_ = src_size;
   }
 
-  [[nodiscard]] auto copy_into(std::array<uint8_t, M>& dst) const noexcept -> uint16_t {
-    std::memcpy(dst.data(), this->buffer_.data(), this->size_);
-    // std::copy_n(std::begin(this->buffer_), this->size_, std::begin(dst));
+  [[nodiscard]] auto copy_into(std::array<uint8_t, M>* dst) const noexcept -> uint16_t {
+    // std::memcpy(dst.data(), this->buffer_.data(), this->size_);
+    std::copy_n(std::begin(this->buffer_), this->size_, std::begin(*dst));
     return this->size_;
   }
 
