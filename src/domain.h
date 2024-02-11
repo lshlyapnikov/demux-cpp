@@ -49,6 +49,16 @@ class SubscriberId {
       return std::optional{SubscriberId{mask, index}};
     }
   }
+
+  [[nodiscard]] static auto all_subscribers_mask(uint8_t total_subscriber_num) -> std::optional<uint32_t> {
+    if (total_subscriber_num > MAX_SUBSCRIBER_NUM || total_subscriber_num == 0) {
+      return std::nullopt;
+    } else {
+      const uint32_t mask = std::pow(2, total_subscriber_num) - 1;
+      return std::optional{mask};
+    }
+  }
+
   [[nodiscard]] auto mask() const noexcept -> uint32_t { return this->mask_; }
   [[nodiscard]] auto index() const noexcept -> size_t { return this->index_; }
 
@@ -59,30 +69,30 @@ class SubscriberId {
   size_t index_;
 };
 
-struct Header {
-  std::atomic<uint64_t> sequence_number;
-  uint16_t message_count;
-};
+// struct Header {
+//   std::atomic<uint64_t> sequence_number;
+//   uint16_t message_count;
+// };
 
-template <const size_t N>
-struct DownstreamPacket {
-  Header header;
-  uint16_t message_length;
-  std::array<uint8_t, N> message_data;
-};
+// template <const size_t N>
+// struct DownstreamPacket {
+//   Header header;
+//   uint16_t message_length;
+//   std::array<uint8_t, N> message_data;
+// };
 
-template <const size_t N>
-struct UpstreamPacket {
-  Header header;
-  uint16_t message_length;
-  std::array<uint8_t, N> message_data;
-};
+// template <const size_t N>
+// struct UpstreamPacket {
+//   Header header;
+//   uint16_t message_length;
+//   std::array<uint8_t, N> message_data;
+// };
 
-template <const size_t N>
-struct Client {
-  uint16_t id;
-  UpstreamPacket<N> upstream_packet;
-};
+// template <const size_t N>
+// struct Client {
+//   uint16_t id;
+//   UpstreamPacket<N> upstream_packet;
+// };
 
 // struct RequestPacket {
 //   Header header;

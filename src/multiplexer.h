@@ -1,6 +1,5 @@
 #ifndef SHM_SEQUENCER_MULTIPLEXER_H
 #define SHM_SEQUENCER_MULTIPLEXER_H
-
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -8,26 +7,11 @@
 #include <cstdint>
 #include <cstring>
 #include <optional>
+#include "domain.h"
 
 namespace ShmSequencer {
 
 using std::uint64_t;
-
-typedef uint32_t subscriber_id_t;
-// const size_t MAX_SUBSCRIBER_NUM = sizeof(subscriber_id_t) * 8;
-
-constexpr auto subscriber_id_to_index(subscriber_id_t id) -> size_t {
-  switch (id) {
-    case 0b00000000000000000000000000000001:
-      return 0;
-    case 0b00000000000000000000000000000010:
-      return 1;
-    case 0b00000000000000000000000000000100:
-      return 2;
-    default:
-      return 1;
-  }
-}
 
 // enum MultiplexerResult { Ok, FullBuffer, MemoryOverlap };
 
@@ -63,6 +47,10 @@ class Packet {
 template <const size_t N, const uint16_t M>
 class MultiplexerPublisher {
  public:
+  MultiplexerPublisher(uint8_t subscriber_number) : subscriber_number_(subscriber_number) {
+    this->all_subscribers_mask_ = SubscriberId::all_subscribers_mask(subscriber_number);
+  }
+
   /// @brief Copies the packet data into the shared buffer.
   /// @param packet that will be copied.
   /// @return true if the packet was copied and there was enough space in the buffer.
@@ -89,8 +77,11 @@ class MultiplexerPublisher {
   static const size_t BUFFER_SIZE = M * N + 2 * N;
   std::atomic<size_t> offset_{0};
   std::array<uint8_t, BUFFER_SIZE> buffer_;
-  // std::array<std::atomic<SUB_ID>> read_by_subscribers_;
-  std::array<std::array<uint8_t, M>, N> buffer2_;
+
+  std::array<std::array<uint8_t, M>, N> buffers_;
+  std::array<std::atomic<uint32_t>, N> read_by_subscriber_masks_;
+  const uint8_t subscriber_number_;
+  const uint32_t all_subscribers_mask_;
 };
 
 /// @brief Multiplexer subscriber. Should be mapped into shared memory allocated by MultiplexerPublisher.
@@ -120,7 +111,7 @@ class MultiplexerSubscriber {
   std::atomic<size_t> offset_{0};
   std::array<uint8_t, BUFFER_SIZE> buffer_;
 
-  static const size_t x = subscriber_id_to_index(1);
+  SubscriberId id;
 };
 
 }  // namespace ShmSequencer

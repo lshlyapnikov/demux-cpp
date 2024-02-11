@@ -39,65 +39,103 @@ TEST(DomainTest, Constants) {
 
 TEST(DomainTest, SubscriberIdManualCheck) {
   {
-    const std::optional<SubscriberId> actual = SubscriberId::create(0);
-    ASSERT_FALSE(actual.has_value());
+    const std::optional<SubscriberId> sub_id = SubscriberId::create(0);
+    ASSERT_FALSE(sub_id.has_value());
+
+    const std::optional<uint32_t> mask = SubscriberId::all_subscribers_mask(0);
+    ASSERT_FALSE(mask.has_value());
   }
   {
-    const std::optional<SubscriberId> actual = SubscriberId::create(33);
-    ASSERT_FALSE(actual.has_value());
+    const std::optional<SubscriberId> sub_id = SubscriberId::create(33);
+    ASSERT_FALSE(sub_id.has_value());
+
+    const std::optional<uint32_t> mask = SubscriberId::all_subscribers_mask(33);
+    ASSERT_FALSE(mask.has_value());
   }
   {
-    const std::optional<SubscriberId> actual = SubscriberId::create(255);
-    ASSERT_FALSE(actual.has_value());
+    const std::optional<SubscriberId> sub_id = SubscriberId::create(255);
+    ASSERT_FALSE(sub_id.has_value());
+
+    const std::optional<uint32_t> mask = SubscriberId::all_subscribers_mask(255);
+    ASSERT_FALSE(mask.has_value());
   }
   {
-    const std::optional<SubscriberId> actual = SubscriberId::create(1);
-    ASSERT_TRUE(actual.has_value());
-    ASSERT_EQ(0, actual.value().index());
-    ASSERT_EQ(1, actual.value().mask());
+    const std::optional<SubscriberId> sub_id = SubscriberId::create(1);
+    ASSERT_TRUE(sub_id.has_value());
+
+    ASSERT_EQ(0, sub_id.value().index());
+    ASSERT_EQ(0b1, sub_id.value().mask());
+
+    const std::optional<uint32_t> mask = SubscriberId::all_subscribers_mask(1);
+    ASSERT_TRUE(mask.has_value());
+    ASSERT_EQ(0b1, mask.value());
   }
   {
-    const std::optional<SubscriberId> actual = SubscriberId::create(2);
-    ASSERT_TRUE(actual.has_value());
-    ASSERT_EQ(1, actual.value().index());
-    ASSERT_EQ(0b10, actual.value().mask());
+    const std::optional<SubscriberId> sub_id = SubscriberId::create(2);
+    ASSERT_TRUE(sub_id.has_value());
+    ASSERT_EQ(1, sub_id.value().index());
+    ASSERT_EQ(0b10, sub_id.value().mask());
+
+    const std::optional<uint32_t> mask = SubscriberId::all_subscribers_mask(2);
+    ASSERT_TRUE(mask.has_value());
+    ASSERT_EQ(0b11, mask.value());
   }
   {
-    const std::optional<SubscriberId> actual = SubscriberId::create(3);
-    ASSERT_TRUE(actual.has_value());
-    ASSERT_EQ(2, actual.value().index());
-    ASSERT_EQ(0b100, actual.value().mask());
+    const std::optional<SubscriberId> sub_id = SubscriberId::create(3);
+    ASSERT_TRUE(sub_id.has_value());
+    ASSERT_EQ(2, sub_id.value().index());
+    ASSERT_EQ(0b100, sub_id.value().mask());
+
+    const std::optional<uint32_t> mask = SubscriberId::all_subscribers_mask(3);
+    ASSERT_TRUE(mask.has_value());
+    ASSERT_EQ(0b111, mask.value());
   }
   {
-    const std::optional<SubscriberId> actual = SubscriberId::create(4);
-    ASSERT_TRUE(actual.has_value());
-    ASSERT_EQ(3, actual.value().index());
-    ASSERT_EQ(0b1000, actual.value().mask());
+    const std::optional<SubscriberId> sub_id = SubscriberId::create(4);
+    ASSERT_TRUE(sub_id.has_value());
+    ASSERT_EQ(3, sub_id.value().index());
+    ASSERT_EQ(0b1000, sub_id.value().mask());
+
+    const std::optional<uint32_t> mask = SubscriberId::all_subscribers_mask(4);
+    ASSERT_TRUE(mask.has_value());
+    ASSERT_EQ(0b1111, mask.value());
   }
   {
-    const std::optional<SubscriberId> actual = SubscriberId::create(31);
-    ASSERT_TRUE(actual.has_value());
-    ASSERT_EQ(30, actual.value().index());
-    ASSERT_EQ(0b1000000000000000000000000000000, actual.value().mask());
+    const std::optional<SubscriberId> sub_id = SubscriberId::create(31);
+    ASSERT_TRUE(sub_id.has_value());
+    ASSERT_EQ(30, sub_id.value().index());
+    ASSERT_EQ(0b1000000000000000000000000000000, sub_id.value().mask());
+
+    const std::optional<uint32_t> mask = SubscriberId::all_subscribers_mask(31);
+    ASSERT_TRUE(mask.has_value());
+    ASSERT_EQ(0b1111111111111111111111111111111, mask.value());
   }
   {
-    const std::optional<SubscriberId> actual = SubscriberId::create(32);
-    ASSERT_TRUE(actual.has_value());
-    ASSERT_EQ(31, actual.value().index());
-    ASSERT_EQ(0b10000000000000000000000000000000, actual.value().mask());
+    const std::optional<SubscriberId> sub_id = SubscriberId::create(32);
+    ASSERT_TRUE(sub_id.has_value());
+    ASSERT_EQ(31, sub_id.value().index());
+    ASSERT_EQ(0b10000000000000000000000000000000, sub_id.value().mask());
+
+    const std::optional<uint32_t> mask = SubscriberId::all_subscribers_mask(32);
+    ASSERT_TRUE(mask.has_value());
+    ASSERT_EQ(0b11111111111111111111111111111111, mask.value());
   }
 }
 
 TEST(DomainTest, SubscriberId) {
-  rc::check("SubscriberId::create", [](const uint8_t id) {
-    // std::cout << "id: " << static_cast<uint32_t>(id) << std::endl;
-    const std::optional<SubscriberId> actual = SubscriberId::create(id);
-    if (id > ShmSequencer::MAX_SUBSCRIBER_NUM || id == 0) {
-      ASSERT_FALSE(actual.has_value());
+  rc::check("SubscriberId::create", [](const uint8_t num) {
+    const std::optional<SubscriberId> sub_id = SubscriberId::create(num);
+    const std::optional<uint32_t> all_mask = SubscriberId::all_subscribers_mask(num);
+    if (num > ShmSequencer::MAX_SUBSCRIBER_NUM || num == 0) {
+      ASSERT_FALSE(sub_id.has_value());
+      ASSERT_FALSE(all_mask.has_value());
     } else {
-      ASSERT_TRUE(actual.has_value());
-      ASSERT_EQ(id - 1, actual.value().index());
-      ASSERT_EQ(pow(2, (id - 1)), actual.value().mask());
+      ASSERT_TRUE(sub_id.has_value());
+      ASSERT_EQ(num - 1, sub_id.value().index());
+      ASSERT_EQ(pow(2, (num - 1)), sub_id.value().mask());
+
+      ASSERT_TRUE(all_mask.has_value());
+      ASSERT_EQ(pow(2, num) - 1, all_mask.value());
     }
   });
 }
