@@ -1,5 +1,6 @@
 #include "../src/sequencer.h"
 #include <gtest/gtest.h>
+#include <boost/interprocess/ipc/message_queue.hpp>
 #include <sstream>
 
 TEST(SequencerTest, PrintStatus2) {
