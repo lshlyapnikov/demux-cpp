@@ -7,10 +7,14 @@
 #include <cstdint>
 #include <cstring>
 #include <optional>
+#include <span>
+#include "atomic_util.h"
 #include "domain.h"
 
 namespace ShmSequencer {
 
+using std::optional;
+using std::span;
 using std::uint64_t;
 
 // enum MultiplexerResult { Ok, FullBuffer, MemoryOverlap };
@@ -47,39 +51,69 @@ class Packet {
 template <const size_t N, const uint16_t M>
 class MultiplexerPublisher {
  public:
-  MultiplexerPublisher(uint8_t subscriber_number) : subscriber_number_(subscriber_number) {
-    this->all_subscribers_mask_ = SubscriberId::all_subscribers_mask(subscriber_number);
-  }
-
-  /// @brief Copies the packet data into the shared buffer.
-  /// @param packet that will be copied.
-  /// @return true if the packet was copied and there was enough space in the buffer.
-  auto send(const Packet<M>& packet) noexcept -> bool {
-    if (packet.size == 0) {
-      return true;
-    }
-    const size_t required_space = sizeof(packet.size) + packet.size;
-    const size_t current_offset = this->offset_.load(std::memory_order_acquire);
-    const size_t new_offset = current_offset + required_space;
-    if (new_offset <= BUFFER_SIZE) {
-      const uint8_t* dst_address = this->buffer_.data() + current_offset;
-      std::memcpy(dst_address, &packet, required_space);
-      this->offset_.store(new_offset, std::memory_order_release);  // this->offset = new_offset;
-      return true;
+  static auto create(uint8_t subscriber_number) -> std::optional<MultiplexerPublisher> {
+    const optional<uint32_t> all_subs_mask = SubscriberId::all_subscribers_mask(subscriber_number);
+    if (all_subs_mask.has_value()) {
+      return optional(MultiplexerPublisher(subscriber_number, all_subs_mask.value()));
     } else {
-      return false;
+      return std::nullopt;
     }
   }
 
-  auto roll_over() noexcept -> void { this->offset_.store(0, std::memory_order_release); }
+  // /// @brief Copies the packet data into the shared buffer.
+  // /// @param packet that will be copied.
+  // /// @return true if the packet was copied and there was enough space in the buffer.
+  // auto send(const Packet<M>& packet) noexcept -> bool {
+  //   if (packet.size == 0) {
+  //     return true;
+  //   }
+  //   const size_t required_space = sizeof(packet.size) + packet.size;
+  //   const size_t current_offset = this->offset_.load(std::memory_order_acquire);
+  //   const size_t new_offset = current_offset + required_space;
+  //   if (new_offset <= BUFFER_SIZE) {
+  //     const uint8_t* dst_address = this->buffer_.data() + current_offset;
+  //     std::memcpy(dst_address, &packet, required_space);
+  //     this->offset_.store(new_offset, std::memory_order_release);  // this->offset = new_offset;
+  //     return true;
+  //   } else {
+  //     return false;
+  //   }
+  // }
+
+  auto send(const span<uint8_t> source) noexcept -> bool {
+    const size_t n = source.size();
+    if (n == 0) {
+      return true;
+    } else if (n > M) {
+      return false;
+    } else {
+      const size_t i = this->index_;
+      std::atomic<uint32_t>& sub_mask = this->subscriber_masks_[i];
+      wait_exact_value_and_acquire(sub_mask, this->all_subscribers_mask_);
+      std::copy(source.begin(), source.end(), this->buffers[i]);
+      set_and_release(&sub_mask, 0U);
+      this->increment_index();
+      return true;
+    }
+  }
 
  private:
+  MultiplexerPublisher(uint8_t subscriber_number, uint32_t all_subscribers_mask)
+      : subscriber_number_(subscriber_number), all_subscribers_mask_(all_subscribers_mask), index_(0) {}
+
+  auto increment_index() noexcept -> void {
+    const size_t i = this->index_;
+    this->index_ = (i == N - 1) ? 0 : i + 1;
+  }
+
   static const size_t BUFFER_SIZE = M * N + 2 * N;
   std::atomic<size_t> offset_{0};
   std::array<uint8_t, BUFFER_SIZE> buffer_;
 
   std::array<std::array<uint8_t, M>, N> buffers_;
-  std::array<std::atomic<uint32_t>, N> read_by_subscriber_masks_;
+  std::array<std::atomic<uint32_t>, N> subscriber_masks_;
+  size_t index_;
+
   const uint8_t subscriber_number_;
   const uint32_t all_subscribers_mask_;
 };

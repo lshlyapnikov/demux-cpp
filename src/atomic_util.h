@@ -6,28 +6,41 @@
 
 namespace ShmSequencer {
 
-using std::uint64_t;
-
 // multiple threads can wait for the update.
 //
 // consider using https://en.cppreference.com/w/cpp/atomic/atomic/wait
-// `wait` doesn't exist in GCC 9.4.0 C++20
-[[nodiscard]] inline auto wait_and_acquire(const std::atomic<uint64_t>& actual, const uint64_t old) -> uint64_t {
+template <typename T>
+[[nodiscard]] inline auto wait_new_value_and_acquire(const std::atomic<T>& actual, T old_val) -> T {
   while (true) {
     const uint64_t x = actual.load(std::memory_order_acquire);
-    if (x != old) {
+    if (x != old_val) {
       return x;
     }
   }
 }
 
-[[nodiscard]] inline auto acquire(const std::atomic<uint64_t>& actual) -> uint64_t {
+// multiple threads can wait for the update.
+//
+// consider using https://en.cppreference.com/w/cpp/atomic/atomic/wait
+template <typename T>
+inline auto wait_exact_value_and_acquire(const std::atomic<T>& actual, T new_val) -> void {
+  while (true) {
+    const T x = actual.load(std::memory_order_acquire);
+    if (x == new_val) {
+      return;
+    }
+  }
+}
+
+template <typename T>
+[[nodiscard]] inline auto acquire(const std::atomic<T>& actual) -> T {
   return actual.load(std::memory_order_acquire);
 }
 
 // Only 1 thread is expected to set it.
-inline auto set_and_release(std::atomic<uint64_t>& actual, const uint64_t new_one) -> void {
-  actual.store(new_one, std::memory_order_release);
+template <typename T>
+inline auto set_and_release(std::atomic<T>* actual, T new_val) -> void {
+  actual->store(new_val, std::memory_order_release);
 }
 
 }  // namespace ShmSequencer

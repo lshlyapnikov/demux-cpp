@@ -6,7 +6,9 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <iostream>
 #include <iterator>
+#include <span>
 #include <vector>
 #include "../src/domain.h"
 
@@ -16,6 +18,48 @@ using ShmSequencer::SubscriberId;
 using std::uint16_t;
 using std::uint8_t;
 using std::vector;
+
+auto test_span_fn1(std::span<uint8_t> buf) -> void {
+  std::cout << "1. buf[0]: " << (int)buf[0] << ", buf.size: " << buf.size() << " buf.size_bytes: " << buf.size_bytes()
+            << std::endl;
+}
+
+auto test_span_fn2(std::span<uint8_t, 8> buf) -> void {
+  std::cout << "2. buf[0]: " << (int)buf[0] << ", buf.size: " << buf.size() << " buf.size_bytes: " << buf.size_bytes()
+            << std::endl;
+}
+
+template <typename T, std::size_t M>
+auto test_span_fn3(std::span<T, M> buf) -> void {
+  std::cout << "3. buf[0]: " << (int)buf[0] << ", buf.size: " << buf.size() << " buf.size_bytes: " << buf.size_bytes()
+            << std::endl;
+}
+
+TEST(MultiplexerTest, Span) {
+  std::array<uint8_t, 8> buf1{
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+  };
+
+  test_span_fn1(buf1);
+  test_span_fn2(buf1);
+  // test_span_fn3(buf1);
+
+  std::array<uint8_t, 3> buf2{0, 1, 2};
+
+  test_span_fn1(buf2);
+  // test_span_fn2(buf2);
+  // test_span_fn3(buf2);
+
+  std::array<uint16_t, 3> buf3{0, 1, 2};
+  test_span_fn3(std::span(buf3));
+}
 
 TEST(MultiplexerTest, Packet) {
   const size_t M = 8;
