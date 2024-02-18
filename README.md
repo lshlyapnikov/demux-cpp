@@ -16,6 +16,12 @@ $ ./bin/init-cmake-build.sh
 $ cmake --build ./build
 ```
 
+### Clean
+
+```
+$ cmake --build ./build --target clean
+```
+
 ### Run Tests
 
 ```

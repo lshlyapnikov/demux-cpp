@@ -30,10 +30,10 @@ template <const size_t N, const uint16_t M>
   requires(N >= M + 2)
 class MultiplexerPublisher {
  public:
-  MultiplexerPublisher(uint8_t subscriber_number)
+  MultiplexerPublisher(uint8_t subscriber_number) noexcept(false)
       : index_(0),
-        subscriber_number_(SubscriberId::validate_subscriber_number(subscriber_number)),
-        all_subscribers_mask_(SubscriberId::all_subscribers_mask(subscriber_number).value()) {}
+        subscriber_number_(validate_subscriber_number(subscriber_number)),
+        all_subscribers_mask_(SubscriberId::all_subscribers_mask(subscriber_number)) {}
 
   auto send(const span<uint8_t> source) noexcept -> bool {
     const size_t n = source.size();

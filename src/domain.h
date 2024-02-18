@@ -38,33 +38,31 @@ using std::uint8_t;
 
 const size_t MAX_SUBSCRIBER_NUM = sizeof(uint32_t) * 8;  // 32
 
+[[nodiscard]] constexpr auto is_valid_subscriber_number(uint8_t num) noexcept -> bool {
+  return num >= 1 && num <= MAX_SUBSCRIBER_NUM;
+}
+
+constexpr auto validate_subscriber_number(uint8_t num) noexcept(false) -> uint8_t {
+  if (is_valid_subscriber_number(num)) {
+    return num;
+  } else {
+    throw std::invalid_argument("subscriber_number must be within the inclusive interval: [1, 32]");
+  }
+}
+
 class SubscriberId {
  public:
-  [[nodiscard]] static auto create(uint8_t id) -> std::optional<SubscriberId> {
-    if (id > MAX_SUBSCRIBER_NUM || id == 0) {
-      return std::nullopt;
-    } else {
-      const size_t index = id - 1;
-      const uint32_t mask = std::pow(2, index);
-      return std::optional{SubscriberId{mask, index}};
-    }
+  [[nodiscard]] static auto create(uint8_t num) noexcept(false) -> SubscriberId {
+    validate_subscriber_number(num);
+    const size_t index = num - 1;
+    const uint32_t mask = std::pow(2, index);
+    return SubscriberId{mask, index};
   }
 
-  [[nodiscard]] static auto validate_subscriber_number(uint8_t num) -> uint8_t {
-    if (num > MAX_SUBSCRIBER_NUM) {
-      throw std::invalid_argument("subscriber_number must be <= 32");
-    } else {
-      return num;
-    }
-  }
-
-  [[nodiscard]] static auto all_subscribers_mask(uint8_t total_subscriber_num) -> std::optional<uint32_t> {
-    if (total_subscriber_num > MAX_SUBSCRIBER_NUM || total_subscriber_num == 0) {
-      return std::nullopt;
-    } else {
-      const uint32_t mask = std::pow(2, total_subscriber_num) - 1;
-      return std::optional{mask};
-    }
+  [[nodiscard]] static auto all_subscribers_mask(uint8_t total_subscriber_num) noexcept(false) -> uint32_t {
+    validate_subscriber_number(total_subscriber_num);
+    const uint32_t mask = std::pow(2, total_subscriber_num) - 1;
+    return mask;
   }
 
   [[nodiscard]] auto mask() const noexcept -> uint32_t { return this->mask_; }
