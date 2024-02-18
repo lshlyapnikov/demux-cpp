@@ -50,6 +50,14 @@ class SubscriberId {
     }
   }
 
+  [[nodiscard]] static auto validate_subscriber_number(uint8_t num) -> uint8_t {
+    if (num > MAX_SUBSCRIBER_NUM) {
+      throw std::invalid_argument("subscriber_number must be <= 32");
+    } else {
+      return num;
+    }
+  }
+
   [[nodiscard]] static auto all_subscribers_mask(uint8_t total_subscriber_num) -> std::optional<uint32_t> {
     if (total_subscriber_num > MAX_SUBSCRIBER_NUM || total_subscriber_num == 0) {
       return std::nullopt;

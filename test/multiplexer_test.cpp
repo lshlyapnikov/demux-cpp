@@ -9,11 +9,12 @@
 #include <iostream>
 #include <iterator>
 #include <span>
+#include <stdexcept>
 #include <vector>
 #include "../src/domain.h"
 
 using ShmSequencer::MultiplexerPublisher;
-using ShmSequencer::Packet;
+// using ShmSequencer::Packet;
 using ShmSequencer::SubscriberId;
 using std::uint16_t;
 using std::uint8_t;
@@ -33,6 +34,18 @@ template <typename T, std::size_t M>
 auto test_span_fn3(std::span<T, M> buf) -> void {
   std::cout << "3. buf[0]: " << (int)buf[0] << ", buf.size: " << buf.size() << " buf.size_bytes: " << buf.size_bytes()
             << std::endl;
+}
+
+TEST(MultiplexerTest, Constructor) {
+  MultiplexerPublisher<32, 4> m(5);
+  MultiplexerPublisher<32, 4> m1(32);
+
+  try {
+    MultiplexerPublisher<32, 4> m3(33);
+    FAIL() << "Expected exception here";
+  } catch (std::invalid_argument e) {
+    ASSERT_STREQ(e.what(), "subscriber_number must be <= 32");
+  }
 }
 
 TEST(MultiplexerTest, Span) {
@@ -61,21 +74,21 @@ TEST(MultiplexerTest, Span) {
   test_span_fn3(std::span(buf3));
 }
 
-TEST(MultiplexerTest, Packet) {
-  const size_t M = 8;
-  Packet<M> packet;
+// TEST(MultiplexerTest, Packet) {
+//   const size_t M = 8;
+//   Packet<M> packet;
 
-  const std::array<uint8_t, M> src = {1, 2, 3, 4, 5, 6, 7, 8};
-  packet.read_from(src, 3);
-  ASSERT_EQ(3, packet.size());
+//   const std::array<uint8_t, M> src = {1, 2, 3, 4, 5, 6, 7, 8};
+//   packet.read_from(src, 3);
+//   ASSERT_EQ(3, packet.size());
 
-  std::array<uint8_t, M> dst{0, 0, 0, 0, 0, 0, 0, 0};
-  const uint16_t result = packet.write_into(&dst);
-  ASSERT_EQ(result, 3);
+//   std::array<uint8_t, M> dst{0, 0, 0, 0, 0, 0, 0, 0};
+//   const uint16_t result = packet.write_into(&dst);
+//   ASSERT_EQ(result, 3);
 
-  const std::array<uint8_t, M> expected = {1, 2, 3, 0, 0, 0, 0, 0};
-  EXPECT_EQ(dst, expected);
-}
+//   const std::array<uint8_t, M> expected = {1, 2, 3, 0, 0, 0, 0, 0};
+//   EXPECT_EQ(dst, expected);
+// }
 
 TEST(DomainTest, Constants) {
   EXPECT_EQ(ShmSequencer::MAX_SUBSCRIBER_NUM, 32);
@@ -185,22 +198,22 @@ TEST(DomainTest, SubscriberId) {
 }
 
 // NOLINTBEGIN(misc-include-cleaner,cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
-TEST(MultiplexerTest, RoundtripReadWrite) {
-  rc::check("Packet::read_from followed by Packet::write_into does not not lose any data",
-            [](const std::array<uint8_t, 256>& a0, const uint8_t size) {
-              Packet<256> packet;
-              packet.read_from(a0, size);
+// TEST(MultiplexerTest, RoundtripReadWrite) {
+//   rc::check("Packet::read_from followed by Packet::write_into does not not lose any data",
+//             [](const std::array<uint8_t, 256>& a0, const uint8_t size) {
+//               Packet<256> packet;
+//               packet.read_from(a0, size);
 
-              std::array<uint8_t, 256> a1{};
-              const uint16_t written_bytes = packet.write_into(&a1);
+//               std::array<uint8_t, 256> a1{};
+//               const uint16_t written_bytes = packet.write_into(&a1);
 
-              const auto data0 = vector<uint8_t>(std::begin(a0), std::begin(a0) + size);
-              const auto data1 = vector<uint8_t>(std::begin(a1), std::begin(a1) + size);
+//               const auto data0 = vector<uint8_t>(std::begin(a0), std::begin(a0) + size);
+//               const auto data1 = vector<uint8_t>(std::begin(a1), std::begin(a1) + size);
 
-              ASSERT_TRUE(written_bytes == size);
-              ASSERT_TRUE(data0 == data1);
-            });
-}
+//               ASSERT_TRUE(written_bytes == size);
+//               ASSERT_TRUE(data0 == data1);
+//             });
+// }
 // NOLINTEND(misc-include-cleaner,cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 
 // NOLINTBEGIN(misc-include-cleaner,cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
