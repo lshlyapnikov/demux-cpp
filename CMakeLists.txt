@@ -100,6 +100,17 @@ enable_testing()
 include(GoogleTest)
 
 add_executable(
+  domain_test
+  test/domain_test.cpp
+)
+target_link_libraries(
+  domain_test
+  GTest::gtest_main
+  rapidcheck
+)
+gtest_discover_tests(domain_test)
+
+add_executable(
   sequencer_test
   test/sequencer_test.cpp
 )
@@ -116,10 +127,6 @@ add_executable(
   multiplexer_test
   test/multiplexer_test.cpp
 )
-# set_target_properties(
-#   multiplexer_test
-#   PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}"
-# )
 target_link_libraries(
   multiplexer_test
   PRIVATE atomic

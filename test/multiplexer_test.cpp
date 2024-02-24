@@ -12,32 +12,27 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-#include "../src/domain.h"
 
 using ShmSequencer::MultiplexerPublisher;
-using ShmSequencer::SubscriberId;
 using std::uint16_t;
 using std::uint8_t;
 using std::vector;
 
-TEST(MultiplexerTest, Constructor) {
-  MultiplexerPublisher<32, 4> m(5);
-  MultiplexerPublisher<32, 4> m1(32);
+// namespace rc {
+// template <>
+// struct Arbitrary<span<uint8_t>> {
+//   static const size_t MAX_SIZE = 32;
+//   static Gen<span<uint8_t>> arbitrary() {
+//     return {
+//       const size_t n = *rc::gen::inRange(0, MAX_SIZE);
 
-  try {
-    MultiplexerPublisher<32, 4> m3(0);
-    FAIL() << "Expected exception here";
-  } catch (std::invalid_argument e) {
-    ASSERT_STREQ(e.what(), "subscriber_number must be within the inclusive interval: [1, 32]");
-  }
-
-  try {
-    MultiplexerPublisher<32, 4> m3(33);
-    FAIL() << "Expected exception here";
-  } catch (std::invalid_argument e) {
-    ASSERT_STREQ(e.what(), "subscriber_number must be within the inclusive interval: [1, 32]");
-  }
-}
+//       gen::build<span<uint8_t>>(
+//       //     gen::set(&Person::firstName), gen::set(&Person::lastName), gen::set(&Person::age, gen::inRange(0,
+//       100)));
+//     }
+//   }
+// };
+// }  // namespace rc
 
 // TEST(MultiplexerTest, Packet) {
 //   const size_t M = 8;
@@ -54,88 +49,6 @@ TEST(MultiplexerTest, Constructor) {
 //   const std::array<uint8_t, M> expected = {1, 2, 3, 0, 0, 0, 0, 0};
 //   EXPECT_EQ(dst, expected);
 // }
-
-TEST(DomainTest, Constants) {
-  EXPECT_EQ(ShmSequencer::MAX_SUBSCRIBER_NUM, 32);
-}
-
-TEST(DomainTest, SubscriberIdManualCheck) {
-  for (uint8_t num : {0, 33, 128, 255}) {
-    ASSERT_THROW({ std::ignore = SubscriberId::create(num); }, std::invalid_argument);
-    ASSERT_THROW({ std::ignore = SubscriberId::all_subscribers_mask(num); }, std::invalid_argument);
-  }
-  {
-    const SubscriberId sub_id = SubscriberId::create(1);
-    ASSERT_EQ(0, sub_id.index());
-    ASSERT_EQ(0b1, sub_id.mask());
-
-    const uint32_t mask = SubscriberId::all_subscribers_mask(1);
-    ASSERT_EQ(0b1, mask);
-  }
-  {
-    const SubscriberId sub_id = SubscriberId::create(2);
-    ASSERT_EQ(1, sub_id.index());
-    ASSERT_EQ(0b10, sub_id.mask());
-
-    const std::optional<uint32_t> mask = SubscriberId::all_subscribers_mask(2);
-    ASSERT_EQ(0b11, mask.value());
-  }
-  {
-    const SubscriberId sub_id = SubscriberId::create(3);
-    ASSERT_EQ(2, sub_id.index());
-    ASSERT_EQ(0b100, sub_id.mask());
-
-    const std::optional<uint32_t> mask = SubscriberId::all_subscribers_mask(3);
-    ASSERT_EQ(0b111, mask.value());
-  }
-  {
-    const SubscriberId sub_id = SubscriberId::create(4);
-    ASSERT_EQ(3, sub_id.index());
-    ASSERT_EQ(0b1000, sub_id.mask());
-
-    const std::optional<uint32_t> mask = SubscriberId::all_subscribers_mask(4);
-    ASSERT_EQ(0b1111, mask.value());
-  }
-  {
-    const SubscriberId sub_id = SubscriberId::create(31);
-    ASSERT_EQ(30, sub_id.index());
-    ASSERT_EQ(0b1000000000000000000000000000000, sub_id.mask());
-
-    const std::optional<uint32_t> mask = SubscriberId::all_subscribers_mask(31);
-    ASSERT_EQ(0b1111111111111111111111111111111, mask.value());
-  }
-  {
-    const SubscriberId sub_id = SubscriberId::create(32);
-    ASSERT_EQ(31, sub_id.index());
-    ASSERT_EQ(0b10000000000000000000000000000000, sub_id.mask());
-
-    const std::optional<uint32_t> mask = SubscriberId::all_subscribers_mask(32);
-    ASSERT_EQ(0b11111111111111111111111111111111, mask.value());
-  }
-}
-
-TEST(DomainTest, SubscriberId) {
-  rc::check("SubscriberId::create", [](const uint8_t num) {
-    if (num > ShmSequencer::MAX_SUBSCRIBER_NUM || num == 0) {
-      ASSERT_THROW({ std::ignore = SubscriberId::create(num); }, std::invalid_argument);
-    } else {
-      const SubscriberId sub_id = SubscriberId::create(num);
-      ASSERT_EQ(num - 1, sub_id.index());
-      ASSERT_EQ(pow(2, (num - 1)), sub_id.mask());
-    }
-  });
-}
-
-TEST(DomainTest, AllSubscribersMask) {
-  rc::check("SubscriberId::all_subscribers_mask", [](const uint8_t num) {
-    if (num > ShmSequencer::MAX_SUBSCRIBER_NUM || num == 0) {
-      ASSERT_THROW({ std::ignore = SubscriberId::all_subscribers_mask(num); }, std::invalid_argument);
-    } else {
-      const uint32_t all_mask = SubscriberId::all_subscribers_mask(num);
-      ASSERT_EQ(pow(2, num) - 1, all_mask);
-    }
-  });
-}
 
 // NOLINTBEGIN(misc-include-cleaner,cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 // TEST(MultiplexerTest, RoundtripReadWrite) {
@@ -155,3 +68,22 @@ TEST(DomainTest, AllSubscribersMask) {
 //             });
 // }
 // NOLINTEND(misc-include-cleaner,cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
+
+TEST(MultiplexerTest, Constructor) {
+  MultiplexerPublisher<32, 4> m(5);
+  MultiplexerPublisher<32, 4> m1(32);
+
+  try {
+    MultiplexerPublisher<32, 4> m3(0);
+    FAIL() << "Expected exception here";
+  } catch (std::invalid_argument e) {
+    ASSERT_STREQ(e.what(), "subscriber_number must be within the inclusive interval: [1, 32]");
+  }
+
+  try {
+    MultiplexerPublisher<32, 4> m3(33);
+    FAIL() << "Expected exception here";
+  } catch (std::invalid_argument e) {
+    ASSERT_STREQ(e.what(), "subscriber_number must be within the inclusive interval: [1, 32]");
+  }
+}

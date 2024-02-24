@@ -7,7 +7,7 @@ Shared Memory Sequencer.
 ### Generate/Regenerate Project Makefile
 
 ```
-$ ./bin/init-cmake-build.sh
+./bin/init-cmake-build.sh
 ```
 
 ### Build
@@ -25,7 +25,7 @@ $ cmake --build ./build --target clean
 ### Run Tests
 
 ```
-cmake --build ./build --target test
+$ cmake --build ./build --target test
 ```
 
 ### Profile with Valgrind
@@ -41,6 +41,8 @@ $ valgrind --leak-check=full --show-leak-kinds=all ./build/shm-sequencer
 - [FlatBuffers](https://flatbuffers.dev/flatbuffers_guide_use_cpp.html)
 - [GoogleTest Primer](https://google.github.io/googletest/primer.html)
 - [RapidCheck](https://github.com/emil-e/rapidcheck)
+  - [Arbitrary Generators](https://github.com/emil-e/rapidcheck/blob/master/doc/generators.md#arbitrary)
+  - [Configuration](https://github.com/emil-e/rapidcheck/blob/master/doc/configuration.md)
 - [Boost Library Documentation](https://www.boost.org/doc/libs/)
 - [Boost.Program_options](https://www.boost.org/doc/libs/1_83_0/doc/html/program_options.html)
 - [Boost.Interprocess](https://www.boost.org/doc/libs/1_83_0/doc/html/interprocess.html)

@@ -69,7 +69,7 @@ class SubscriberId {
   [[nodiscard]] auto index() const noexcept -> size_t { return this->index_; }
 
  private:
-  SubscriberId(uint32_t mask, size_t index) : mask_(mask), index_(index) {}
+  SubscriberId(uint32_t mask, size_t index) noexcept : mask_(mask), index_(index) {}
 
   uint32_t mask_;
   size_t index_;

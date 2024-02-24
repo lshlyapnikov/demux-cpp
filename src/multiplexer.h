@@ -30,28 +30,72 @@ template <const size_t N, const uint16_t M>
   requires(N >= M + 2)
 class MultiplexerPublisher {
  public:
-  MultiplexerPublisher(uint8_t subscriber_number) noexcept(false)
-      : index_(0),
-        subscriber_number_(validate_subscriber_number(subscriber_number)),
-        all_subscribers_mask_(SubscriberId::all_subscribers_mask(subscriber_number)) {}
+  MultiplexerPublisher(uint8_t total_subs_number) noexcept(false)
+      : total_subs_number_(validate_subscriber_number(total_subs_number)),
+        all_subs_mask_(SubscriberId::all_subscribers_mask(total_subs_number)) {}
+
+  // auto send(const span<uint8_t> source) noexcept -> bool {
+  //   const size_t n = source.size();
+  //   if (n == 0) {
+  //     return true;
+  //   } else if (n > M) {
+  //     return false;
+  //   } else {
+  //     const size_t i = this->index_;
+  //     std::atomic<uint32_t>& mask = this->masks_[i];
+  //     wait_exact_value_and_acquire(mask, this->all_subscribers_mask_);
+  //     std::copy(source.begin(), source.end(), this->buffers_[i]);
+  //     this->buffer_lengths_[i] = n;
+  //     set_and_release(&mask, 0U);
+  //     this->increment_index();
+  //     return true;
+  //   }
+  // }
 
   auto send(const span<uint8_t> source) noexcept -> bool {
     const size_t n = source.size();
     if (n == 0) {
       return true;
     } else if (n > M) {
+      // TODO: should you throw from here???
       return false;
     } else {
-      const size_t i = this->index_;
-      std::atomic<uint32_t>& mask = this->masks_[i];
-      wait_exact_value_and_acquire(mask, this->all_subscribers_mask_);
-      std::copy(source.begin(), source.end(), this->buffers_[i]);
-      this->buffer_lengths_[i] = n;
-      set_and_release(&mask, 0U);
-      this->increment_index();
-      return true;
+      const size_t required_space = sizeof(uint16_t) + n;
+      const size_t current_offset = this->size_;
+      const size_t new_offset = current_offset + required_space;
+      if (new_offset <= N) {
+        uint8_t* dst_address = this->buffer_.data() + current_offset;
+        // write the source length
+        const uint16_t length = static_cast<uint16_t>(n);
+        memcpy(dst_address, &length, sizeof(uint16_t));
+        // write the source bytes
+        dst_address += sizeof(uint16_t);
+        // std::copy(source.begin(), source.end(), dst_address);
+        memcpy(dst_address, source.data(), n);
+        this->size_ = new_offset;
+        message_count_.fetch_add(1L, std::memory_order_seq_cst);
+        return true;
+      } else {
+        this->all_subs_reached_end_of_buffer_mask_.store(0L);
+        this->size_ = 0;
+        // wait for all subs to reach the end of buffer.
+        return false;
+      }
     }
   }
+
+  auto wait_all_subs_reached_end_of_buffer() const noexcept -> void {
+    while (true) {
+      const uint32_t x = this->all_subs_reached_end_of_buffer_mask_.load();
+      if (x == this->all_subs_mask_) {
+        return;
+      }
+    }
+  }
+
+  auto message_count() const noexcept -> size_t { return this->message_count_.load(); }
+
+  auto data() const noexcept -> span<uint8_t> { return span(this->buffers_.data(), this->size_); }
 
  private:
   auto increment_index() noexcept -> void {
@@ -59,12 +103,13 @@ class MultiplexerPublisher {
     this->index_ = (i == N - 1) ? 0 : i + 1;
   }
 
-  array<array<uint8_t, M>, N> buffers_;
-  array<size_t, N> buffer_lengths_;
-  std::array<std::atomic<uint32_t>, N> masks_;
-  size_t index_;
-  const uint8_t subscriber_number_;
-  const uint32_t all_subscribers_mask_;
+  size_t size_{0};
+  std::atomic<uint64_t> message_count_{0};
+  std::array<uint8_t, N> buffer_;
+
+  uint8_t total_subs_number_;
+  const uint32_t all_subs_mask_;
+  std::array<std::atomic<uint32_t>, N> all_subs_reached_end_of_buffer_mask_;
 };
 
 /// @brief Multiplexer subscriber. Should be mapped into shared memory allocated by MultiplexerPublisher.

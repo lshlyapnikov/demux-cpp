@@ -1,6 +1,6 @@
 {
   "my.terminal.run.cmd1": "clear; scan-build-17 cmake --build ./build",
-  "my.terminal.run.cmd2": "clear; cmake --build ./build && ./build/multiplexer_test  && ./build/sequencer_test",
+  "my.terminal.run.cmd2": "clear; cmake --build ./build && cmake --build ./build --target test",
   "my.terminal.run.cmd3": "clear; ./bin/run-clang-tidy.sh",
   "cSpell.words": [
     "Interprocess",
