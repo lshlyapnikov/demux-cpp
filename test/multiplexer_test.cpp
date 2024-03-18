@@ -128,6 +128,15 @@ TEST(MultiPlexerTest, MessageBuffer_write) {
   });
 }
 
+TEST(MultiPlexerTest, MessageBuffer_write_empty) {
+  MessageBuffer<TEST_MAX_MSG_SIZE> buf(TEST_MAX_MSG_SIZE + 2);
+  unique_ptr<uint8_t> msg(new uint8_t[0]);
+  const size_t written = buf.write(0, span(msg.get(), 0));
+  ASSERT_EQ(written, sizeof(uint16_t));
+  const span<uint8_t> read = buf.read(0);
+  ASSERT_EQ(read.size(), 0);
+}
+
 TEST(MultiplexerTest, Constructor) {
   MultiplexerPublisher<32, 4> m(5);
   MultiplexerPublisher<32, 4> m1(32);

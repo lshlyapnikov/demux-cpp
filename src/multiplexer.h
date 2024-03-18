@@ -40,7 +40,7 @@ struct MessageBuffer {
     if (this->remaining(position) >= total_required) {
       uint8_t* data = this->data_.get();
       std::copy_n(&n, x, data + position);
-      std::copy_n(message.begin(), n, data + position + x);
+      std::copy_n(message.data(), n, data + position + x);
       return total_required;
     } else {
       return 0;
