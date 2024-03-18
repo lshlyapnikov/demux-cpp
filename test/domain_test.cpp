@@ -3,6 +3,7 @@
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
 #include <cmath>
 #include <cstdint>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <tuple>

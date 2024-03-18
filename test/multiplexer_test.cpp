@@ -8,15 +8,29 @@
 #include <cstdint>
 #include <iostream>
 #include <iterator>
+#include <memory>
 #include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
+using ShmSequencer::MessageBuffer;
 using ShmSequencer::MultiplexerPublisher;
+using std::span;
 using std::uint16_t;
 using std::uint8_t;
+using std::unique_ptr;
 using std::vector;
+
+const uint16_t TEST_MAX_MSG_SIZE = 32;
+
+auto create_test_array(const size_t size) -> unique_ptr<uint8_t> {
+  unique_ptr<uint8_t> result(new uint8_t[size]);
+  for (uint8_t i = 0; i < size; i++) {
+    result.get()[i] = i;
+  }
+  return result;
+}
 
 // namespace rc {
 // template <>
@@ -68,6 +82,51 @@ using std::vector;
 //             });
 // }
 // NOLINTEND(misc-include-cleaner,cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
+
+// TEST(MultiplexerTest, MessageBuffer_constructor) {
+//   rc::check("MessageBuffer::constructor", [](const uint8_t size) {
+//     if (size >= TEST_MAX_MSG_SIZE + sizeof(uint16_t)) {
+//       MessageBuffer<TEST_MAX_MSG_SIZE> buf(size);
+//       ASSERT_EQ(size, buf.remaining(0));
+//     } else {
+//       ASSERT_THROW({ std::ignore = MessageBuffer<TEST_MAX_MSG_SIZE>(size); }, std::invalid_argument);
+//     }
+//   });
+// }
+
+TEST(MultiplexerTest, MessageBuffer_remaining) {
+  rc::check("MessageBuffer::remaining", [](const uint8_t size, const uint8_t position) {
+    MessageBuffer<TEST_MAX_MSG_SIZE> buf(size);
+    const size_t actual = buf.remaining(position);
+    if (position >= size) {
+      ASSERT_EQ(actual, 0);
+    } else {
+      ASSERT_EQ(actual, (size - position));
+    }
+  });
+}
+
+TEST(MultiPlexerTest, MessageBuffer_write) {
+  rc::check("MessageBuffer::write", [](const uint8_t buf_size, const uint8_t position, const uint8_t src_size) {
+    std::cout << "buf_size: " << (int)buf_size << ", position: " << (int)position << ", src_size: " << (int)src_size
+              << std::endl;
+    MessageBuffer<TEST_MAX_MSG_SIZE> buf(buf_size);
+    const size_t remaining = buf.remaining(position);
+    const unique_ptr<uint8_t> src = create_test_array(src_size);
+    const size_t written = buf.write(position, span(src.get(), src_size));
+    if (remaining >= src_size + sizeof(uint16_t)) {
+      ASSERT_EQ(src_size + sizeof(uint16_t), written);
+      const span<uint8_t> read = buf.read(position);
+      ASSERT_EQ(read.size(), src_size);
+      for (uint8_t i = 0; i < src_size; i++) {
+        std::cout << "\ti:" << (int)i << ", value: " << (int)src.get()[i] << std::endl;
+        ASSERT_EQ(read[i], src.get()[i]);
+      }
+    } else {
+      ASSERT_EQ(0, written);
+    }
+  });
+}
 
 TEST(MultiplexerTest, Constructor) {
   MultiplexerPublisher<32, 4> m(5);

@@ -6,8 +6,10 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <optional>
 #include <span>
+#include <stdexcept>
 #include <type_traits>
 #include "atomic_util.h"
 #include "domain.h"
@@ -16,12 +18,56 @@ namespace ShmSequencer {
 
 using std::array;
 using std::atomic;
+using std::make_unique;
+using std::nullopt;
 using std::optional;
 using std::size_t;
 using std::span;
 using std::uint64_t;
+using std::unique_ptr;
 
 // enum MultiplexerResult { Ok, FullBuffer, MemoryOverlap };
+
+template <const uint16_t M>
+struct MessageBuffer {
+ public:
+  MessageBuffer(const size_t size) : size_(size), data_(new uint8_t[size]) {}
+
+  auto write(const size_t position, const span<uint8_t> message) noexcept -> size_t {
+    const size_t x = sizeof(uint16_t);
+    const size_t n = message.size();
+    const size_t total_required = n + x;
+    if (this->remaining(position) >= total_required) {
+      uint8_t* data = this->data_.get();
+      std::copy_n(&n, x, data + position);
+      std::copy_n(message.begin(), n, data + position + x);
+      return total_required;
+    } else {
+      return 0;
+    }
+  }
+
+  auto remaining(const size_t position) const noexcept -> size_t {
+    if (position >= this->size_) {
+      return 0;
+    } else {
+      return this->size_ - position;
+    }
+  }
+
+  auto read(const size_t position) const noexcept -> span<uint8_t> {
+    uint16_t msg_size = 0;
+    uint8_t* data = this->data_.get();
+    data += position;
+    std::copy_n(data, sizeof(uint16_t), &msg_size);
+    data += sizeof(uint16_t);
+    return span(data, msg_size);
+  }
+
+ private:
+  const size_t size_;
+  unique_ptr<uint8_t[]> data_;
+};
 
 /// @brief Multiplexer publisher.
 /// @tparam N total buffer size in bytes.
