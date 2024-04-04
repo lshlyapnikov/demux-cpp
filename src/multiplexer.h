@@ -31,6 +31,8 @@ using std::unique_ptr;
 /// @brief MessageBuffer that can be allocated in shared memory. External synchronization is required for accessing
 ///        the `data_` via `read` and `write` calls. Read or write `position` must be stored outside of this class.
 struct MessageBuffer {
+  using message_length_t = uint16_t;
+
  public:
   MessageBuffer(const size_t size) : size_(size), data_(new uint8_t[size]) {}
 
@@ -39,17 +41,14 @@ struct MessageBuffer {
   /// @param message -- the bytes that should be written.
   /// @return the total number of written bytes (2 + message length) or zero.
   auto write(const size_t position, const span<uint8_t> message) noexcept -> size_t {
-    const size_t x = sizeof(uint16_t);
+    const size_t x = sizeof(message_length_t);
     const size_t n = message.size();
     const size_t total_required = n + x;
 
     if (this->remaining(position) >= total_required) {
       uint8_t* data = this->data_.get();
-      // write the length of the message
-      std::copy_n(&n, x, data + position);
-      // write the message bytes
-      std::copy_n(message.data(), n, data + position + x);
-
+      std::copy_n(&n, x, data + position);                  // write message length
+      std::copy_n(message.data(), n, data + position + x);  // write message bytes
       return total_required;
     } else {
       return 0;
@@ -71,11 +70,11 @@ struct MessageBuffer {
   /// @param position zero-based byte offset.
   /// @return the message at the provided position.
   auto read(const size_t position) const noexcept -> span<uint8_t> {
-    uint16_t msg_size = 0;
+    message_length_t msg_size = 0;
     uint8_t* data = this->data_.get();
     data += position;
-    std::copy_n(data, sizeof(uint16_t), &msg_size);
-    data += sizeof(uint16_t);
+    std::copy_n(data, sizeof(message_length_t), &msg_size);
+    data += sizeof(message_length_t);
     return span(data, msg_size);
   }
 
