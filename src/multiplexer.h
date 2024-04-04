@@ -28,33 +28,48 @@ using std::unique_ptr;
 
 // enum MultiplexerResult { Ok, FullBuffer, MemoryOverlap };
 
-template <const uint16_t M>
+/// @brief MessageBuffer that can be allocated in shared memory. External synchronization is required for accessing
+///        the `data_` via `read` and `write` calls. Read or write `position` must be stored outside of this class.
 struct MessageBuffer {
  public:
   MessageBuffer(const size_t size) : size_(size), data_(new uint8_t[size]) {}
 
+  /// @brief Writes the entire passed message into the buffer.
+  /// @param position -- the zero-based byte offset at which the message should be written.
+  /// @param message -- the bytes that should be written.
+  /// @return the total number of written bytes (2 + message length) or zero.
   auto write(const size_t position, const span<uint8_t> message) noexcept -> size_t {
     const size_t x = sizeof(uint16_t);
     const size_t n = message.size();
     const size_t total_required = n + x;
+
     if (this->remaining(position) >= total_required) {
       uint8_t* data = this->data_.get();
+      // write the length of the message
       std::copy_n(&n, x, data + position);
+      // write the message bytes
       std::copy_n(message.data(), n, data + position + x);
+
       return total_required;
     } else {
       return 0;
     }
   }
 
+  /// @param position -- zero-based byte offset.
+  /// @return the available number of byte at the provided position.
   auto remaining(const size_t position) const noexcept -> size_t {
-    if (position >= this->size_) {
+    if (this->size_ <= position) {
       return 0;
     } else {
       return this->size_ - position;
     }
   }
 
+  /// @brief Reads the message at the specified position. The behavior is undefined if wrong position provided,
+  ///        the position that does not pointing to a 2-byte length value.
+  /// @param position zero-based byte offset.
+  /// @return the message at the provided position.
   auto read(const size_t position) const noexcept -> span<uint8_t> {
     uint16_t msg_size = 0;
     uint8_t* data = this->data_.get();
@@ -66,9 +81,11 @@ struct MessageBuffer {
 
  private:
   const size_t size_;
-  unique_ptr<uint8_t[]> data_;
+  const unique_ptr<uint8_t[]> data_;
 };
 
+// TODO: Leo: This is unfinished
+//
 /// @brief Multiplexer publisher.
 /// @tparam N total buffer size in bytes.
 /// @tparam M max packet size in bytes.
@@ -158,6 +175,8 @@ class MultiplexerPublisher {
   std::array<std::atomic<uint32_t>, N> all_subs_reached_end_of_buffer_mask_;
 };
 
+// TODO: Leo: This is unfinished
+//
 /// @brief Multiplexer subscriber. Should be mapped into shared memory allocated by MultiplexerPublisher.
 /// @tparam N max number of packets.
 /// @tparam M max packet size.

@@ -71,6 +71,7 @@ TEST(DomainTest, SubscriberIdManualCheck) {
 }
 // NOLINTEND(readability-function-cognitive-complexity)
 
+// NOLINTBEGIN(readability-function-cognitive-complexity)
 TEST(DomainTest, SubscriberId) {
   rc::check("SubscriberId::create", [](const uint8_t num) {
     if (num > ShmSequencer::MAX_SUBSCRIBER_NUM || num == 0) {
@@ -82,7 +83,9 @@ TEST(DomainTest, SubscriberId) {
     }
   });
 }
+// NOLINTEND(readability-function-cognitive-complexity)
 
+// NOLINTBEGIN(readability-function-cognitive-complexity)
 TEST(DomainTest, AllSubscribersMask) {
   rc::check("SubscriberId::all_subscribers_mask", [](const uint8_t num) {
     if (num > ShmSequencer::MAX_SUBSCRIBER_NUM || num == 0) {
@@ -93,3 +96,4 @@ TEST(DomainTest, AllSubscribersMask) {
     }
   });
 }
+// NOLINTEND(readability-function-cognitive-complexity)

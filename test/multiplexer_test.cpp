@@ -86,17 +86,17 @@ auto create_test_array(const size_t size) -> unique_ptr<uint8_t> {
 // TEST(MultiplexerTest, MessageBuffer_constructor) {
 //   rc::check("MessageBuffer::constructor", [](const uint8_t size) {
 //     if (size >= TEST_MAX_MSG_SIZE + sizeof(uint16_t)) {
-//       MessageBuffer<TEST_MAX_MSG_SIZE> buf(size);
+//       MessageBuffer buf(size);
 //       ASSERT_EQ(size, buf.remaining(0));
 //     } else {
-//       ASSERT_THROW({ std::ignore = MessageBuffer<TEST_MAX_MSG_SIZE>(size); }, std::invalid_argument);
+//       ASSERT_THROW({ std::ignore = MessageBuffer(size); }, std::invalid_argument);
 //     }
 //   });
 // }
 
 TEST(MultiplexerTest, MessageBuffer_remaining) {
   rc::check("MessageBuffer::remaining", [](const uint8_t size, const uint8_t position) {
-    MessageBuffer<TEST_MAX_MSG_SIZE> buf(size);
+    MessageBuffer buf(size);
     const size_t actual = buf.remaining(position);
     if (position >= size) {
       ASSERT_EQ(actual, 0);
@@ -110,7 +110,7 @@ TEST(MultiPlexerTest, MessageBuffer_write) {
   rc::check("MessageBuffer::write", [](const uint8_t buf_size, const uint8_t position, const uint8_t src_size) {
     std::cout << "buf_size: " << (int)buf_size << ", position: " << (int)position << ", src_size: " << (int)src_size
               << std::endl;
-    MessageBuffer<TEST_MAX_MSG_SIZE> buf(buf_size);
+    MessageBuffer buf(buf_size);
     const size_t remaining = buf.remaining(position);
     const unique_ptr<uint8_t> src = create_test_array(src_size);
     const size_t written = buf.write(position, span(src.get(), src_size));
@@ -118,6 +118,7 @@ TEST(MultiPlexerTest, MessageBuffer_write) {
       ASSERT_EQ(src_size + sizeof(uint16_t), written);
       const span<uint8_t> read = buf.read(position);
       ASSERT_EQ(read.size(), src_size);
+      // compare read bytes with the src bytes
       for (uint8_t i = 0; i < src_size; i++) {
         std::cout << "\ti:" << (int)i << ", value: " << (int)src.get()[i] << std::endl;
         ASSERT_EQ(read[i], src.get()[i]);
@@ -129,7 +130,7 @@ TEST(MultiPlexerTest, MessageBuffer_write) {
 }
 
 TEST(MultiPlexerTest, MessageBuffer_write_empty) {
-  MessageBuffer<TEST_MAX_MSG_SIZE> buf(TEST_MAX_MSG_SIZE + 2);
+  MessageBuffer buf(TEST_MAX_MSG_SIZE + 2);
   unique_ptr<uint8_t> msg(new uint8_t[0]);
   const size_t written = buf.write(0, span(msg.get(), 0));
   ASSERT_EQ(written, sizeof(uint16_t));
