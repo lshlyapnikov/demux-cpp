@@ -32,6 +32,15 @@ auto create_test_array(const size_t size) -> unique_ptr<uint8_t> {
   return result;
 }
 
+TEST(MultiplexerTest, Atomic) {
+  ASSERT_EQ(std::atomic<uint8_t>{}.is_lock_free(), true);
+  ASSERT_EQ(std::atomic<uint16_t>{}.is_lock_free(), true);
+  ASSERT_EQ(std::atomic<uint32_t>{}.is_lock_free(), true);
+  ASSERT_EQ(std::atomic<size_t>{}.is_lock_free(), true);
+  ASSERT_EQ(std::atomic<uint64_t>{}.is_lock_free(), true);
+  ASSERT_EQ(sizeof(size_t), sizeof(uint64_t));
+}
+
 // namespace rc {
 // template <>
 // struct Arbitrary<span<uint8_t>> {
@@ -96,7 +105,8 @@ auto create_test_array(const size_t size) -> unique_ptr<uint8_t> {
 
 TEST(MultiplexerTest, MessageBuffer_remaining) {
   rc::check("MessageBuffer::remaining", [](const uint8_t size, const uint8_t position) {
-    MessageBuffer buf(size);
+    unique_ptr<uint8_t> data(new uint8_t[size]);
+    MessageBuffer buf(span(data.get(), size));
     const size_t actual = buf.remaining(position);
     if (position >= size) {
       ASSERT_EQ(actual, 0);
@@ -110,7 +120,9 @@ TEST(MultiPlexerTest, MessageBuffer_write) {
   rc::check("MessageBuffer::write", [](const uint8_t buf_size, const uint8_t position, const uint8_t src_size) {
     std::cout << "buf_size: " << (int)buf_size << ", position: " << (int)position << ", src_size: " << (int)src_size
               << std::endl;
-    MessageBuffer buf(buf_size);
+
+    unique_ptr<uint8_t> data(new uint8_t[buf_size]);
+    MessageBuffer buf(span(data.get(), buf_size));
     const size_t remaining = buf.remaining(position);
     const unique_ptr<uint8_t> src = create_test_array(src_size);
     const size_t written = buf.write(position, span(src.get(), src_size));
@@ -130,7 +142,9 @@ TEST(MultiPlexerTest, MessageBuffer_write) {
 }
 
 TEST(MultiPlexerTest, MessageBuffer_write_empty) {
-  MessageBuffer buf(TEST_MAX_MSG_SIZE + 2);
+  const size_t size = TEST_MAX_MSG_SIZE + 2;
+  unique_ptr<uint8_t> data(new uint8_t[size]);
+  MessageBuffer buf(span(data.get(), size));
   unique_ptr<uint8_t> msg(new uint8_t[0]);
   const size_t written = buf.write(0, span(msg.get(), 0));
   ASSERT_EQ(written, sizeof(uint16_t));

@@ -28,13 +28,15 @@ using std::unique_ptr;
 
 // enum MultiplexerResult { Ok, FullBuffer, MemoryOverlap };
 
-/// @brief MessageBuffer that can be allocated in shared memory. External synchronization is required for accessing
-///        the `data_` via `read` and `write` calls. Read or write `position` must be stored outside of this class.
+/// @brief MessageBuffer wraps a byte array, which can be allocated in shared memory. MessageBuffer does not take the
+/// ownership of the passed buffer. The outside logic is responsible to freeing the passed buffer. External
+/// synchronization is required for accessing the `data_` via `read` and `write` calls. Read or write `position` must be
+/// stored outside of this class.
 struct MessageBuffer {
   using message_length_t = uint16_t;
 
  public:
-  MessageBuffer(const size_t size) : size_(size), data_(new uint8_t[size]) {}
+  MessageBuffer(span<uint8_t> buffer) : size_(buffer.size()), data_(buffer.data()) {}
 
   /// @brief Writes the entire passed message into the buffer.
   /// @param position -- the zero-based byte offset at which the message should be written.
@@ -46,7 +48,7 @@ struct MessageBuffer {
     const size_t total_required = n + x;
 
     if (this->remaining(position) >= total_required) {
-      uint8_t* data = this->data_.get();
+      uint8_t* data = this->data_;
       std::copy_n(&n, x, data + position);                  // write message length
       std::copy_n(message.data(), n, data + position + x);  // write message bytes
       return total_required;
@@ -71,7 +73,7 @@ struct MessageBuffer {
   /// @return the message at the provided position.
   auto read(const size_t position) const noexcept -> span<uint8_t> {
     message_length_t msg_size = 0;
-    uint8_t* data = this->data_.get();
+    uint8_t* data = this->data_;
     data += position;
     std::copy_n(data, sizeof(message_length_t), &msg_size);
     data += sizeof(message_length_t);
@@ -79,8 +81,8 @@ struct MessageBuffer {
   }
 
  private:
-  const size_t size_;
-  const unique_ptr<uint8_t[]> data_;
+  size_t const size_;
+  uint8_t* const data_;
 };
 
 // TODO: Leo: This is unfinished
@@ -170,6 +172,8 @@ class MultiplexerPublisher {
   size_t size_{0};
   std::atomic<uint64_t> message_count_{0};
   std::array<uint8_t, N> buffer_;
+
+  std::atomic<size_t> position_{0};
 
   uint8_t total_subs_number_;
   const uint32_t all_subs_mask_;

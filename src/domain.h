@@ -10,6 +10,7 @@
 #include <string>
 
 namespace ShmSequencer {
+
 using std::size_t;
 using std::uint16_t;
 using std::uint64_t;
@@ -39,7 +40,7 @@ using std::uint8_t;
 const size_t MAX_SUBSCRIBER_NUM = sizeof(uint32_t) * 8;  // 32
 
 [[nodiscard]] constexpr auto is_valid_subscriber_number(uint8_t num) noexcept -> bool {
-  return num >= 1 && num <= MAX_SUBSCRIBER_NUM;
+  return 1 <= num && num <= MAX_SUBSCRIBER_NUM;
 }
 
 constexpr auto validate_subscriber_number(uint8_t num) noexcept(false) -> uint8_t {
