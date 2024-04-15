@@ -67,8 +67,8 @@ struct MessageBuffer {
     }
   }
 
-  /// @brief Reads the message at the specified position. The behavior is undefined if wrong position provided,
-  ///        the position that does not pointing to a 2-byte length value.
+  /// @brief Reads the message at the specified position. The behavior is undefined when wrong position is provided,
+  ///        position has to point to a 2-byte length value that precedes the bytes data.
   /// @param position zero-based byte offset.
   /// @return the message at the provided position.
   auto read(const size_t position) const noexcept -> span<uint8_t> {
