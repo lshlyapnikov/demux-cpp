@@ -26,8 +26,6 @@ using std::span;
 using std::uint64_t;
 using std::unique_ptr;
 
-// enum MultiplexerResult { Ok, FullBuffer, MemoryOverlap };
-
 /// @brief MessageBuffer wraps a byte array, which can be allocated in shared memory. MessageBuffer does not take the
 /// ownership of the passed buffer. The outside logic is responsible to freeing the passed buffer. External
 /// synchronization is required for accessing the `data_` via `read` and `write` calls. Read or write `position` must be
@@ -123,14 +121,13 @@ class MultiplexerPublisher {
     if (n == 0) {
       return true;
     } else if (n > M) {
-      // TODO: should you throw from here???
       return false;
     } else {
       const size_t required_space = sizeof(uint16_t) + n;
-      const size_t current_offset = this->size_;
-      const size_t new_offset = current_offset + required_space;
-      if (new_offset <= N) {
-        uint8_t* dst_address = this->buffer_.data() + current_offset;
+      const size_t cur_position = this->size_;
+      const size_t new_position = cur_position + required_space;
+      if (new_position <= N) {
+        uint8_t* dst_address = this->buffer_.data() + cur_position;
         // write the source length
         const uint16_t length = static_cast<uint16_t>(n);
         memcpy(dst_address, &length, sizeof(uint16_t));
@@ -138,7 +135,7 @@ class MultiplexerPublisher {
         dst_address += sizeof(uint16_t);
         // std::copy(source.begin(), source.end(), dst_address);
         memcpy(dst_address, source.data(), n);
-        this->size_ = new_offset;
+        this->size_ = new_position;
         message_count_.fetch_add(1L, std::memory_order_seq_cst);
         return true;
       } else {
@@ -162,6 +159,13 @@ class MultiplexerPublisher {
   auto message_count() const noexcept -> size_t { return this->message_count_.load(); }
 
   auto data() const noexcept -> span<uint8_t> { return span(this->buffers_.data(), this->size_); }
+
+  /// new design
+  /// roll over if there is no remaining space in the buffer or available space is less than 2 bytes.
+  auto should_roll_over() -> bool {
+    // TODO: use MessageBuffer::remaining method here
+    return this->size_ >= N || (N - this->size_) < sizeof(uint16_t);
+  }
 
  private:
   auto increment_index() noexcept -> void {

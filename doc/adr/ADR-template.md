@@ -5,6 +5,8 @@ You can use [adr-tools](https://github.com/npryce/adr-tools) for managing the AD
 
 In each ADR file, write these sections:
 
+---
+
 # Title
 
 ## Status
