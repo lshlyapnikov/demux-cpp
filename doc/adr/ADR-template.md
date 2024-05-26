@@ -1,9 +1,4 @@
-# Decision record template by Michael Nygard
-
-This is the template in [Documenting architecture decisions - Michael Nygard](http://thinkrelevance.com/blog/2011/11/15/documenting-architecture-decisions).
-You can use [adr-tools](https://github.com/npryce/adr-tools) for managing the ADR files.
-
-In each ADR file, write these sections:
+This is the template from [Documenting architecture decisions - Michael Nygard](http://thinkrelevance.com/blog/2011/11/15/documenting-architecture-decisions).
 
 ---
 
@@ -11,7 +6,6 @@ In each ADR file, write these sections:
 
 ## Status
 
-What is the status, such as proposed, accepted, rejected, deprecated, superseded, etc.?
 [ ] proposed, [X] accepted, [ ] rejected, [ ] deprecated, [ ] superseded
 
 ## Context
