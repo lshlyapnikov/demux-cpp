@@ -3,7 +3,6 @@
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
 #include <cmath>
 #include <cstdint>
-#include <optional>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -11,12 +10,12 @@
 using ShmSequencer::SubscriberId;
 
 TEST(DomainTest, Constants) {
-  EXPECT_EQ(ShmSequencer::MAX_SUBSCRIBER_NUM, 32);
+  EXPECT_EQ(ShmSequencer::MAX_SUBSCRIBER_NUM, 64);
 }
 
 // NOLINTBEGIN(readability-function-cognitive-complexity)
 TEST(DomainTest, SubscriberIdManualCheck) {
-  for (const uint8_t num : {0, 33, 128, 255}) {
+  for (const uint8_t num : {0, 65, 128, 255}) {
     ASSERT_THROW({ std::ignore = SubscriberId::create(num); }, std::invalid_argument);
     ASSERT_THROW({ std::ignore = SubscriberId::all_subscribers_mask(num); }, std::invalid_argument);
   }
@@ -65,8 +64,17 @@ TEST(DomainTest, SubscriberIdManualCheck) {
     ASSERT_EQ(31, sub_id.index());
     ASSERT_EQ(0b10000000000000000000000000000000, sub_id.mask());
 
-    const std::optional<uint32_t> mask = SubscriberId::all_subscribers_mask(32);
+    const uint32_t mask = SubscriberId::all_subscribers_mask(32);
     ASSERT_EQ(0b11111111111111111111111111111111, mask);
+  }
+
+  {
+    const SubscriberId sub_id = SubscriberId::create(64);
+    ASSERT_EQ(63, sub_id.index());
+    ASSERT_EQ(0b1000000000000000000000000000000000000000000000000000000000000000, sub_id.mask());
+
+    const uint64_t mask = SubscriberId::all_subscribers_mask(64);
+    ASSERT_EQ(0b1111111111111111111111111111111111111111111111111111111111111111, mask);
   }
 }
 // NOLINTEND(readability-function-cognitive-complexity)

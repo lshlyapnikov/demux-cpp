@@ -153,20 +153,21 @@ TEST(MultiPlexerTest, MessageBuffer_write_empty) {
 }
 
 TEST(MultiplexerTest, Constructor) {
-  MultiplexerPublisher<32, 4> m(5);
+  MultiplexerPublisher<32, 4> m0(5);
   MultiplexerPublisher<32, 4> m1(32);
+  MultiplexerPublisher<32, 4> m2(64);
 
   try {
     MultiplexerPublisher<32, 4> m3(0);
     FAIL() << "Expected exception here";
   } catch (std::invalid_argument e) {
-    ASSERT_STREQ(e.what(), "subscriber_number must be within the inclusive interval: [1, 32]");
+    ASSERT_STREQ(e.what(), "subscriber_number must be within the inclusive interval: [1, 64]");
   }
 
   try {
-    MultiplexerPublisher<32, 4> m3(33);
+    MultiplexerPublisher<32, 4> m3(65);
     FAIL() << "Expected exception here";
   } catch (std::invalid_argument e) {
-    ASSERT_STREQ(e.what(), "subscriber_number must be within the inclusive interval: [1, 32]");
+    ASSERT_STREQ(e.what(), "subscriber_number must be within the inclusive interval: [1, 64]");
   }
 }

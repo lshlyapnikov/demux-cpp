@@ -37,7 +37,7 @@ using std::uint8_t;
 //   uint16_t value_;
 // };
 
-const size_t MAX_SUBSCRIBER_NUM = sizeof(uint32_t) * 8;  // 32
+const size_t MAX_SUBSCRIBER_NUM = sizeof(uint64_t) * 8;  // 64
 
 [[nodiscard]] constexpr auto is_valid_subscriber_number(uint8_t num) noexcept -> bool {
   return 1 <= num && num <= MAX_SUBSCRIBER_NUM;
@@ -47,32 +47,44 @@ constexpr auto validate_subscriber_number(uint8_t num) noexcept(false) -> uint8_
   if (is_valid_subscriber_number(num)) {
     return num;
   } else {
-    throw std::invalid_argument("subscriber_number must be within the inclusive interval: [1, 32]");
+    throw std::invalid_argument(std::string("subscriber_number must be within the inclusive interval: [1, ") +
+                                std::to_string(MAX_SUBSCRIBER_NUM) + ']');
   }
+}
+
+auto my_pow(uint8_t x, uint8_t p) -> uint64_t {
+  if (p == 0) {
+    return 1;
+  }
+  uint64_t result = x;
+  for (size_t i = 2; i <= p; ++i) {
+    result *= x;
+  }
+  return result;
 }
 
 class SubscriberId {
  public:
   [[nodiscard]] static auto create(uint8_t num) noexcept(false) -> SubscriberId {
     validate_subscriber_number(num);
-    const size_t index = num - 1;
-    const uint32_t mask = std::pow(2, index);
+    const uint8_t index = num - 1;
+    const uint64_t mask = my_pow(2, index);
     return SubscriberId{mask, index};
   }
 
-  [[nodiscard]] static auto all_subscribers_mask(uint8_t total_subscriber_num) noexcept(false) -> uint32_t {
+  [[nodiscard]] static auto all_subscribers_mask(uint8_t total_subscriber_num) noexcept(false) -> uint64_t {
     validate_subscriber_number(total_subscriber_num);
-    const uint32_t mask = std::pow(2, total_subscriber_num) - 1;
+    const uint64_t mask = my_pow(2, total_subscriber_num) - 1L;
     return mask;
   }
 
-  [[nodiscard]] auto mask() const noexcept -> uint32_t { return this->mask_; }
+  [[nodiscard]] auto mask() const noexcept -> uint64_t { return this->mask_; }
   [[nodiscard]] auto index() const noexcept -> size_t { return this->index_; }
 
  private:
-  SubscriberId(uint32_t mask, size_t index) noexcept : mask_(mask), index_(index) {}
+  SubscriberId(uint64_t mask, size_t index) noexcept : mask_(mask), index_(index) {}
 
-  uint32_t mask_;
+  uint64_t mask_;
   size_t index_;
 };
 
