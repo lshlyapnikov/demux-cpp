@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 project(shm-sequencer VERSION 0.1.0 LANGUAGES CXX)
 
-# set(CMAKE_VERBOSE_MAKEFILE ON) # verbose CMake output
+#set(CMAKE_VERBOSE_MAKEFILE ON) # verbose CMake output
 
 message("CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
 
@@ -19,7 +19,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # https://github.com/cpp-best-practices/cppbestpractices/blob/master/02-Use_the_Tools_Available.md#gcc--clang
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Werror")
+#set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wconversion -Wsign-conversion -Werror")
+set(MY_CXX_FLAGS -Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wconversion -Wsign-conversion -Werror)
 
 #
 # tools
@@ -58,6 +59,7 @@ set(FETCHCONTENT_QUIET OFF)
 
 FetchContent_Declare(
   googletest
+  SYSTEM
   URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
 )
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -65,15 +67,16 @@ FetchContent_MakeAvailable(googletest)
 
 FetchContent_Declare(
   rapidcheck
+  SYSTEM
   GIT_REPOSITORY git@github.com:emil-e/rapidcheck.git
   GIT_TAG ff6af6fc683159deb51c543b065eba14dfcf329b
 )
 FetchContent_MakeAvailable(rapidcheck)
 
+# system include directories does not raise compiler warnings
 include_directories(
-  # ${FLATBUF_ROOT}/include
-  ${Boost_INCLUDE_DIR}
-  ${rapidcheck_SOURCE_DIR}/include
+  SYSTEM ${Boost_INCLUDE_DIR}
+  SYSTEM ${rapidcheck_SOURCE_DIR}/include
 )
 
 #
@@ -84,6 +87,10 @@ add_library(
   sequencer
   OBJECT src/sequencer.cpp
 )
+target_compile_options(
+  sequencer
+  PRIVATE ${MY_CXX_FLAGS}
+)
 
 add_executable(
   ${PROJECT_NAME}
@@ -91,9 +98,13 @@ add_executable(
 )
 target_link_libraries(
   ${PROJECT_NAME}
-  PRIVATE atomic
   sequencer
+  atomic
   Boost::log
+)
+target_compile_options(
+  ${PROJECT_NAME}
+  PRIVATE ${MY_CXX_FLAGS}
 )
 
 enable_testing()
@@ -108,6 +119,10 @@ target_link_libraries(
   GTest::gtest_main
   rapidcheck
 )
+target_compile_options(
+  domain_test
+  PRIVATE ${MY_CXX_FLAGS}
+)
 gtest_discover_tests(domain_test)
 
 add_executable(
@@ -116,10 +131,14 @@ add_executable(
 )
 target_link_libraries(
   sequencer_test
-  PRIVATE atomic
   sequencer
+  atomic
   GTest::gtest_main
   Boost::log
+)
+target_compile_options(
+  sequencer_test
+  PRIVATE ${MY_CXX_FLAGS}
 )
 gtest_discover_tests(sequencer_test)
 
@@ -129,10 +148,14 @@ add_executable(
 )
 target_link_libraries(
   multiplexer_test
-  PRIVATE atomic
+  atomic
   sequencer
   GTest::gtest_main
   Boost::log
   rapidcheck
+)
+target_compile_options(
+  multiplexer_test
+  PRIVATE ${MY_CXX_FLAGS}
 )
 gtest_discover_tests(multiplexer_test)

@@ -180,7 +180,7 @@ class MultiplexerPublisher {
   std::atomic<size_t> position_{0};
 
   uint8_t total_subs_number_;
-  const uint32_t all_subs_mask_;
+  const uint64_t all_subs_mask_;
   std::array<std::atomic<uint32_t>, N> all_subs_reached_end_of_buffer_mask_;
 };
 
