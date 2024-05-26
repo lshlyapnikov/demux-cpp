@@ -66,7 +66,7 @@ FetchContent_MakeAvailable(googletest)
 FetchContent_Declare(
   rapidcheck
   GIT_REPOSITORY git@github.com:emil-e/rapidcheck.git
-  # GIT_TAG 1c91f40e64d87869250cfb610376c629307bf77d
+  GIT_TAG ff6af6fc683159deb51c543b065eba14dfcf329b
 )
 FetchContent_MakeAvailable(rapidcheck)
 
