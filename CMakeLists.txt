@@ -52,8 +52,6 @@ set(BOOST_ROOT $ENV{HOME}/local/boost-installed)
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost 1.83.0 REQUIRED COMPONENTS log)
 
-# set(FLATBUF_ROOT $ENV{HOME}/local/flatbuffers)
-
 include(FetchContent)
 set(FETCHCONTENT_QUIET OFF)
 
@@ -73,7 +71,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(rapidcheck)
 
-# system include directories does not raise compiler warnings
+# system include directories do not raise compiler warnings
 include_directories(
   SYSTEM ${Boost_INCLUDE_DIR}
   SYSTEM ${rapidcheck_SOURCE_DIR}/include
@@ -82,15 +80,6 @@ include_directories(
 #
 # artifacts
 #
-
-add_library(
-  sequencer
-  OBJECT src/sequencer.cpp
-)
-target_compile_options(
-  sequencer
-  PRIVATE ${MY_CXX_FLAGS}
-)
 
 add_executable(
   ${PROJECT_NAME}
@@ -104,6 +93,15 @@ target_link_libraries(
 )
 target_compile_options(
   ${PROJECT_NAME}
+  PRIVATE ${MY_CXX_FLAGS}
+)
+
+add_library(
+  sequencer
+  OBJECT src/sequencer.cpp
+)
+target_compile_options(
+  sequencer
   PRIVATE ${MY_CXX_FLAGS}
 )
 
@@ -134,7 +132,6 @@ target_link_libraries(
   sequencer
   atomic
   GTest::gtest_main
-  Boost::log
 )
 target_compile_options(
   sequencer_test
@@ -151,7 +148,6 @@ target_link_libraries(
   atomic
   sequencer
   GTest::gtest_main
-  Boost::log
   rapidcheck
 )
 target_compile_options(

@@ -15,7 +15,8 @@ TEST(DomainTest, Constants) {
 
 // NOLINTBEGIN(readability-function-cognitive-complexity)
 TEST(DomainTest, SubscriberIdManualCheck) {
-  for (const uint8_t num : {(uint8_t)0, (uint8_t)65, (uint8_t)128, (uint8_t)255}) {
+  for (const uint8_t num :
+       {static_cast<uint8_t>(0), static_cast<uint8_t>(65), static_cast<uint8_t>(128), static_cast<uint8_t>(255)}) {
     ASSERT_THROW({ std::ignore = SubscriberId::create(num); }, std::invalid_argument);
     ASSERT_THROW({ std::ignore = SubscriberId::all_subscribers_mask(num); }, std::invalid_argument);
   }
@@ -79,7 +80,7 @@ TEST(DomainTest, SubscriberIdManualCheck) {
 }
 // NOLINTEND(readability-function-cognitive-complexity)
 
-// NOLINTBEGIN(readability-function-cognitive-complexity)
+// NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner)
 TEST(DomainTest, SubscriberId) {
   rc::check("SubscriberId::create", [](const uint8_t num) {
     if (num > ShmSequencer::MAX_SUBSCRIBER_NUM || num == 0) {
@@ -91,9 +92,9 @@ TEST(DomainTest, SubscriberId) {
     }
   });
 }
-// NOLINTEND(readability-function-cognitive-complexity)
+// NOLINTEND(readability-function-cognitive-complexity, misc-include-cleaner)
 
-// NOLINTBEGIN(readability-function-cognitive-complexity)
+// NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner)
 TEST(DomainTest, AllSubscribersMask) {
   rc::check("SubscriberId::all_subscribers_mask", [](const uint8_t num) {
     if (num > ShmSequencer::MAX_SUBSCRIBER_NUM || num == 0) {
@@ -104,4 +105,4 @@ TEST(DomainTest, AllSubscribersMask) {
     }
   });
 }
-// NOLINTEND(readability-function-cognitive-complexity)
+// NOLINTEND(readability-function-cognitive-complexity, misc-include-cleaner)
