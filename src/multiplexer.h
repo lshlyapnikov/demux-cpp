@@ -104,27 +104,20 @@ class MultiplexerPublisher {
         message_count_sync_(message_count_sync),
         wraparound_sync_(wraparound_sync) {}
 
-  auto send(const span<uint8_t> source) noexcept -> bool {
+  auto send(const span<uint8_t> source) noexcept(false) -> bool {
     const size_t n = source.size();
-    if (n == 0) {
-      return true;
-    } else if (n > M) {
-      return false;
+    if (n <= M) {
+      return this->send_(source);
     } else {
-      const written = this->buffer_.write(this->position_, source);
-      if (written > 0) {
-        this->position_ += written;
-        return true;
-      } else {
-        // TODO
-      }
+      throw std::invalid_argument(std::string("source.size() must be <= M, source.size(): ") + std::to_string(n) +
+                                  "M: " + std::to_string(M));
     }
   }
 
   template <const uint16_t A>
     requires(A <= M)
-  auto send_static(const span<uint8_t, A> source) noexcept -> bool {
-    return this->send(source);
+  auto send(const span<uint8_t, A> source) noexcept -> bool {
+    return this->send_(source);
   }
 
   auto wait_all_subs_reached_end_of_buffer() const noexcept -> void {
@@ -148,6 +141,24 @@ class MultiplexerPublisher {
   }
 
  private:
+  auto send_(const span<uint8_t> source) noexcept -> bool {
+    const size_t n = source.size();
+    if (n == 0) {
+      return true;
+    } else if (n > M) {
+      return false;
+    } else {
+      const size_t written = this->buffer_.write(this->position_, source);
+      if (written > 0) {
+        this->position_ += written;
+        return true;
+      } else {
+        // TODO
+        return 0;
+      }
+    }
+  }
+
   auto increment_index() noexcept -> void {
     const size_t i = this->index_;
     this->index_ = (i == N - 1) ? 0 : i + 1;
