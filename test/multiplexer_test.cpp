@@ -1,6 +1,7 @@
 #include "../src/multiplexer.h"
 #include <gtest/gtest.h>
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
+#include <array>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -12,6 +13,8 @@
 
 using ShmSequencer::MessageBuffer;
 using ShmSequencer::MultiplexerPublisher;
+using std::array;
+using std::atomic;
 using std::span;
 using std::uint16_t;
 using std::uint8_t;
@@ -148,23 +151,32 @@ TEST(MultiPlexerTest, MessageBufferWriteEmpty) {
 }
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
-TEST(MultiplexerTest, Constructor) {
-  const MultiplexerPublisher<32, 4> m0(5);
-  const MultiplexerPublisher<32, 4> m1(32);
-  const MultiplexerPublisher<32, 4> m2(64);
+TEST(MultiplexerTest, ConstructorDoesNotThrowWhenValidSubscriberNumberPassed) {
+  array<uint8_t, 32> buffer;
+  atomic<uint64_t> msg_counter_sync{0};
+  atomic<uint64_t> wraparound_sync{0};
 
-  try {
-    const MultiplexerPublisher<32, 4> m3(0);
-    FAIL() << "Expected exception here";
-  } catch (std::invalid_argument& e) {
-    ASSERT_STREQ(e.what(), "subscriber_number must be within the inclusive interval: [1, 64]");
+  const array<uint8_t, 7> valid_subscriber_numbers{1, 2, 3, 4, 5, 32, 64};
+  for (uint8_t x : valid_subscriber_numbers) {
+    const MultiplexerPublisher<32, 4> m0(x, buffer, &msg_counter_sync, &wraparound_sync);
   }
+}
+// NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
 
-  try {
-    const MultiplexerPublisher<32, 4> m3(65);
-    FAIL() << "Expected exception here";
-  } catch (std::invalid_argument& e) {
-    ASSERT_STREQ(e.what(), "subscriber_number must be within the inclusive interval: [1, 64]");
+// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
+TEST(MultiplexerTest, ConstructorThrowsWhenInvalidSubscriberNumberPassed) {
+  array<uint8_t, 32> buffer;
+  atomic<uint64_t> msg_counter_sync{0};
+  atomic<uint64_t> wraparound_sync{0};
+
+  const array<uint8_t, 4> invalid_subscriber_numbers{0, 65, 66, 128};
+  for (uint8_t x : invalid_subscriber_numbers) {
+    try {
+      const MultiplexerPublisher<32, 4> m3(x, buffer, &msg_counter_sync, &wraparound_sync);
+      FAIL() << "Expected exception here but did not get any";
+    } catch (std::invalid_argument& e) {
+      ASSERT_STREQ(e.what(), "subscriber_number must be within the inclusive interval: [1, 64]");
+    }
   }
 }
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)

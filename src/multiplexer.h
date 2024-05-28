@@ -94,27 +94,15 @@ template <const size_t N, const uint16_t M>
   requires(N >= M + 2)
 class MultiplexerPublisher {
  public:
-  MultiplexerPublisher(uint8_t total_subs_number) noexcept(false)
+  MultiplexerPublisher(uint8_t total_subs_number,
+                       span<uint8_t, N> buffer,
+                       atomic<uint64_t>* message_count_sync,
+                       atomic<uint64_t>* wraparound_sync) noexcept(false)
       : total_subs_number_(validate_subscriber_number(total_subs_number)),
-        all_subs_mask_(SubscriberId::all_subscribers_mask(total_subs_number)) {}
-
-  // auto send(const span<uint8_t> source) noexcept -> bool {
-  //   const size_t n = source.size();
-  //   if (n == 0) {
-  //     return true;
-  //   } else if (n > M) {
-  //     return false;
-  //   } else {
-  //     const size_t i = this->index_;
-  //     std::atomic<uint32_t>& mask = this->masks_[i];
-  //     wait_exact_value_and_acquire(mask, this->all_subscribers_mask_);
-  //     std::copy(source.begin(), source.end(), this->buffers_[i]);
-  //     this->buffer_lengths_[i] = n;
-  //     set_and_release(&mask, 0U);
-  //     this->increment_index();
-  //     return true;
-  //   }
-  // }
+        all_subs_mask_(SubscriberId::all_subscribers_mask(total_subs_number)),
+        buffer_(buffer),
+        message_count_sync_(message_count_sync),
+        wraparound_sync_(wraparound_sync) {}
 
   auto send(const span<uint8_t> source) noexcept -> bool {
     const size_t n = source.size();
@@ -123,28 +111,20 @@ class MultiplexerPublisher {
     } else if (n > M) {
       return false;
     } else {
-      const size_t required_space = sizeof(uint16_t) + n;
-      const size_t cur_position = this->size_;
-      const size_t new_position = cur_position + required_space;
-      if (new_position <= N) {
-        uint8_t* dst_address = this->buffer_.data() + cur_position;
-        // write the source length
-        const uint16_t length = static_cast<uint16_t>(n);
-        memcpy(dst_address, &length, sizeof(uint16_t));
-        // write the source bytes
-        dst_address += sizeof(uint16_t);
-        // std::copy(source.begin(), source.end(), dst_address);
-        memcpy(dst_address, source.data(), n);
-        this->size_ = new_position;
-        message_count_.fetch_add(1L, std::memory_order_seq_cst);
+      const written = this->buffer_.write(this->position_, source);
+      if (written > 0) {
+        this->position_ += written;
         return true;
       } else {
-        this->all_subs_reached_end_of_buffer_mask_.store(0L);
-        this->size_ = 0;
-        // wait for all subs to reach the end of buffer.
-        return false;
+        // TODO
       }
     }
+  }
+
+  template <const uint16_t A>
+    requires(A <= M)
+  auto send_static(const span<uint8_t, A> source) noexcept -> bool {
+    return this->send(source);
   }
 
   auto wait_all_subs_reached_end_of_buffer() const noexcept -> void {
@@ -158,13 +138,13 @@ class MultiplexerPublisher {
 
   auto message_count() const noexcept -> size_t { return this->message_count_.load(); }
 
-  auto data() const noexcept -> span<uint8_t> { return span(this->buffers_.data(), this->size_); }
+  auto data() const noexcept -> span<uint8_t> { return span(this->buffers_.data(), this->position_); }
 
   /// new design
   /// roll over if there is no remaining space in the buffer or available space is less than 2 bytes.
   auto should_roll_over() -> bool {
     // TODO: use MessageBuffer::remaining method here
-    return this->size_ >= N || (N - this->size_) < sizeof(uint16_t);
+    return this->position_ >= N || (N - this->position_) < sizeof(uint16_t);
   }
 
  private:
@@ -173,15 +153,14 @@ class MultiplexerPublisher {
     this->index_ = (i == N - 1) ? 0 : i + 1;
   }
 
-  size_t size_{0};
-  std::atomic<uint64_t> message_count_{0};
-  std::array<uint8_t, N> buffer_;
-
-  std::atomic<size_t> position_{0};
-
-  uint8_t total_subs_number_;
+  const uint8_t total_subs_number_;
   const uint64_t all_subs_mask_;
-  std::array<std::atomic<uint32_t>, N> all_subs_reached_end_of_buffer_mask_;
+
+  MessageBuffer const buffer_;
+  atomic<uint64_t>* const message_count_sync_;
+  atomic<uint64_t>* const wraparound_sync_;
+
+  size_t position_{0};
 };
 
 // TODO: Leo: This is unfinished
