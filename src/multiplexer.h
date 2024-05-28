@@ -36,7 +36,7 @@ struct MessageBuffer {
  public:
   MessageBuffer(span<uint8_t> buffer) : size_(buffer.size()), data_(buffer.data()) {}
 
-  /// @brief Writes the entire passed message into the buffer.
+  /// @brief Writes the entire passed message into the buffer or nothing.
   /// @param position -- the zero-based byte offset at which the message should be written.
   /// @param message -- the bytes that should be written.
   /// @return the total number of written bytes (2 + message length) or zero.
@@ -132,19 +132,18 @@ class MultiplexerPublisher {
  private:
   auto send_(const span<uint8_t> source) noexcept -> bool;
 
-  auto wait_all_subs_reached_end_of_buffer_and_wraparound_() const noexcept -> void;
+  auto wait_for_subs_to_catch_up_and_wraparound_() const noexcept -> void;
 
   auto increment_message_count_() noexcept -> void;
 
   const uint8_t total_subs_number_;
   const uint64_t all_subs_mask_;
 
+  size_t position_{0};
   uint64_t message_count_{0};
   MessageBuffer const buffer_;
   atomic<uint64_t>* const message_count_sync_;
   atomic<uint64_t>* const wraparound_sync_;
-
-  size_t position_{0};
 };
 
 // TODO: Leo: This is unfinished

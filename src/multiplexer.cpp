@@ -14,13 +14,14 @@ inline auto MultiplexerPublisher<N, M>::send_(const span<uint8_t> source) noexce
   } else if (n > M) {
     return false;
   } else {
+    // it either writes the entire message or nothing
     const size_t written = this->buffer_.write(this->position_, source);
     if (written > 0) {
       this->position_ += written;
       this->increment_message_count_();
       return true;
     } else {
-      this->wait_all_subs_reached_end_of_buffer_and_wraparound_();
+      this->wait_for_subs_to_catch_up_and_wraparound_();
       // TODO: check recursion level, exit with error after it gets greater than 2
       return this->send_(source);
     }
@@ -29,7 +30,7 @@ inline auto MultiplexerPublisher<N, M>::send_(const span<uint8_t> source) noexce
 
 template <size_t N, uint16_t M>
   requires(N >= M + 2 && M > 0)
-auto MultiplexerPublisher<N, M>::wait_all_subs_reached_end_of_buffer_and_wraparound_() const noexcept -> void {
+auto MultiplexerPublisher<N, M>::wait_for_subs_to_catch_up_and_wraparound_() const noexcept -> void {
   // TODO: implement wraparound with message counter increment
   // see doc/adr/ADR003.md for more details
   this->wraparound_sync_->store(0);
