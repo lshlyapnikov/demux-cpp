@@ -105,12 +105,12 @@ class MultiplexerPublisher {
         wraparound_sync_(wraparound_sync) {}
 
   auto send(const span<uint8_t> source) noexcept(false) -> bool {
-    const size_t n = source.size();
-    if (n <= M) {
+    const size_t k = source.size();
+    if (0 < k && k <= M) {
       return this->send_(source);
     } else {
-      throw std::invalid_argument(std::string("source.size() must be <= M, source.size(): ") + std::to_string(n) +
-                                  ", M: " + std::to_string(M));
+      throw std::invalid_argument(std::string("Must have 0 < source.size() <= M. Got source.size(): ") +
+                                  std::to_string(k) + ", M: " + std::to_string(M));
     }
   }
 
@@ -119,17 +119,6 @@ class MultiplexerPublisher {
   auto send(const span<uint8_t, K> source) noexcept -> bool {
     return this->send_(source);
   }
-
-  auto wait_all_subs_reached_end_of_buffer() const noexcept -> void {
-    while (true) {
-      const uint32_t x = this->all_subs_reached_end_of_buffer_mask_.load();
-      if (x == this->all_subs_mask_) {
-        return;
-      }
-    }
-  }
-
-  auto message_count() const noexcept -> size_t { return this->message_count_.load(); }
 
   auto data() const noexcept -> span<uint8_t> { return span(this->buffers_.data(), this->position_); }
 
@@ -143,14 +132,14 @@ class MultiplexerPublisher {
  private:
   auto send_(const span<uint8_t> source) noexcept -> bool;
 
-  auto increment_index() noexcept -> void {
-    const size_t i = this->index_;
-    this->index_ = (i == N - 1) ? 0 : i + 1;
-  }
+  auto wait_all_subs_reached_end_of_buffer_and_wraparound_() const noexcept -> void;
+
+  auto increment_message_count_() noexcept -> void;
 
   const uint8_t total_subs_number_;
   const uint64_t all_subs_mask_;
 
+  uint64_t message_count_{0};
   MessageBuffer const buffer_;
   atomic<uint64_t>* const message_count_sync_;
   atomic<uint64_t>* const wraparound_sync_;
