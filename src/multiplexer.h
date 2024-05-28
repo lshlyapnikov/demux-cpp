@@ -91,7 +91,7 @@ struct MessageBuffer {
 /// @tparam N total buffer size in bytes.
 /// @tparam M max packet size in bytes.
 template <const size_t N, const uint16_t M>
-  requires(N >= M + 2)
+  requires(N >= M + 2 && M > 0)
 class MultiplexerPublisher {
  public:
   MultiplexerPublisher(uint8_t total_subs_number,
@@ -110,13 +110,13 @@ class MultiplexerPublisher {
       return this->send_(source);
     } else {
       throw std::invalid_argument(std::string("source.size() must be <= M, source.size(): ") + std::to_string(n) +
-                                  "M: " + std::to_string(M));
+                                  ", M: " + std::to_string(M));
     }
   }
 
-  template <const uint16_t A>
-    requires(A <= M)
-  auto send(const span<uint8_t, A> source) noexcept -> bool {
+  template <const uint16_t K>
+    requires(K <= M && K > 0)
+  auto send(const span<uint8_t, K> source) noexcept -> bool {
     return this->send_(source);
   }
 
@@ -141,23 +141,7 @@ class MultiplexerPublisher {
   }
 
  private:
-  auto send_(const span<uint8_t> source) noexcept -> bool {
-    const size_t n = source.size();
-    if (n == 0) {
-      return true;
-    } else if (n > M) {
-      return false;
-    } else {
-      const size_t written = this->buffer_.write(this->position_, source);
-      if (written > 0) {
-        this->position_ += written;
-        return true;
-      } else {
-        // TODO
-        return 0;
-      }
-    }
-  }
+  auto send_(const span<uint8_t> source) noexcept -> bool;
 
   auto increment_index() noexcept -> void {
     const size_t i = this->index_;

@@ -52,16 +52,7 @@ constexpr auto validate_subscriber_number(uint8_t num) noexcept(false) -> uint8_
   }
 }
 
-auto my_pow(uint8_t x, uint8_t p) -> uint64_t {
-  if (p == 0) {
-    return 1;
-  }
-  uint64_t result = x;
-  for (size_t i = 2; i <= p; ++i) {
-    result *= x;
-  }
-  return result;
-}
+auto my_pow(uint8_t x, uint8_t p) -> uint64_t;
 
 class SubscriberId {
  public:
@@ -87,35 +78,6 @@ class SubscriberId {
   uint64_t mask_;
   size_t index_;
 };
-
-// struct Header {
-//   std::atomic<uint64_t> sequence_number;
-//   uint16_t message_count;
-// };
-
-// template <const size_t N>
-// struct DownstreamPacket {
-//   Header header;
-//   uint16_t message_length;
-//   std::array<uint8_t, N> message_data;
-// };
-
-// template <const size_t N>
-// struct UpstreamPacket {
-//   Header header;
-//   uint16_t message_length;
-//   std::array<uint8_t, N> message_data;
-// };
-
-// template <const size_t N>
-// struct Client {
-//   uint16_t id;
-//   UpstreamPacket<N> upstream_packet;
-// };
-
-// struct RequestPacket {
-//   Header header;
-// };
 
 }  // namespace ShmSequencer
 

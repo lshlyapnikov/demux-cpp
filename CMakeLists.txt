@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 project(shm-sequencer VERSION 0.1.0 LANGUAGES CXX)
 
-#set(CMAKE_VERBOSE_MAKEFILE ON) # verbose CMake output
+set(CMAKE_VERBOSE_MAKEFILE ON) # verbose CMake output
 
 message("CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
 
@@ -97,11 +97,29 @@ target_compile_options(
 )
 
 add_library(
+  domain
+  OBJECT src/domain.cpp
+)
+target_compile_options(
+  domain
+  PRIVATE ${MY_CXX_FLAGS}
+)
+
+add_library(
   sequencer
   OBJECT src/sequencer.cpp
 )
 target_compile_options(
   sequencer
+  PRIVATE ${MY_CXX_FLAGS}
+)
+
+add_library(
+  multiplexer
+  OBJECT src/multiplexer.cpp
+)
+target_compile_options(
+  multiplexer
   PRIVATE ${MY_CXX_FLAGS}
 )
 
@@ -114,6 +132,7 @@ add_executable(
 )
 target_link_libraries(
   domain_test
+  domain
   GTest::gtest_main
   rapidcheck
 )
@@ -130,6 +149,8 @@ add_executable(
 target_link_libraries(
   sequencer_test
   sequencer
+  multiplexer
+  domain
   atomic
   GTest::gtest_main
 )
@@ -147,6 +168,8 @@ target_link_libraries(
   multiplexer_test
   atomic
   sequencer
+  multiplexer
+  domain
   GTest::gtest_main
   rapidcheck
 )
