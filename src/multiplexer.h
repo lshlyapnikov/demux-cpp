@@ -83,23 +83,21 @@ struct MessageBuffer {
   uint8_t* const data_;
 };
 
-// TODO: Leo: This is unfinished
 // TODO: make sure the size of the shares memory is a multiple of the page size. Because the operating system
 // TODO: performs mapping operations over whole pages. So, you don't waste memory.
 //
 /// @brief Multiplexer publisher.
 /// @tparam N total buffer size in bytes.
-/// @tparam M max packet size in bytes.
+/// @tparam M max message size in bytes.
 template <const size_t N, const uint16_t M>
   requires(N >= M + 2 && M > 0)
 class MultiplexerPublisher {
  public:
-  MultiplexerPublisher(uint8_t total_subs_number,
+  MultiplexerPublisher(uint64_t all_subs_mask,
                        span<uint8_t, N> buffer,
                        atomic<uint64_t>* message_count_sync,
-                       atomic<uint64_t>* wraparound_sync) noexcept(false)
-      : total_subs_number_(validate_subscriber_number(total_subs_number)),
-        all_subs_mask_(SubscriberId::all_subscribers_mask(total_subs_number)),
+                       atomic<uint64_t>* wraparound_sync) noexcept
+      : all_subs_mask_(all_subs_mask),
         buffer_(buffer),
         message_count_sync_(message_count_sync),
         wraparound_sync_(wraparound_sync) {}
@@ -120,14 +118,17 @@ class MultiplexerPublisher {
     return this->send_(source);
   }
 
+  auto message_count() const noexcept -> uint64_t { return this->message_count_; }
+
+#ifdef UNIT_TEST
+
   auto data() const noexcept -> span<uint8_t> { return span(this->buffers_.data(), this->position_); }
 
-  /// new design
-  /// roll over if there is no remaining space in the buffer or available space is less than 2 bytes.
-  auto should_roll_over() -> bool {
-    // TODO: use MessageBuffer::remaining method here
-    return this->position_ >= N || (N - this->position_) < sizeof(uint16_t);
-  }
+  auto position() const noexcept -> size_t { return this->position_; }
+
+  auto all_subs_mask() const noexcept -> uint64_t { return this->all_subs_mask_; }
+
+#endif  // UNIT_TEST
 
  private:
   auto send_(const span<uint8_t> source) noexcept -> bool;
@@ -136,7 +137,6 @@ class MultiplexerPublisher {
 
   auto increment_message_count_() noexcept -> void;
 
-  const uint8_t total_subs_number_;
   const uint64_t all_subs_mask_;
 
   size_t position_{0};
@@ -146,36 +146,45 @@ class MultiplexerPublisher {
   atomic<uint64_t>* const wraparound_sync_;
 };
 
-// TODO: Leo: This is unfinished
-//
 /// @brief Multiplexer subscriber. Should be mapped into shared memory allocated by MultiplexerPublisher.
-/// @tparam N max number of packets.
-/// @tparam M max packet size.
+/// @tparam N total buffer size in bytes.
+/// @tparam M max message size in bytes.
 template <const size_t N, const uint16_t M>
+  requires(N >= M + 2 && M > 0)
 class MultiplexerSubscriber {
-  // auto receive(Packet<M>* packet) noexcept -> bool {
-  //   const size_t required_space = sizeof(packet->size) + packet->size;
-  //   const size_t new_offset = this->offset + required_space;
-  //   if (new_offset <= BUFFER_SIZE) {
-  //     void* dst_address = this->buffer.data + this->offset;
-  //     std::memcpy(dst_address, &packet, required_space);
-  //     this->offset = new_offset;
-  //   } else {
-  //     return false;
-  //   }
-  // }
+ public:
+  MultiplexerSubscriber(const SubscriberId& subscriber_id,
+                        span<uint8_t, N> buffer,
+                        atomic<uint64_t>* message_count_sync,
+                        atomic<uint64_t>* wraparound_sync) noexcept
+      : id_(subscriber_id),
+        buffer_(buffer),
+        message_count_sync_(message_count_sync),
+        wraparound_sync_(wraparound_sync) {}
 
-  // auto receive() noexcept -> std::optional<const Packet<M>*> {
-  //   // test
-  //   return std::nullopt;
-  // }
+  auto read() noexcept -> const span<uint8_t>;
+
+  auto message_count() const noexcept -> uint64_t { return this->read_message_count_; }
+
+#ifdef UNIT_TEST
+  auto data() const noexcept -> span<uint8_t> { return span(this->buffers_.data(), this->position_); }
+
+  auto position() const noexcept -> size_t { return this->position_; }
+
+  auto mask() const noexcept -> uint64_t { return this->all_subs_mask_; }
+#endif  // UNIT_TEST
 
  private:
-  static const size_t BUFFER_SIZE = M * N + 2 * N;
-  std::atomic<size_t> offset_{0};
-  std::array<uint8_t, BUFFER_SIZE> buffer_;
+  auto wait_for_message_count_increment_() noexcept -> void;
 
-  SubscriberId id;
+  const SubscriberId id_;
+
+  size_t position_{0};
+  uint64_t available_message_count_{0};
+  uint64_t read_message_count_{0};
+  MessageBuffer const buffer_;
+  atomic<uint64_t>* const message_count_sync_;
+  atomic<uint64_t>* const wraparound_sync_;
 };
 
 }  // namespace ShmSequencer

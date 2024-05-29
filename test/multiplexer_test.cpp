@@ -1,3 +1,5 @@
+#define UNIT_TEST
+
 #include "../src/multiplexer.h"
 #include <gtest/gtest.h>
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
@@ -45,11 +47,9 @@ TEST(MultiplexerTest, Atomic) {
 //   static const size_t MAX_SIZE = 32;
 //   static Gen<span<uint8_t>> arbitrary() {
 //     return {
-//       const size_t n = *rc::gen::inRange(0, MAX_SIZE);
+//       const size_t n = *rc::gen::inRange(1, MAX_SIZE);
 
 //       gen::build<span<uint8_t>>(
-//       //     gen::set(&Person::firstName), gen::set(&Person::lastName), gen::set(&Person::age, gen::inRange(0,
-//       100)));
 //     }
 //   }
 // };
@@ -143,40 +143,25 @@ TEST(MultiPlexerTest, MessageBufferWriteEmpty) {
   const size_t size = TEST_MAX_MSG_SIZE + 2;
   const unique_ptr<uint8_t[]> data(new uint8_t[size]);
   MessageBuffer buf(span(data.get(), size));
-  const unique_ptr<uint8_t[]> msg(new uint8_t[0]);
-  const size_t written = buf.write(0, span(msg.get(), 0));
+
+  const span<uint8_t> empty_message{};
+  const size_t written = buf.write(0, empty_message);
+
   ASSERT_EQ(written, sizeof(uint16_t));
+  ASSERT_EQ(written, 2);
   const span<uint8_t> read = buf.read(0);
   ASSERT_EQ(read.size(), 0);
 }
 
-// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
-TEST(MultiplexerTest, ConstructorDoesNotThrowWhenValidSubscriberNumberPassed) {
-  array<uint8_t, 32> buffer;
-  atomic<uint64_t> msg_counter_sync{0};
-  atomic<uint64_t> wraparound_sync{0};
+TEST(MultiplexerTest, ConstructorDoesNotThrow) {
+  rc::check("MultiplexerTest::Constructor", [](const uint8_t all_subs_mask) {
+    array<uint8_t, 32> buffer;
+    atomic<uint64_t> msg_counter_sync{0};
+    atomic<uint64_t> wraparound_sync{0};
 
-  const array<uint8_t, 7> valid_subscriber_numbers{1, 2, 3, 4, 5, 32, 64};
-  for (uint8_t x : valid_subscriber_numbers) {
-    const MultiplexerPublisher<32, 4> m0(x, buffer, &msg_counter_sync, &wraparound_sync);
-  }
+    const MultiplexerPublisher<32, 4> m(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
+    ASSERT_EQ(0, m.message_count());
+    ASSERT_EQ(0, m.position());
+    ASSERT_EQ(all_subs_mask, m.all_subs_mask());
+  });
 }
-// NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
-
-// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
-TEST(MultiplexerTest, ConstructorThrowsWhenInvalidSubscriberNumberPassed) {
-  array<uint8_t, 32> buffer;
-  atomic<uint64_t> msg_counter_sync{0};
-  atomic<uint64_t> wraparound_sync{0};
-
-  const array<uint8_t, 4> invalid_subscriber_numbers{0, 65, 66, 128};
-  for (uint8_t x : invalid_subscriber_numbers) {
-    try {
-      const MultiplexerPublisher<32, 4> m3(x, buffer, &msg_counter_sync, &wraparound_sync);
-      FAIL() << "Expected exception here but did not get any";
-    } catch (std::invalid_argument& e) {
-      ASSERT_STREQ(e.what(), "subscriber_number must be within the inclusive interval: [1, 64]");
-    }
-  }
-}
-// NOLINTEND(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
