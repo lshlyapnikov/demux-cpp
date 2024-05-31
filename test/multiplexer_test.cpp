@@ -12,9 +12,12 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include "../src/domain.h"
 
 using ShmSequencer::MessageBuffer;
 using ShmSequencer::MultiplexerPublisher;
+using ShmSequencer::MultiplexerSubscriber;
+using ShmSequencer::SubscriberId;
 using std::array;
 using std::atomic;
 using std::span;
@@ -41,67 +44,7 @@ TEST(MultiplexerTest, Atomic) {
   ASSERT_EQ(sizeof(size_t), sizeof(uint64_t));
 }
 
-// namespace rc {
-// template <>
-// struct Arbitrary<span<uint8_t>> {
-//   static const size_t MAX_SIZE = 32;
-//   static Gen<span<uint8_t>> arbitrary() {
-//     return {
-//       const size_t n = *rc::gen::inRange(1, MAX_SIZE);
-
-//       gen::build<span<uint8_t>>(
-//     }
-//   }
-// };
-// }  // namespace rc
-
-// TEST(MultiplexerTest, Packet) {
-//   const size_t M = 8;
-//   Packet<M> packet;
-
-//   const std::array<uint8_t, M> src = {1, 2, 3, 4, 5, 6, 7, 8};
-//   packet.read_from(src, 3);
-//   ASSERT_EQ(3, packet.size());
-
-//   std::array<uint8_t, M> dst{0, 0, 0, 0, 0, 0, 0, 0};
-//   const uint16_t result = packet.write_into(&dst);
-//   ASSERT_EQ(result, 3);
-
-//   const std::array<uint8_t, M> expected = {1, 2, 3, 0, 0, 0, 0, 0};
-//   EXPECT_EQ(dst, expected);
-// }
-
-// NOLINTBEGIN(misc-include-cleaner,cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
-// TEST(MultiplexerTest, RoundtripReadWrite) {
-//   rc::check("Packet::read_from followed by Packet::write_into does not not lose any data",
-//             [](const std::array<uint8_t, 256>& a0, const uint8_t size) {
-//               Packet<256> packet;
-//               packet.read_from(a0, size);
-
-//               std::array<uint8_t, 256> a1{};
-//               const uint16_t written_bytes = packet.write_into(&a1);
-
-//               const auto data0 = vector<uint8_t>(std::begin(a0), std::begin(a0) + size);
-//               const auto data1 = vector<uint8_t>(std::begin(a1), std::begin(a1) + size);
-
-//               ASSERT_TRUE(written_bytes == size);
-//               ASSERT_TRUE(data0 == data1);
-//             });
-// }
-// NOLINTEND(misc-include-cleaner,cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
-
-// TEST(MultiplexerTest, MessageBuffer_constructor) {
-//   rc::check("MessageBuffer::constructor", [](const uint8_t size) {
-//     if (size >= TEST_MAX_MSG_SIZE + sizeof(uint16_t)) {
-//       MessageBuffer buf(size);
-//       ASSERT_EQ(size, buf.remaining(0));
-//     } else {
-//       ASSERT_THROW({ std::ignore = MessageBuffer(size); }, std::invalid_argument);
-//     }
-//   });
-// }
-
-TEST(MultiplexerTest, MessageBufferRemaining) {
+TEST(MessageBufferTest, MessageBufferRemaining) {
   rc::check("MessageBuffer::remaining", [](const uint8_t size, const uint8_t position) {
     const unique_ptr<uint8_t[]> data(new uint8_t[size]);
     const MessageBuffer buf(span(data.get(), size));
@@ -114,7 +57,7 @@ TEST(MultiplexerTest, MessageBufferRemaining) {
   });
 }
 
-TEST(MultiPlexerTest, MessageBufferWrite) {
+TEST(MessageBufferTest, MessageBufferWriteRead) {
   rc::check("MessageBuffer::write", [](const uint8_t buf_size, const uint8_t position, const uint8_t src_size) {
     std::cout << "buf_size: " << static_cast<int>(buf_size) << ", position: " << static_cast<int>(position)
               << ", src_size: " << static_cast<int>(src_size) << '\n';
@@ -139,7 +82,7 @@ TEST(MultiPlexerTest, MessageBufferWrite) {
   });
 }
 
-TEST(MultiPlexerTest, MessageBufferWriteEmpty) {
+TEST(MessageBufferTest, MessageBufferWriteEmpty) {
   const size_t size = TEST_MAX_MSG_SIZE + 2;
   const unique_ptr<uint8_t[]> data(new uint8_t[size]);
   MessageBuffer buf(span(data.get(), size));
@@ -153,8 +96,8 @@ TEST(MultiPlexerTest, MessageBufferWriteEmpty) {
   ASSERT_EQ(read.size(), 0);
 }
 
-TEST(MultiplexerTest, ConstructorDoesNotThrow) {
-  rc::check("MultiplexerTest::Constructor", [](const uint8_t all_subs_mask) {
+TEST(MultiplexerPublisherTest, ConstructorDoesNotThrow) {
+  rc::check("MultiplexerPublisher::Constructor", [](const uint8_t all_subs_mask) {
     array<uint8_t, 32> buffer;
     atomic<uint64_t> msg_counter_sync{0};
     atomic<uint64_t> wraparound_sync{0};
@@ -165,3 +108,37 @@ TEST(MultiplexerTest, ConstructorDoesNotThrow) {
     ASSERT_EQ(all_subs_mask, m.all_subs_mask());
   });
 }
+
+// NOLINTBEGIN(misc - include - cleaner, cppcoreguidelines - avoid - magic - numbers, readability - magic - numbers)
+// TEST(MultiplexerPublisherTest, RoundtripReadWrite2) {
+//   using std::span;
+//   using std::vector;
+//   rc::check("MultiplexerPublisher::send", [](const vector<vector<uint8_t>>& messages) {
+//     array<uint8_t, 128> buffer;
+//     atomic<uint64_t> msg_counter_sync{0};
+//     atomic<uint64_t> wraparound_sync{0};
+//     const uint8_t all_subs_mask = 0b1;
+//     const SubscriberId subId = SubscriberId::create(1);
+
+//     MultiplexerPublisher<128, 64> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
+//     MultiplexerSubscriber<128, 64> subsriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
+//     for (vector<uint8_t> message : messages) {
+//       if (message.size() > 0) {
+//         span<uint8_t> packet{message};
+//         publisher.send(packet);
+//       }
+//     }
+//   });
+// }
+// NOLINTEND(misc - include - cleaner, cppcoreguidelines - avoid - magic - numbers, readability - magic - numbers)
+
+// TEST(MultiplexerTest, MessageBuffer_constructor) {
+//   rc::check("MessageBuffer::constructor", [](const uint8_t size) {
+//     if (size >= TEST_MAX_MSG_SIZE + sizeof(uint16_t)) {
+//       MessageBuffer buf(size);
+//       ASSERT_EQ(size, buf.remaining(0));
+//     } else {
+//       ASSERT_THROW({ std::ignore = MessageBuffer(size); }, std::invalid_argument);
+//     }
+//   });
+// }

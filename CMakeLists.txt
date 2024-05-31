@@ -166,10 +166,10 @@ add_executable(
 )
 target_link_libraries(
   multiplexer_test
-  atomic
-  sequencer
   multiplexer
+  sequencer
   domain
+  atomic
   GTest::gtest_main
   rapidcheck
 )
