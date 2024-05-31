@@ -25,8 +25,6 @@ using std::uint16_t;
 using std::uint8_t;
 using std::unique_ptr;
 
-const uint16_t TEST_MAX_MSG_SIZE = 32;
-
 auto create_test_array(const size_t size) -> unique_ptr<uint8_t[]> {
   unique_ptr<uint8_t[]> result(new uint8_t[size]);
   for (uint8_t i = 0; i < size; i++) {
@@ -45,25 +43,60 @@ TEST(MultiplexerTest, Atomic) {
 }
 
 TEST(MessageBufferTest, MessageBufferRemaining) {
-  rc::check("MessageBuffer::remaining", [](const uint8_t size, const uint8_t position) {
-    const unique_ptr<uint8_t[]> data(new uint8_t[size]);
-    const MessageBuffer buf(span(data.get(), size));
+  rc::check("MessageBuffer::remaining", [](const uint8_t position) {
+    std::cout << "position: " << static_cast<int>(position) << '\n';
+
+    constexpr size_t BUF_SIZE = 32;
+
+    std::array<uint8_t, BUF_SIZE> data{0};
+    const MessageBuffer<BUF_SIZE> buf(span<uint8_t, BUF_SIZE>{data});
+
     const size_t actual = buf.remaining(position);
-    if (position >= size) {
+    if (position >= BUF_SIZE) {
       ASSERT_EQ(actual, 0);
     } else {
-      ASSERT_EQ(actual, (size - position));
+      ASSERT_EQ(actual, (BUF_SIZE - position));
+    }
+  });
+}
+
+TEST(MessageBufferTest, WriteToSharedMemory) {
+  rc::check("MessageBuffer::write", [](std::vector<uint8_t> message) {
+    constexpr size_t BUF_SIZE = 32;
+
+    std::array<uint8_t, BUF_SIZE> data{0};
+    MessageBuffer<BUF_SIZE> buf(span<uint8_t, BUF_SIZE>{data});
+
+    const size_t written = buf.write(0, message);
+    if (message.size() + 2 <= BUF_SIZE) {
+      ASSERT_EQ(written, message.size() + 2);
+
+      uint16_t written_length = 0;
+      std::copy_n(data.data(), sizeof(uint16_t), &written_length);
+      ASSERT_EQ(written_length, message.size());
+
+      const span<uint8_t> read = buf.read(0);
+      ASSERT_EQ(read.size(), message.size());
+
+      for (size_t i = 0; i < message.size(); ++i) {
+        ASSERT_EQ(data[i + sizeof(uint16_t)], message[i]);
+        ASSERT_EQ(read[i], message[i]);
+      }
+    } else {
+      ASSERT_EQ(written, 0);
     }
   });
 }
 
 TEST(MessageBufferTest, MessageBufferWriteRead) {
-  rc::check("MessageBuffer::write", [](const uint8_t buf_size, const uint8_t position, const uint8_t src_size) {
-    std::cout << "buf_size: " << static_cast<int>(buf_size) << ", position: " << static_cast<int>(position)
-              << ", src_size: " << static_cast<int>(src_size) << '\n';
+  rc::check("MessageBuffer::write", [](const uint8_t position, const uint8_t src_size) {
+    std::cout << "position: " << static_cast<int>(position) << ", src_size: " << static_cast<int>(src_size) << '\n';
 
-    const unique_ptr<uint8_t[]> data(new uint8_t[buf_size]);
-    MessageBuffer buf(span(data.get(), buf_size));
+    constexpr size_t BUF_SIZE = 32;
+
+    std::array<uint8_t, BUF_SIZE> data{};
+    MessageBuffer<BUF_SIZE> buf(data);
+
     const size_t remaining = buf.remaining(position);
     const unique_ptr<uint8_t[]> src = create_test_array(src_size);
     const size_t written = buf.write(position, span(src.get(), src_size));
@@ -83,9 +116,10 @@ TEST(MessageBufferTest, MessageBufferWriteRead) {
 }
 
 TEST(MessageBufferTest, MessageBufferWriteEmpty) {
-  const size_t size = TEST_MAX_MSG_SIZE + 2;
-  const unique_ptr<uint8_t[]> data(new uint8_t[size]);
-  MessageBuffer buf(span(data.get(), size));
+  constexpr size_t BUF_SIZE = 32;
+
+  std::array<uint8_t, BUF_SIZE> data{};
+  MessageBuffer<BUF_SIZE> buf(data);
 
   const span<uint8_t> empty_message{};
   const size_t written = buf.write(0, empty_message);
@@ -122,6 +156,7 @@ TEST(MultiplexerPublisherTest, ConstructorDoesNotThrow) {
 
 //     MultiplexerPublisher<128, 64> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
 //     MultiplexerSubscriber<128, 64> subsriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
+//     // TODO start a subscriber thread reading
 //     for (vector<uint8_t> message : messages) {
 //       if (message.size() > 0) {
 //         span<uint8_t> packet{message};

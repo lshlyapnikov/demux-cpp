@@ -31,11 +31,13 @@ using std::unique_ptr;
 /// ownership of the passed buffer. The outside logic is responsible to freeing the passed buffer. External
 /// synchronization is required for accessing the `data_` via `read` and `write` calls. Read or write `position` must be
 /// stored outside of this class.
+/// @tparam L total buffer size in bytes.
+template <size_t L>
 struct MessageBuffer {
   using message_length_t = uint16_t;
 
  public:
-  MessageBuffer(span<uint8_t> buffer) : size_(buffer.size()), data_(buffer.data()) {}
+  MessageBuffer(span<uint8_t, L> buffer) : data_(buffer.data()) {}
 
   /// @brief Writes the entire passed message into the buffer or nothing.
   /// @param position -- the zero-based byte offset at which the message should be written.
@@ -59,10 +61,10 @@ struct MessageBuffer {
   /// @param position -- zero-based byte offset.
   /// @return the available number of byte at the provided position.
   auto remaining(const size_t position) const noexcept -> size_t {
-    if (this->size_ <= position) {
+    if (L <= position) {
       return 0;
     } else {
-      return this->size_ - position;
+      return L - position;
     }
   }
 
@@ -80,7 +82,6 @@ struct MessageBuffer {
   }
 
  private:
-  size_t const size_;
   uint8_t* const data_;
 };
 
@@ -88,14 +89,14 @@ struct MessageBuffer {
 // TODO: performs mapping operations over whole pages. So, you don't waste memory.
 //
 /// @brief Multiplexer publisher.
-/// @tparam N total buffer size in bytes.
+/// @tparam L total buffer size in bytes.
 /// @tparam M max message size in bytes.
-template <const size_t N, const uint16_t M>
-  requires(N >= M + 2 && M > 0)
+template <size_t L, uint16_t M>
+  requires(L >= M + 2 && M > 0)
 class MultiplexerPublisher {
  public:
   MultiplexerPublisher(uint64_t all_subs_mask,
-                       span<uint8_t, N> buffer,
+                       span<uint8_t, L> buffer,
                        atomic<uint64_t>* message_count_sync,
                        atomic<uint64_t>* wraparound_sync) noexcept
       : all_subs_mask_(all_subs_mask),
@@ -103,13 +104,21 @@ class MultiplexerPublisher {
         message_count_sync_(message_count_sync),
         wraparound_sync_(wraparound_sync) {}
 
-  auto send(const span<uint8_t> source) noexcept(false) -> bool;
+  auto send(const span<uint8_t> source) noexcept(false) -> bool {
+    const size_t n = source.size();
+    if (0 < n && n <= M) {
+      return this->send_(source);
+    } else {
+      throw std::invalid_argument(std::string("Must have 0 < source.size() <= M. Got source.size(): ") +
+                                  std::to_string(n) + ", M: " + std::to_string(M));
+    }
+  }
 
-  // template <const uint16_t K>
-  //   requires(K <= M && K > 0)
-  // auto send_static(const span<uint8_t, K> source) noexcept -> bool {
-  //   return this->send_(source);
-  // }
+  template <uint16_t N>
+    requires(0 < N && N <= M)
+  auto send_safe(const span<uint8_t, N> source) noexcept -> bool {
+    return this->send_(source);
+  }
 
   auto message_count() const noexcept -> uint64_t { return this->message_count_; }
 
@@ -137,20 +146,20 @@ class MultiplexerPublisher {
 
   size_t position_{0};
   uint64_t message_count_{0};
-  MessageBuffer buffer_;
+  MessageBuffer<L> buffer_;
   atomic<uint64_t>* const message_count_sync_;
   atomic<uint64_t>* const wraparound_sync_;
 };
 
 /// @brief Multiplexer subscriber. Should be mapped into shared memory allocated by MultiplexerPublisher.
-/// @tparam N total buffer size in bytes.
+/// @tparam L total buffer size in bytes.
 /// @tparam M max message size in bytes.
-template <const size_t N, const uint16_t M>
-  requires(N >= M + 2 && M > 0)
+template <size_t L, uint16_t M>
+  requires(L >= M + 2 && M > 0)
 class MultiplexerSubscriber {
  public:
   MultiplexerSubscriber(const SubscriberId& subscriber_id,
-                        span<uint8_t, N> buffer,
+                        span<uint8_t, L> buffer,
                         atomic<uint64_t>* message_count_sync,
                         atomic<uint64_t>* wraparound_sync) noexcept
       : id_(subscriber_id),
@@ -178,26 +187,14 @@ class MultiplexerSubscriber {
   size_t position_{0};
   uint64_t available_message_count_{0};
   uint64_t read_message_count_{0};
-  MessageBuffer const buffer_;
+  MessageBuffer<L> const buffer_;
   atomic<uint64_t>* const message_count_sync_;
   atomic<uint64_t>* const wraparound_sync_;
 };
 
-template <size_t N, uint16_t M>
-  requires(N >= M + 2 && M > 0)
-auto MultiplexerPublisher<N, M>::send(const span<uint8_t> source) noexcept(false) -> bool {
-  const size_t k = source.size();
-  if (0 < k && k <= M) {
-    return this->send_(source);
-  } else {
-    throw std::invalid_argument(std::string("Must have 0 < source.size() <= M. Got source.size(): ") +
-                                std::to_string(k) + ", M: " + std::to_string(M));
-  }
-}
-
-template <size_t N, uint16_t M>
-  requires(N >= M + 2 && M > 0)
-auto MultiplexerPublisher<N, M>::send_(const span<uint8_t> source) noexcept -> bool {
+template <size_t L, uint16_t M>
+  requires(L >= M + 2 && M > 0)
+auto MultiplexerPublisher<L, M>::send_(const span<uint8_t> source) noexcept -> bool {
   const size_t n = source.size();
   if (n == 0) {
     return true;
@@ -218,9 +215,9 @@ auto MultiplexerPublisher<N, M>::send_(const span<uint8_t> source) noexcept -> b
   }
 }
 
-template <size_t N, uint16_t M>
-  requires(N >= M + 2 && M > 0)
-auto MultiplexerPublisher<N, M>::wait_for_subs_to_catch_up_and_wraparound_() noexcept -> void {
+template <size_t L, uint16_t M>
+  requires(L >= M + 2 && M > 0)
+auto MultiplexerPublisher<L, M>::wait_for_subs_to_catch_up_and_wraparound_() noexcept -> void {
   // see doc/adr/ADR003.md for more details
   this->wraparound_sync_->store(0);
   this->send_(span<uint8_t>{});
@@ -234,15 +231,15 @@ auto MultiplexerPublisher<N, M>::wait_for_subs_to_catch_up_and_wraparound_() noe
   this->position_ = 0;
 }
 
-template <size_t N, uint16_t M>
-  requires(N >= M + 2 && M > 0)
-auto MultiplexerSubscriber<N, M>::read() noexcept -> const span<uint8_t> {
+template <size_t L, uint16_t M>
+  requires(L >= M + 2 && M > 0)
+auto MultiplexerSubscriber<L, M>::read() noexcept -> const span<uint8_t> {
   this->wait_for_message_count_increment_();
   const span<uint8_t>& result = this->buffer_.read(this->position_);
   this->read_message_count_ = +1;
   const size_t msg_size = result.size();
   if (msg_size > 0) {
-    this->position_ += msg_size + sizeof(MessageBuffer::message_length_t);
+    this->position_ += msg_size + sizeof(MessageBuffer<L>::message_length_t);
     return result;
   } else {
     assert(this->read_message_count_ == this->available_message_count_);
@@ -254,9 +251,9 @@ auto MultiplexerSubscriber<N, M>::read() noexcept -> const span<uint8_t> {
   }
 }
 
-template <size_t N, uint16_t M>
-  requires(N >= M + 2 && M > 0)
-auto MultiplexerSubscriber<N, M>::wait_for_message_count_increment_() noexcept -> void {
+template <size_t L, uint16_t M>
+  requires(L >= M + 2 && M > 0)
+auto MultiplexerSubscriber<L, M>::wait_for_message_count_increment_() noexcept -> void {
   if (this->read_message_count_ < this->available_message_count_) {
     return;
   } else {
