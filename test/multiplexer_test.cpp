@@ -24,6 +24,7 @@ using std::span;
 using std::uint16_t;
 using std::uint8_t;
 using std::unique_ptr;
+using std::vector;
 
 auto create_test_array(const size_t size) -> unique_ptr<uint8_t[]> {
   unique_ptr<uint8_t[]> result(new uint8_t[size]);
@@ -144,27 +145,31 @@ TEST(MultiplexerPublisherTest, ConstructorDoesNotThrow) {
 }
 
 // NOLINTBEGIN(misc - include - cleaner, cppcoreguidelines - avoid - magic - numbers, readability - magic - numbers)
-// TEST(MultiplexerPublisherTest, RoundtripReadWrite2) {
-//   using std::span;
-//   using std::vector;
-//   rc::check("MultiplexerPublisher::send", [](const vector<vector<uint8_t>>& messages) {
-//     array<uint8_t, 128> buffer;
-//     atomic<uint64_t> msg_counter_sync{0};
-//     atomic<uint64_t> wraparound_sync{0};
-//     const uint8_t all_subs_mask = 0b1;
-//     const SubscriberId subId = SubscriberId::create(1);
+TEST(MultiplexerPublisherTest, Roundtrip1) {
+  rc::check("MultiplexerPublisher::Roundtrip1", [](vector<uint8_t> message) {
+    if (message.size() == 0) {
+      return;
+    }
+    array<uint8_t, 128> buffer;
+    atomic<uint64_t> msg_counter_sync{0};
+    atomic<uint64_t> wraparound_sync{0};
+    const uint8_t all_subs_mask = 0b1;
+    const SubscriberId subId = SubscriberId::create(1);
 
-//     MultiplexerPublisher<128, 64> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
-//     MultiplexerSubscriber<128, 64> subsriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
-//     // TODO start a subscriber thread reading
-//     for (vector<uint8_t> message : messages) {
-//       if (message.size() > 0) {
-//         span<uint8_t> packet{message};
-//         publisher.send(packet);
-//       }
-//     }
-//   });
-// }
+    MultiplexerPublisher<128, 64> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
+    MultiplexerSubscriber<128, 64> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
+
+    const bool ok = publisher.send(span<uint8_t>{message.data(), message.size()});
+    ASSERT_TRUE(ok);
+
+    const span<uint8_t> read = subscriber.next();
+    ASSERT_EQ(read.size(), message.size());
+
+    for (size_t i = 0; i < message.size(); ++i) {
+      ASSERT_EQ(read[i], message[i]);
+    }
+  });
+}
 // NOLINTEND(misc - include - cleaner, cppcoreguidelines - avoid - magic - numbers, readability - magic - numbers)
 
 // TEST(MultiplexerTest, MessageBuffer_constructor) {

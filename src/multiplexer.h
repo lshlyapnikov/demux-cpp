@@ -228,7 +228,7 @@ template <size_t L, uint16_t M>
 auto MultiplexerPublisher<L, M>::wait_for_subs_to_catch_up_and_wraparound_() noexcept -> void {
   // see doc/adr/ADR003.md for more details
   this->wraparound_sync_->store(0);
-  this->send_(span<uint8_t>{});
+  this->send_(span<uint8_t>{}, 1);
   this->increment_message_count_();
 
   // busy-wait
@@ -256,8 +256,8 @@ template <size_t L, uint16_t M>
     const size_t msg_size = result.size();
     assert(msg_size <= M);
     if (msg_size > 0) {
-      this->position_ += msg_size + sizeof(MessageBuffer<L>::message_length_t);
-      assert(this->position <= L);
+      this->position_ += msg_size + sizeof(uint16_t);
+      assert(this->position_ <= L);
       return result;
     } else {
       // signal that it is ready to wraparound, see doc/adr/ADR003.md for more details
