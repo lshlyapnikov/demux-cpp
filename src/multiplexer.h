@@ -167,9 +167,11 @@ class MultiplexerSubscriber {
         message_count_sync_(message_count_sync),
         wraparound_sync_(wraparound_sync) {}
 
-  auto read() noexcept -> const span<uint8_t>;
+  [[nodiscard]] auto next() noexcept -> const span<uint8_t>;
 
-  auto message_count() const noexcept -> uint64_t { return this->read_message_count_; }
+  [[nodiscard]] auto has_next() noexcept -> bool;
+
+  [[nodiscard]] auto message_count() const noexcept -> uint64_t { return this->read_message_count_; }
 
 #ifdef UNIT_TEST
   auto data() const noexcept -> span<uint8_t> { return span(this->buffers_.data(), this->position_); }
@@ -178,9 +180,6 @@ class MultiplexerSubscriber {
 
   auto mask() const noexcept -> uint64_t { return this->all_subs_mask_; }
 #endif  // UNIT_TEST
-
- private:
-  auto wait_for_message_count_increment_() noexcept -> void;
 
   const SubscriberId id_;
 
@@ -222,48 +221,57 @@ auto MultiplexerPublisher<L, M>::wait_for_subs_to_catch_up_and_wraparound_() noe
   this->wraparound_sync_->store(0);
   this->send_(span<uint8_t>{});
   this->increment_message_count_();
+
+  // busy-wait
   while (true) {
     const uint64_t x = this->wraparound_sync_->load();
     if (x == this->all_subs_mask_) {
       break;
     }
   }
+
+  // wait
+  // this->wraparound_sync_->wait(this->all_subs_mask_);
+
   this->position_ = 0;
 }
 
 template <size_t L, uint16_t M>
   requires(L >= M + 2 && M > 0)
-auto MultiplexerSubscriber<L, M>::read() noexcept -> const span<uint8_t> {
-  this->wait_for_message_count_increment_();
-  const span<uint8_t>& result = this->buffer_.read(this->position_);
-  this->read_message_count_ = +1;
-  const size_t msg_size = result.size();
-  if (msg_size > 0) {
-    this->position_ += msg_size + sizeof(MessageBuffer<L>::message_length_t);
-    return result;
+[[nodiscard]] auto MultiplexerSubscriber<L, M>::next() noexcept -> const span<uint8_t> {
+  if (!this->has_next()) {
+    return span<uint8_t>();
   } else {
-    assert(this->read_message_count_ == this->available_message_count_);
-    // signal that it is ready to wraparound, see doc/adr/ADR003.md for more details
-    this->position_ = 0;
-    this->wraparound_sync_->fetch_or(this->id_.mask());
-    // TODO: check recursion level, exit with error after it gets greater than 2
-    return this->read();
+    const span<uint8_t>& result = this->buffer_.read(this->position_);
+    this->read_message_count_ = +1;
+    const size_t msg_size = result.size();
+    assert(msg_size <= M);
+    if (msg_size > 0) {
+      this->position_ += msg_size + sizeof(MessageBuffer<L>::message_length_t);
+      assert(this->position <= L);
+      return result;
+    } else {
+      assert(this->read_message_count_ == this->available_message_count_);
+      // signal that it is ready to wraparound, see doc/adr/ADR003.md for more details
+      this->position_ = 0;
+      this->wraparound_sync_->fetch_or(this->id_.mask());
+      return span<uint8_t>();
+    }
   }
 }
 
 template <size_t L, uint16_t M>
   requires(L >= M + 2 && M > 0)
-auto MultiplexerSubscriber<L, M>::wait_for_message_count_increment_() noexcept -> void {
+[[nodiscard]] auto MultiplexerSubscriber<L, M>::has_next() noexcept -> bool {
   if (this->read_message_count_ < this->available_message_count_) {
-    return;
+    return true;
   } else {
-    while (true) {
-      this->message_count_sync_.wait(10);
-      const uint64_t x = this->message_count_sync_->load();
-      if (x > this->available_message_count_) {
-        this->available_message_count_ = x;
-        return;
-      }
+    const uint64_t x = this->message_count_sync_->load();
+    if (x > this->available_message_count_) {
+      this->available_message_count_ = x;
+      return true;
+    } else {
+      return false;
     }
   }
 }
