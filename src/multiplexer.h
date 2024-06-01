@@ -107,7 +107,7 @@ class MultiplexerPublisher {
   auto send(const span<uint8_t> source) noexcept(false) -> bool {
     const size_t n = source.size();
     if (0 < n && n <= M) {
-      return this->send_(source);
+      return this->send_(source, 1);
     } else {
       throw std::invalid_argument(std::string("Must have 0 < source.size() <= M. Got source.size(): ") +
                                   std::to_string(n) + ", M: " + std::to_string(M));
@@ -117,7 +117,7 @@ class MultiplexerPublisher {
   template <uint16_t N>
     requires(0 < N && N <= M)
   auto send_safe(const span<uint8_t, N> source) noexcept -> bool {
-    return this->send_(source);
+    return this->send_(source, 1);
   }
 
   auto message_count() const noexcept -> uint64_t { return this->message_count_; }
@@ -133,7 +133,11 @@ class MultiplexerPublisher {
 #endif  // UNIT_TEST
 
  private:
-  auto send_(const span<uint8_t> source) noexcept -> bool;
+  /// @brief can block.
+  /// @param source -- message to send.
+  /// @param recursion_level
+  /// @return true if message was sent.
+  auto send_(const span<uint8_t> source, uint8_t recursion_level) noexcept -> bool;
 
   auto wait_for_subs_to_catch_up_and_wraparound_() noexcept -> void;
 
@@ -167,6 +171,8 @@ class MultiplexerSubscriber {
         message_count_sync_(message_count_sync),
         wraparound_sync_(wraparound_sync) {}
 
+  /// @brief Does not block. Calls has_next.
+  /// @return message or empty span if no data available.
   [[nodiscard]] auto next() noexcept -> const span<uint8_t>;
 
   [[nodiscard]] auto has_next() noexcept -> bool;
@@ -193,7 +199,7 @@ class MultiplexerSubscriber {
 
 template <size_t L, uint16_t M>
   requires(L >= M + 2 && M > 0)
-auto MultiplexerPublisher<L, M>::send_(const span<uint8_t> source) noexcept -> bool {
+auto MultiplexerPublisher<L, M>::send_(const span<uint8_t> source, uint8_t recursion_level) noexcept -> bool {
   const size_t n = source.size();
   if (n == 0) {
     return true;
@@ -207,9 +213,12 @@ auto MultiplexerPublisher<L, M>::send_(const span<uint8_t> source) noexcept -> b
       this->increment_message_count_();
       return true;
     } else {
-      this->wait_for_subs_to_catch_up_and_wraparound_();
-      // TODO: check recursion level, exit with error after it gets greater than 2
-      return this->send_(source);
+      if (recursion_level > 1) {
+        return false;
+      } else {
+        this->wait_for_subs_to_catch_up_and_wraparound_();
+        return this->send_(source, recursion_level + 1);
+      }
     }
   }
 }
@@ -251,8 +260,8 @@ template <size_t L, uint16_t M>
       assert(this->position <= L);
       return result;
     } else {
-      assert(this->read_message_count_ == this->available_message_count_);
       // signal that it is ready to wraparound, see doc/adr/ADR003.md for more details
+      assert(this->read_message_count_ == this->available_message_count_);
       this->position_ = 0;
       this->wraparound_sync_->fetch_or(this->id_.mask());
       return span<uint8_t>();
