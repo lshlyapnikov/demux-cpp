@@ -161,9 +161,11 @@ TEST(MultiplexerPublisherTest, Roundtrip1) {
 
     const bool ok = publisher.send(span<uint8_t>{message.data(), message.size()});
     ASSERT_TRUE(ok);
+    ASSERT_EQ(1, publisher.message_count());
 
     const span<uint8_t> read = subscriber.next();
     ASSERT_EQ(read.size(), message.size());
+    ASSERT_EQ(1, subscriber.message_count());
 
     for (size_t i = 0; i < message.size(); ++i) {
       ASSERT_EQ(read[i], message[i]);

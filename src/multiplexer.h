@@ -104,15 +104,15 @@ class MultiplexerPublisher {
         message_count_sync_(message_count_sync),
         wraparound_sync_(wraparound_sync) {}
 
-  auto send(const span<uint8_t> source) noexcept -> bool { return this->send_(source, 1); }
+  [[nodiscard]] auto send(const span<uint8_t> source) noexcept -> bool { return this->send_(source, 1); }
 
   template <uint16_t N>
     requires(0 < N && N <= M)
-  auto send_safe(const span<uint8_t, N> source) noexcept -> bool {
+  [[nodiscard]] auto send_safe(const span<uint8_t, N> source) noexcept -> bool {
     return this->send_(source, 1);
   }
 
-  auto message_count() const noexcept -> uint64_t { return this->message_count_; }
+  [[nodiscard]] auto message_count() const noexcept -> uint64_t { return this->message_count_; }
 
 #ifdef UNIT_TEST
 
@@ -125,11 +125,11 @@ class MultiplexerPublisher {
 #endif  // UNIT_TEST
 
  private:
-  /// @brief can block.
+  /// @brief will block while waiting for subscribers to catch up before wrapping around.
   /// @param source -- message to send.
   /// @param recursion_level
   /// @return true if message was sent.
-  auto send_(const span<uint8_t> source, uint8_t recursion_level) noexcept -> bool;
+  [[nodiscard]] auto send_(const span<uint8_t> source, uint8_t recursion_level) noexcept -> bool;
 
   auto wait_for_subs_to_catch_up_and_wraparound_() noexcept -> void;
 
