@@ -43,7 +43,7 @@ struct MessageBuffer {
   /// @param position -- the zero-based byte offset at which the message should be written.
   /// @param message -- the bytes that should be written.
   /// @return the total number of written bytes (2 + message length) or zero.
-  auto write(const size_t position, const span<uint8_t> message) noexcept -> size_t {
+  [[nodiscard]] auto write(const size_t position, const span<uint8_t> message) noexcept -> size_t {
     const size_t x = sizeof(message_length_t);
     const size_t n = message.size();
     const size_t total_required = n + x;
@@ -60,7 +60,7 @@ struct MessageBuffer {
 
   /// @param position -- zero-based byte offset.
   /// @return the available number of byte at the provided position.
-  auto remaining(const size_t position) const noexcept -> size_t {
+  [[nodiscard]] auto remaining(const size_t position) const noexcept -> size_t {
     if (L <= position) {
       return 0;
     } else {
@@ -72,7 +72,7 @@ struct MessageBuffer {
   ///        position has to point to a 2-byte length value that precedes the bytes data.
   /// @param position zero-based byte offset.
   /// @return the message at the provided position.
-  auto read(const size_t position) const noexcept -> span<uint8_t> {
+  [[nodiscard]] auto read(const size_t position) const noexcept -> span<uint8_t> {
     message_length_t msg_size = 0;
     uint8_t* data = this->data_;
     data += position;
@@ -104,15 +104,7 @@ class MultiplexerPublisher {
         message_count_sync_(message_count_sync),
         wraparound_sync_(wraparound_sync) {}
 
-  auto send(const span<uint8_t> source) noexcept(false) -> bool {
-    const size_t n = source.size();
-    if (0 < n && n <= M) {
-      return this->send_(source, 1);
-    } else {
-      throw std::invalid_argument(std::string("Must have 0 < source.size() <= M. Got source.size(): ") +
-                                  std::to_string(n) + ", M: " + std::to_string(M));
-    }
-  }
+  auto send(const span<uint8_t> source) noexcept -> bool { return this->send_(source, 1); }
 
   template <uint16_t N>
     requires(0 < N && N <= M)
@@ -202,7 +194,7 @@ template <size_t L, uint16_t M>
 auto MultiplexerPublisher<L, M>::send_(const span<uint8_t> source, uint8_t recursion_level) noexcept -> bool {
   const size_t n = source.size();
   if (n == 0) {
-    return true;
+    return false;
   } else if (n > M) {
     return false;
   } else {
@@ -228,7 +220,7 @@ template <size_t L, uint16_t M>
 auto MultiplexerPublisher<L, M>::wait_for_subs_to_catch_up_and_wraparound_() noexcept -> void {
   // see doc/adr/ADR003.md for more details
   this->wraparound_sync_->store(0);
-  this->send_(span<uint8_t>{}, 1);
+  std::ignore = this->buffer_.write(this->position_, span<uint8_t>{});
   this->increment_message_count_();
 
   // busy-wait
