@@ -45,6 +45,15 @@ auto assert_eq(const span<uint8_t>& left, const span<uint8_t>& right) {
   }
 }
 
+auto assert_eq(const vector<vector<uint8_t>>& left, const vector<vector<uint8_t>>& right) {
+  ASSERT_EQ(left.size(), right.size());
+  for (size_t i = 0; i < right.size(); ++i) {
+    vector<uint8_t> x = left[i];
+    vector<uint8_t> y = right[i];
+    assert_eq(x, y);
+  }
+}
+
 auto nonempty_only(const vector<vector<uint8_t>>& messages) -> vector<vector<uint8_t>> {
   vector<vector<uint8_t>> result;
   for (const vector<uint8_t>& m : messages) {
@@ -202,6 +211,32 @@ TEST(MultiplexerPublisherTest, Roundtrip1) {
 }
 // NOLINTEND(misc - include - cleaner, cppcoreguidelines - avoid - magic - numbers, readability - magic - numbers)
 
+template <size_t L, uint16_t M>
+auto publisher_send_all(const vector<vector<uint8_t>>& nonempty_messages, MultiplexerPublisher<L, M>& publisher)
+    -> size_t {
+  size_t result = 0;
+  for (auto m : nonempty_messages) {
+    const bool ok = publisher.send(m);
+    if (ok) {
+      result += 1;
+    }
+  }
+  return result;
+}
+
+template <size_t L, uint16_t M>
+auto subscriber_read_n(const size_t message_num, MultiplexerSubscriber<L, M>& subscriber) -> vector<vector<uint8_t>> {
+  vector<vector<uint8_t>> result;
+  while (result.size() < message_num) {
+    const span<uint8_t> m = subscriber.next();
+    if (!m.empty()) {
+      vector<uint8_t> v{m.begin(), m.end()};
+      result.push_back(v);
+    }
+  }
+  return result;
+}
+
 TEST(MultiplexerPublisherTest, RoundtripX) {
   rc::check([](const vector<vector<uint8_t>>& messages) {
     using namespace std::chrono_literals;
@@ -223,28 +258,11 @@ TEST(MultiplexerPublisherTest, RoundtripX) {
     MultiplexerSubscriber<128, 64> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
 
     std::future<size_t> sent_count_future = std::async(std::launch::async, [&nonempty_messages, &publisher] {
-      size_t result = 0;
-      for (auto m : nonempty_messages) {
-        const bool ok = publisher.send(m);
-        if (ok) {
-          result += 1;
-        }
-      }
-      return result;
+      return publisher_send_all(nonempty_messages, publisher);
     });
 
-    std::future<vector<vector<uint8_t>>> received_messages_future =
-        std::async(std::launch::async, [message_num, &subscriber] {
-          vector<vector<uint8_t>> result;
-          while (result.size() < message_num) {
-            const span<uint8_t> m = subscriber.next();
-            if (!m.empty()) {
-              vector<uint8_t> v{m.begin(), m.end()};
-              result.push_back(v);
-            }
-          }
-          return result;
-        });
+    std::future<vector<vector<uint8_t>>> received_messages_future = std::async(
+        std::launch::async, [message_num, &subscriber] { return subscriber_read_n(message_num, subscriber); });
 
     sent_count_future.wait_for(5s);
     ASSERT_TRUE(sent_count_future.valid());
@@ -252,11 +270,10 @@ TEST(MultiplexerPublisherTest, RoundtripX) {
     received_messages_future.wait_for(5s);
     ASSERT_TRUE(received_messages_future.valid());
 
-    ASSERT_EQ(message_num, sent_count_future.get());
-    ASSERT_EQ(message_num, received_messages_future.get().size());
+    const size_t sent_count = sent_count_future.get();
+    ASSERT_EQ(message_num, sent_count);
 
-    // assert_eq(nonempty_messages, received_messages_future.get());
-
-    // const bool ok = publisher.send(span<uint8_t>{message});
+    const auto received_messages = received_messages_future.get();
+    assert_eq(nonempty_messages, received_messages);
   });
 }

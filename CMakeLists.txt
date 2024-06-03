@@ -3,8 +3,6 @@ project(shm-sequencer VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_VERBOSE_MAKEFILE ON) # verbose CMake output
 
-add_definitions(-DLOG_LEVEL=debug)
-
 message("CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
 
 IF(CMAKE_BUILD_TYPE MATCHES Debug)

@@ -121,7 +121,10 @@ class MultiplexerPublisher {
       : all_subs_mask_(all_subs_mask),
         buffer_(buffer),
         message_count_sync_(message_count_sync),
-        wraparound_sync_(wraparound_sync) {}
+        wraparound_sync_(wraparound_sync) {
+    BOOST_LOG_TRIVIAL(info) << "MultiplexerPublisher::constructor L: " << L << ", M: " << M
+                            << ", all_subs_mask_: " << this->all_subs_mask_;
+  }
 
   [[nodiscard]] auto send(const span<uint8_t> source) noexcept -> bool { return this->send_(source, 1); }
 
@@ -180,7 +183,10 @@ class MultiplexerSubscriber {
       : id_(subscriber_id),
         buffer_(buffer),
         message_count_sync_(message_count_sync),
-        wraparound_sync_(wraparound_sync) {}
+        wraparound_sync_(wraparound_sync) {
+    BOOST_LOG_TRIVIAL(info) << "MultiplexerSubscriber::constructor L: " << L << ", M: " << M
+                            << ", subscriber_id.mask: " << this->id_.mask();
+  }
 
   /// @brief Does not block. Calls has_next.
   /// @return message or empty span if no data available.
@@ -242,8 +248,10 @@ auto MultiplexerPublisher<L, M>::wait_for_subs_to_catch_up_and_wraparound_() noe
   std::ignore = this->buffer_.write(this->position_, span<uint8_t>{});
   this->increment_message_count_();
 
+#ifndef NDEBUG
   BOOST_LOG_TRIVIAL(debug) << "MultiplexerPublisher::wait_for_subs_to_catch_up_and_wraparound_, message_count_: "
                            << this->message_count_ << ", position_: " << this->position_ << " ... waiting ...";
+#endif
 
   // busy-wait
   while (true) {
@@ -262,8 +270,10 @@ auto MultiplexerPublisher<L, M>::wait_for_subs_to_catch_up_and_wraparound_() noe
 template <size_t L, uint16_t M>
   requires(L >= M + 2 && M > 0)
 [[nodiscard]] auto MultiplexerSubscriber<L, M>::next() noexcept -> const span<uint8_t> {
+#ifndef NDEBUG
   BOOST_LOG_TRIVIAL(debug) << "MultiplexerSubscriber::next() read_message_count_: " << this->read_message_count_
                            << ", position_: " << this->position_;
+#endif
 
   if (!this->has_next()) {
     return span<uint8_t>();
@@ -280,10 +290,12 @@ template <size_t L, uint16_t M>
     ASSERT_EX(this->position_ <= L, std::cerr << "failed assertion: " << this->position_ << " <= " << L << '\n');
     return result;
   } else {
+#ifndef NDEBUG
     BOOST_LOG_TRIVIAL(debug) << "MultiplexerSubscriber::next() wrapping up, read_message_count_: "
                              << this->read_message_count_
                              << ", available_message_count_: " << this->available_message_count_
                              << ", position_: " << this->position_;
+#endif
     // signal that it is ready to wraparound, see doc/adr/ADR003.md for more details
     assert(this->read_message_count_ == this->available_message_count_);
     this->position_ = 0;
