@@ -184,8 +184,7 @@ class MultiplexerSubscriber {
         buffer_(buffer),
         message_count_sync_(message_count_sync),
         wraparound_sync_(wraparound_sync) {
-    BOOST_LOG_TRIVIAL(info) << "MultiplexerSubscriber::constructor L: " << L << ", M: " << M
-                            << ", subscriber_id.mask: " << this->id_.mask();
+    BOOST_LOG_TRIVIAL(info) << "MultiplexerSubscriber::constructor L: " << L << ", M: " << M << ", " << this->id_;
   }
 
   /// @brief Does not block. Calls has_next.
@@ -271,7 +270,8 @@ template <size_t L, uint16_t M>
   requires(L >= M + 2 && M > 0)
 [[nodiscard]] auto MultiplexerSubscriber<L, M>::next() noexcept -> const span<uint8_t> {
 #ifndef NDEBUG
-  BOOST_LOG_TRIVIAL(debug) << "MultiplexerSubscriber::next() read_message_count_: " << this->read_message_count_
+  BOOST_LOG_TRIVIAL(debug) << "MultiplexerSubscriber::next() " << this->id_
+                           << ", read_message_count_: " << this->read_message_count_
                            << ", position_: " << this->position_;
 #endif
 
@@ -291,8 +291,8 @@ template <size_t L, uint16_t M>
     return result;
   } else {
 #ifndef NDEBUG
-    BOOST_LOG_TRIVIAL(debug) << "MultiplexerSubscriber::next() wrapping up, read_message_count_: "
-                             << this->read_message_count_
+    BOOST_LOG_TRIVIAL(debug) << "MultiplexerSubscriber::next() wrapping up, " << this->id_
+                             << ", read_message_count_: " << this->read_message_count_
                              << ", available_message_count_: " << this->available_message_count_
                              << ", position_: " << this->position_;
 #endif

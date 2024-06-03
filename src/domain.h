@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 
@@ -71,6 +72,8 @@ class SubscriberId {
 
   [[nodiscard]] auto mask() const noexcept -> uint64_t { return this->mask_; }
   [[nodiscard]] auto index() const noexcept -> size_t { return this->index_; }
+
+  friend auto operator<<(std::ostream& os, const SubscriberId& sub) -> std::ostream&;
 
  private:
   SubscriberId(uint64_t mask, size_t index) noexcept : mask_(mask), index_(index) {}
