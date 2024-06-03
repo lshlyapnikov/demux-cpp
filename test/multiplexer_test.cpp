@@ -195,14 +195,17 @@ TEST(MultiplexerPublisherTest, ConstructorDoesNotThrow) {
 }
 
 TEST(MultiplexerPublisherTest, SendEmptyMessage) {
-  array<uint8_t, 128> buffer;
+  constexpr size_t L = 128;
+  constexpr uint16_t M = 64;
+
+  array<uint8_t, L> buffer;
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
   const uint8_t all_subs_mask = 0b1;
   const SubscriberId subId = SubscriberId::create(1);
 
-  MultiplexerPublisher<128, 64> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
-  MultiplexerSubscriber<128, 64> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
+  MultiplexerPublisher<L, M> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
+  MultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
 
   const bool ok = publisher.send(span<uint8_t>{});
 
@@ -217,14 +220,17 @@ TEST(MultiplexerPublisherTest, SendEmptyMessage) {
 // NOLINTBEGIN(misc - include - cleaner, cppcoreguidelines - avoid - magic - numbers, readability - magic - numbers)
 TEST(MultiplexerPublisherTest, SendReceive1) {
   rc::check([](TestMessage message) {
-    array<uint8_t, 128> buffer;
+    constexpr size_t L = 128;
+    constexpr uint16_t M = 64;
+
+    array<uint8_t, L> buffer;
     atomic<uint64_t> msg_counter_sync{0};
     atomic<uint64_t> wraparound_sync{0};
     const uint8_t all_subs_mask = 0b1;
     const SubscriberId subId = SubscriberId::create(1);
 
-    MultiplexerPublisher<128, 64> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
-    MultiplexerSubscriber<128, 64> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
+    MultiplexerPublisher<L, M> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
+    MultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
 
     const bool ok = publisher.send(message.t);
 

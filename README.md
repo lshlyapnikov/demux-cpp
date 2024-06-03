@@ -41,6 +41,7 @@ $ valgrind --leak-check=full --show-leak-kinds=all ./build/shm-sequencer
 - [FlatBuffers](https://flatbuffers.dev/flatbuffers_guide_use_cpp.html)
 - [GoogleTest Primer](https://google.github.io/googletest/primer.html)
 - [RapidCheck](https://github.com/emil-e/rapidcheck)
+  - [User Guide](https://github.com/emil-e/rapidcheck/blob/master/doc/user_guide.md)
   - [Arbitrary Generators](https://github.com/emil-e/rapidcheck/blob/master/doc/generators.md#arbitrary)
   - [Configuration](https://github.com/emil-e/rapidcheck/blob/master/doc/configuration.md)
 - [Boost Library Documentation](https://www.boost.org/doc/libs/)
