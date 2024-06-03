@@ -14,6 +14,7 @@
 #include <span>
 #include <stdexcept>
 #include <type_traits>
+#include "assertion_util.h"
 #include "atomic_util.h"
 #include "domain.h"
 
@@ -29,18 +30,6 @@ using std::span;
 using std::uint64_t;
 using std::uint8_t;
 using std::unique_ptr;
-
-#ifndef NDEBUG
-#define ASSERT_EX(condition, statement) \
-  do {                                  \
-    if (!(condition)) {                 \
-      statement;                        \
-      assert(condition);                \
-    }                                   \
-  } while (false)
-#else
-#define ASSERT_EX(condition, statement) ((void)0)
-#endif
 
 /// @brief MessageBuffer wraps a byte array, which can be allocated in shared memory. MessageBuffer does not take the
 /// ownership of the passed buffer. The outside logic is responsible to freeing the passed buffer. External

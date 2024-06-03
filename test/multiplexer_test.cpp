@@ -5,6 +5,7 @@
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
 #include <array>
 #include <atomic>
+#include <boost/serialization/strong_typedef.hpp>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -18,10 +19,18 @@
 #include <thread>
 #include "../src/domain.h"
 
+namespace ShmSequencer {
+const std::chrono::seconds DEFAULT_WAIT(5);
+
+BOOST_STRONG_TYPEDEF(std::vector<uint8_t>, TestMessage);
+}  // namespace ShmSequencer
+
+using ShmSequencer::DEFAULT_WAIT;
 using ShmSequencer::MessageBuffer;
 using ShmSequencer::MultiplexerPublisher;
 using ShmSequencer::MultiplexerSubscriber;
 using ShmSequencer::SubscriberId;
+using ShmSequencer::TestMessage;
 using std::array;
 using std::atomic;
 using std::span;
@@ -29,8 +38,6 @@ using std::uint16_t;
 using std::uint8_t;
 using std::unique_ptr;
 using std::vector;
-
-const std::chrono::seconds DEFAULT_WAIT(5);
 
 auto create_test_array(const size_t size) -> unique_ptr<uint8_t[]> {
   unique_ptr<uint8_t[]> result(new uint8_t[size]);
@@ -94,7 +101,7 @@ TEST(MessageBufferTest, MessageBufferRemaining) {
 }
 
 TEST(MessageBufferTest, WriteToSharedMemory) {
-  rc::check([](std::vector<uint8_t> message) {
+  rc::check([](vector<uint8_t> message) {
     constexpr size_t BUF_SIZE = 32;
 
     std::array<uint8_t, BUF_SIZE> data{0};
