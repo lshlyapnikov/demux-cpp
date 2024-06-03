@@ -12,11 +12,8 @@
 #include <future>
 #include <iostream>
 #include <memory>
-#include <ranges>
 #include <span>
-#include <stdexcept>
-#include <string>
-#include <thread>
+#include <vector>
 #include "../src/domain.h"
 
 namespace ShmSequencer {
@@ -207,7 +204,7 @@ TEST(MultiplexerPublisherTest, SendEmptyMessage) {
   MultiplexerPublisher<L, M> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
   MultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
 
-  const bool ok = publisher.send(span<uint8_t>{});
+  const bool ok = publisher.send({});
 
   ASSERT_FALSE(ok);
   ASSERT_EQ(0, publisher.message_count());

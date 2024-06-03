@@ -8,14 +8,10 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
-#include <iostream>
 #include <memory>
 #include <optional>
 #include <span>
-#include <stdexcept>
-#include <type_traits>
-#include "assertion_util.h"
-#include "atomic_util.h"
+#include <tuple>
 #include "domain.h"
 
 namespace ShmSequencer {
@@ -41,7 +37,7 @@ struct MessageBuffer {
   using message_length_t = uint16_t;
 
  public:
-  MessageBuffer(span<uint8_t, L> buffer) : data_(buffer.data()) {}
+  explicit MessageBuffer(span<uint8_t, L> buffer) : data_(buffer.data()) {}
 
   /// @brief Writes the entire passed message into the buffer or nothing.
   /// @param position -- the zero-based byte offset at which the message should be written.
@@ -53,9 +49,11 @@ struct MessageBuffer {
     const size_t total_required = n + x;
 
     if (this->remaining(position) >= total_required) {
+      // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
       uint8_t* data = this->data_;
       std::copy_n(&n, x, data + position);                  // write message length
       std::copy_n(message.data(), n, data + position + x);  // write message bytes
+      // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
       return total_required;
     } else {
       return 0;
@@ -78,23 +76,25 @@ struct MessageBuffer {
   /// @return the message at the provided position.
   [[nodiscard]] auto read(const size_t position) const noexcept -> span<uint8_t> {
     if (this->remaining(position) < sizeof(message_length_t)) {
-      return span<uint8_t>();
+      return {};
     } else {
+      // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
       message_length_t msg_size = 0;
       uint8_t* data = this->data_;
       data += position;
       std::copy_n(data, sizeof(message_length_t), &msg_size);
       data += sizeof(message_length_t);
-      return span(data, msg_size);
+      // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      return {data, msg_size};
     }
   }
 
  private:
-  uint8_t* const data_;
+  uint8_t* data_;
 };
 
-// TODO: make sure the size of the shares memory is a multiple of the page size. Because the operating system
-// TODO: performs mapping operations over whole pages. So, you don't waste memory.
+// TODO(Leo): make sure the size of the shares memory is a multiple of the page size. Because the operating system
+// TODO(Leo): performs mapping operations over whole pages. So, you don't waste memory.
 //
 /// @brief Multiplexer publisher.
 /// @tparam L total buffer size in bytes.
@@ -115,11 +115,11 @@ class MultiplexerPublisher {
                             << ", all_subs_mask_: " << this->all_subs_mask_;
   }
 
-  [[nodiscard]] auto send(const span<uint8_t> source) noexcept -> bool { return this->send_(source, 1); }
+  [[nodiscard]] auto send(const span<uint8_t>& source) noexcept -> bool { return this->send_(source, 1); }
 
   template <uint16_t N>
     requires(0 < N && N <= M)
-  [[nodiscard]] auto send_safe(const span<uint8_t, N> source) noexcept -> bool {
+  [[nodiscard]] auto send_safe(const span<uint8_t, N>& source) noexcept -> bool {
     return this->send_(source, 1);
   }
 
@@ -127,7 +127,7 @@ class MultiplexerPublisher {
 
 #ifdef UNIT_TEST
 
-  auto data() const noexcept -> span<uint8_t> { return span(this->buffers_.data(), this->position_); }
+  auto data() const noexcept -> span<uint8_t> { return {this->buffers_.data(), this->position_}; }
 
   auto position() const noexcept -> size_t { return this->position_; }
 
@@ -140,7 +140,7 @@ class MultiplexerPublisher {
   /// @param source -- message to send.
   /// @param recursion_level
   /// @return true if message was sent.
-  [[nodiscard]] auto send_(const span<uint8_t> source, uint8_t recursion_level) noexcept -> bool;
+  [[nodiscard]] auto send_(const span<uint8_t>& source, uint8_t recursion_level) noexcept -> bool;
 
   auto wait_for_subs_to_catch_up_and_wraparound_() noexcept -> void;
 
@@ -149,13 +149,14 @@ class MultiplexerPublisher {
     this->message_count_sync_->store(this->message_count_);
   }
 
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
   const uint64_t all_subs_mask_;
 
   size_t position_{0};
   uint64_t message_count_{0};
   MessageBuffer<L> buffer_;
-  atomic<uint64_t>* const message_count_sync_;
-  atomic<uint64_t>* const wraparound_sync_;
+  atomic<uint64_t>* message_count_sync_;
+  atomic<uint64_t>* wraparound_sync_;
 };
 
 /// @brief Multiplexer subscriber. Should be mapped into shared memory allocated by MultiplexerPublisher.
@@ -185,45 +186,46 @@ class MultiplexerSubscriber {
   [[nodiscard]] auto message_count() const noexcept -> uint64_t { return this->read_message_count_; }
 
 #ifdef UNIT_TEST
-  auto data() const noexcept -> span<uint8_t> { return span(this->buffers_.data(), this->position_); }
+  auto data() const noexcept -> span<uint8_t> { return {this->buffers_.data(), this->position_}; }
 
   auto position() const noexcept -> size_t { return this->position_; }
 
   auto mask() const noexcept -> uint64_t { return this->all_subs_mask_; }
 #endif  // UNIT_TEST
 
+ private:
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
   const SubscriberId id_;
 
   size_t position_{0};
   uint64_t available_message_count_{0};
   uint64_t read_message_count_{0};
-  MessageBuffer<L> const buffer_;
-  atomic<uint64_t>* const message_count_sync_;
-  atomic<uint64_t>* const wraparound_sync_;
+  MessageBuffer<L> buffer_;
+  atomic<uint64_t>* message_count_sync_;
+  atomic<uint64_t>* wraparound_sync_;
 };
 
 template <size_t L, uint16_t M>
   requires(L >= M + 2 && M > 0)
-auto MultiplexerPublisher<L, M>::send_(const span<uint8_t> source, uint8_t recursion_level) noexcept -> bool {
+auto MultiplexerPublisher<L, M>::send_(const span<uint8_t>& source, uint8_t recursion_level) noexcept -> bool {
   const size_t n = source.size();
-  if (n == 0) {
+
+  if (n == 0 || n > M) {
     return false;
-  } else if (n > M) {
-    return false;
+  }
+
+  // it either writes the entire message or nothing
+  const size_t written = this->buffer_.write(this->position_, source);
+  if (written > 0) {
+    this->position_ += written;
+    this->increment_message_count_();
+    return true;
   } else {
-    // it either writes the entire message or nothing
-    const size_t written = this->buffer_.write(this->position_, source);
-    if (written > 0) {
-      this->position_ += written;
-      this->increment_message_count_();
-      return true;
+    if (recursion_level > 1) {
+      return false;
     } else {
-      if (recursion_level > 1) {
-        return false;
-      } else {
-        this->wait_for_subs_to_catch_up_and_wraparound_();
-        return this->send_(source, recursion_level + 1);
-      }
+      this->wait_for_subs_to_catch_up_and_wraparound_();
+      return this->send_(source, recursion_level + 1);
     }
   }
 }
@@ -257,6 +259,7 @@ auto MultiplexerPublisher<L, M>::wait_for_subs_to_catch_up_and_wraparound_() noe
 
 template <size_t L, uint16_t M>
   requires(L >= M + 2 && M > 0)
+// NOLINTNEXTLINE(readability-const-return-type)
 [[nodiscard]] auto MultiplexerSubscriber<L, M>::next() noexcept -> const span<uint8_t> {
 #ifndef NDEBUG
   BOOST_LOG_TRIVIAL(debug) << "MultiplexerSubscriber::next() " << this->id_
@@ -265,7 +268,7 @@ template <size_t L, uint16_t M>
 #endif
 
   if (!this->has_next()) {
-    return span<uint8_t>();
+    return {};
   }
 
   const span<uint8_t>& result = this->buffer_.read(this->position_);
@@ -276,7 +279,13 @@ template <size_t L, uint16_t M>
   if (msg_size > 0) {
     this->position_ += msg_size;
     this->position_ += sizeof(uint16_t);
-    ASSERT_EX(this->position_ <= L, std::cerr << "failed assertion: " << this->position_ << " <= " << L << '\n');
+#ifndef NDEBUG
+    BOOST_LOG_TRIVIAL(debug) << "MultiplexerSubscriber::next() continue, " << this->id_
+                             << ", read_message_count_: " << this->read_message_count_
+                             << ", available_message_count_: " << this->available_message_count_
+                             << ", position_: " << this->position_;
+#endif
+    assert(this->position_ <= L);
     return result;
   } else {
 #ifndef NDEBUG
@@ -289,7 +298,7 @@ template <size_t L, uint16_t M>
     assert(this->read_message_count_ == this->available_message_count_);
     this->position_ = 0;
     this->wraparound_sync_->fetch_or(this->id_.mask());
-    return span<uint8_t>();
+    return {};
   }
 }
 

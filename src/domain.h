@@ -1,9 +1,6 @@
 #ifndef SHM_SEQUENCER_DOMAIN_H
 #define SHM_SEQUENCER_DOMAIN_H
 
-#include <array>
-#include <atomic>
-#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
@@ -47,10 +44,9 @@ const size_t MAX_SUBSCRIBER_NUM = sizeof(uint64_t) * 8;  // 64
 constexpr auto validate_subscriber_number(uint8_t num) noexcept(false) -> uint8_t {
   if (is_valid_subscriber_number(num)) {
     return num;
-  } else {
-    throw std::invalid_argument(std::string("subscriber_number must be within the inclusive interval: [1, ") +
-                                std::to_string(MAX_SUBSCRIBER_NUM) + ']');
   }
+  throw std::invalid_argument(std::string("subscriber_number must be within the inclusive interval: [1, ") +
+                              std::to_string(MAX_SUBSCRIBER_NUM) + ']');
 }
 
 auto my_pow(uint8_t x, uint8_t p) -> uint64_t;
