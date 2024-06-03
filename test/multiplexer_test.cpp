@@ -20,9 +20,11 @@
 #include "../src/domain.h"
 
 namespace ShmSequencer {
+
 const std::chrono::seconds DEFAULT_WAIT(5);
 
 BOOST_STRONG_TYPEDEF(std::vector<uint8_t>, TestMessage);
+
 }  // namespace ShmSequencer
 
 using ShmSequencer::DEFAULT_WAIT;
@@ -39,6 +41,18 @@ using std::uint8_t;
 using std::unique_ptr;
 using std::vector;
 
+namespace rc {
+
+template <>
+struct Arbitrary<TestMessage> {
+  static Gen<TestMessage> arbitrary() {
+    Gen<vector<uint8_t>> nonempty_vec_gen = gen::nonEmpty<vector<uint8_t>>();
+    return gen::map(nonempty_vec_gen, [](vector<uint8_t> xs) { return TestMessage(xs); });
+  }
+};
+
+}  // namespace rc
+
 auto create_test_array(const size_t size) -> unique_ptr<uint8_t[]> {
   unique_ptr<uint8_t[]> result(new uint8_t[size]);
   for (uint8_t i = 0; i < size; i++) {
@@ -54,23 +68,20 @@ auto assert_eq(const span<uint8_t>& left, const span<uint8_t>& right) {
   }
 }
 
-auto assert_eq(const vector<vector<uint8_t>>& left, const vector<vector<uint8_t>>& right) {
-  ASSERT_EQ(left.size(), right.size());
-  for (size_t i = 0; i < right.size(); ++i) {
-    vector<uint8_t> x = left[i];
-    vector<uint8_t> y = right[i];
-    assert_eq(x, y);
+auto assert_eq(const TestMessage& left, const TestMessage& right) {
+  ASSERT_EQ(left.t.size(), right.t.size());
+  for (size_t i = 0; i < right.t.size(); ++i) {
+    ASSERT_EQ(left.t[i], right.t[i]) << "index: " << i;
   }
 }
 
-auto nonempty_only(const vector<vector<uint8_t>>& messages) -> vector<vector<uint8_t>> {
-  vector<vector<uint8_t>> result;
-  for (const vector<uint8_t>& m : messages) {
-    if (!m.empty()) {
-      result.push_back(m);
-    }
+auto assert_eq(const vector<TestMessage>& left, const vector<TestMessage>& right) {
+  ASSERT_EQ(left.size(), right.size());
+  for (size_t i = 0; i < right.size(); ++i) {
+    const TestMessage& x = left[i];
+    const TestMessage& y = right[i];
+    assert_eq(x, y);
   }
-  return result;
 }
 
 TEST(MultiplexerTest, Atomic) {
@@ -183,9 +194,29 @@ TEST(MultiplexerPublisherTest, ConstructorDoesNotThrow) {
   });
 }
 
+TEST(MultiplexerPublisherTest, SendEmptyMessage) {
+  array<uint8_t, 128> buffer;
+  atomic<uint64_t> msg_counter_sync{0};
+  atomic<uint64_t> wraparound_sync{0};
+  const uint8_t all_subs_mask = 0b1;
+  const SubscriberId subId = SubscriberId::create(1);
+
+  MultiplexerPublisher<128, 64> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
+  MultiplexerSubscriber<128, 64> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
+
+  const bool ok = publisher.send(span<uint8_t>{});
+
+  ASSERT_FALSE(ok);
+  ASSERT_EQ(0, publisher.message_count());
+
+  const span<uint8_t> read = subscriber.next();
+  ASSERT_EQ(0, read.size());
+  ASSERT_EQ(0, subscriber.message_count());
+}
+
 // NOLINTBEGIN(misc - include - cleaner, cppcoreguidelines - avoid - magic - numbers, readability - magic - numbers)
 TEST(MultiplexerPublisherTest, SendReceive1) {
-  rc::check([](vector<uint8_t> message) {
+  rc::check([](TestMessage message) {
     array<uint8_t, 128> buffer;
     atomic<uint64_t> msg_counter_sync{0};
     atomic<uint64_t> wraparound_sync{0};
@@ -195,36 +226,24 @@ TEST(MultiplexerPublisherTest, SendReceive1) {
     MultiplexerPublisher<128, 64> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
     MultiplexerSubscriber<128, 64> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
 
-    const bool ok = publisher.send(message);
+    const bool ok = publisher.send(message.t);
 
-    if (message.size() == 0) {
-      RC_CLASSIFY(message.empty());
+    ASSERT_TRUE(ok);
+    ASSERT_EQ(1, publisher.message_count());
 
-      ASSERT_FALSE(ok);
-      ASSERT_EQ(0, publisher.message_count());
+    const span<uint8_t> read = subscriber.next();
 
-      const span<uint8_t> read = subscriber.next();
-      ASSERT_EQ(0, read.size());
-      ASSERT_EQ(0, subscriber.message_count());
-    } else {
-      RC_CLASSIFY(!message.empty());
-
-      ASSERT_TRUE(ok);
-      ASSERT_EQ(1, publisher.message_count());
-
-      const span<uint8_t> read = subscriber.next();
-      ASSERT_EQ(1, subscriber.message_count());
-      assert_eq(read, message);
-    }
+    ASSERT_EQ(1, subscriber.message_count());
+    assert_eq(read, message.t);
   });
 }
 // NOLINTEND(misc - include - cleaner, cppcoreguidelines - avoid - magic - numbers, readability - magic - numbers)
 
 template <size_t L, uint16_t M>
-auto send_all(const vector<vector<uint8_t>>& nonempty_messages, MultiplexerPublisher<L, M>& publisher) -> size_t {
+auto send_all(const vector<TestMessage>& nonempty_messages, MultiplexerPublisher<L, M>& publisher) -> size_t {
   size_t result = 0;
   for (auto m : nonempty_messages) {
-    const bool ok = publisher.send(m);
+    const bool ok = publisher.send(m.t);
     if (ok) {
       result += 1;
     }
@@ -233,28 +252,26 @@ auto send_all(const vector<vector<uint8_t>>& nonempty_messages, MultiplexerPubli
 }
 
 template <size_t L, uint16_t M>
-auto read_n(const size_t message_num, MultiplexerSubscriber<L, M>& subscriber) -> vector<vector<uint8_t>> {
-  vector<vector<uint8_t>> result;
+auto read_n(const size_t message_num, MultiplexerSubscriber<L, M>& subscriber) -> vector<TestMessage> {
+  vector<TestMessage> result;
   while (result.size() < message_num) {
     const span<uint8_t> m = subscriber.next();
     if (!m.empty()) {
-      vector<uint8_t> v{m.begin(), m.end()};
-      result.push_back(v);
+      result.emplace_back(TestMessage(vector<uint8_t>{m.begin(), m.end()}));
     }
   }
   return result;
 }
 
 TEST(MultiplexerPublisherTest, SendReceiveX) {
-  rc::check([](const vector<vector<uint8_t>>& messages) {
-    if (messages.empty()) {
+  rc::check([](const vector<TestMessage>& nonempty_messages) {
+    if (nonempty_messages.empty()) {
       return;
     }
 
     constexpr size_t L = 128;
     constexpr uint16_t M = 64;
 
-    const vector<vector<uint8_t>> nonempty_messages = nonempty_only(messages);
     const size_t message_num = nonempty_messages.size();
 
     array<uint8_t, L> buffer;
@@ -269,7 +286,7 @@ TEST(MultiplexerPublisherTest, SendReceiveX) {
     std::future<size_t> sent_count_future = std::async(
         std::launch::async, [&nonempty_messages, &publisher] { return send_all(nonempty_messages, publisher); });
 
-    std::future<vector<vector<uint8_t>>> received_messages_future =
+    std::future<vector<TestMessage>> received_messages_future =
         std::async(std::launch::async, [message_num, &subscriber] { return read_n(message_num, subscriber); });
 
     sent_count_future.wait_for(DEFAULT_WAIT);
@@ -287,8 +304,8 @@ TEST(MultiplexerPublisherTest, SendReceiveX) {
 }
 
 TEST(MultiplexerPublisherTest, MultipleSubsReceiveX) {
-  rc::check([](const vector<vector<uint8_t>>& messages) {
-    if (messages.empty()) {
+  rc::check([](const vector<TestMessage>& nonempty_messages) {
+    if (nonempty_messages.empty()) {
       return;
     }
 
@@ -297,7 +314,6 @@ TEST(MultiplexerPublisherTest, MultipleSubsReceiveX) {
 
     constexpr uint8_t SUB_NUM = 7;
 
-    const vector<vector<uint8_t>> nonempty_messages = nonempty_only(messages);
     const size_t message_num = nonempty_messages.size();
 
     array<uint8_t, L> buffer;
@@ -316,7 +332,7 @@ TEST(MultiplexerPublisherTest, MultipleSubsReceiveX) {
     std::future<size_t> future_pub_result = std::async(
         std::launch::async, [&nonempty_messages, &publisher] { return send_all(nonempty_messages, publisher); });
 
-    vector<std::future<vector<vector<uint8_t>>>> future_sub_results;
+    vector<std::future<vector<TestMessage>>> future_sub_results;
     for (auto& subscriber : subscribers) {
       future_sub_results.emplace_back(
           std::async(std::launch::async, [message_num, &subscriber] { return read_n(message_num, subscriber); }));
@@ -331,5 +347,15 @@ TEST(MultiplexerPublisherTest, MultipleSubsReceiveX) {
       ASSERT_TRUE(future_sub_result.valid());
       assert_eq(nonempty_messages, future_sub_result.get());
     }
+  });
+}
+
+TEST(TestMessageGenerator, CheckDistribution1) {
+  rc::check([](TestMessage message) {
+    const size_t message_size = message.t.size();
+    RC_CLASSIFY(message_size == 0, "size == 0");
+    RC_CLASSIFY(message_size == 1, "size == 1");
+    RC_CLASSIFY(0 < message_size && message_size <= 32, "0 < size <= 32");
+    RC_CLASSIFY(message_size > 32, "size > 32");
   });
 }
