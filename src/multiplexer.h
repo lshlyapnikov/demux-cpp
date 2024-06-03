@@ -262,8 +262,8 @@ auto MultiplexerPublisher<L, M>::wait_for_subs_to_catch_up_and_wraparound_() noe
 template <size_t L, uint16_t M>
   requires(L >= M + 2 && M > 0)
 [[nodiscard]] auto MultiplexerSubscriber<L, M>::next() noexcept -> const span<uint8_t> {
-  BOOST_LOG_TRIVIAL(debug) << "MultiplexerSubscriber::next() position_: " << this->position_
-                           << ", read_message_count_: " << this->read_message_count_;
+  BOOST_LOG_TRIVIAL(debug) << "MultiplexerSubscriber::next() read_message_count_: " << this->read_message_count_
+                           << ", position_: " << this->position_;
 
   if (!this->has_next()) {
     return span<uint8_t>();
@@ -284,12 +284,8 @@ template <size_t L, uint16_t M>
                              << this->read_message_count_
                              << ", available_message_count_: " << this->available_message_count_
                              << ", position_: " << this->position_;
-
     // signal that it is ready to wraparound, see doc/adr/ADR003.md for more details
     assert(this->read_message_count_ == this->available_message_count_);
-    // ASSERT_EX(this->read_message_count_ == this->available_message_count_,
-    //           std::cerr << "failed assertion: " << this->read_message_count_
-    //                     << " == " << this->available_message_count_ << '\n');
     this->position_ = 0;
     this->wraparound_sync_->fetch_or(this->id_.mask());
     return span<uint8_t>();
