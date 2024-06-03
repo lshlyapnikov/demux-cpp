@@ -1,11 +1,14 @@
 #ifndef SHM_SEQUENCER_MULTIPLEXER_H
 #define SHM_SEQUENCER_MULTIPLEXER_H
+
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <boost/log/trivial.hpp>
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <iostream>
 #include <memory>
 #include <optional>
 #include <span>
@@ -26,6 +29,18 @@ using std::span;
 using std::uint64_t;
 using std::uint8_t;
 using std::unique_ptr;
+
+#ifndef NDEBUG
+#define ASSERT_EX(condition, statement) \
+  do {                                  \
+    if (!(condition)) {                 \
+      statement;                        \
+      assert(condition);                \
+    }                                   \
+  } while (false)
+#else
+#define ASSERT_EX(condition, statement) ((void)0)
+#endif
 
 /// @brief MessageBuffer wraps a byte array, which can be allocated in shared memory. MessageBuffer does not take the
 /// ownership of the passed buffer. The outside logic is responsible to freeing the passed buffer. External
@@ -73,12 +88,16 @@ struct MessageBuffer {
   /// @param position zero-based byte offset.
   /// @return the message at the provided position.
   [[nodiscard]] auto read(const size_t position) const noexcept -> span<uint8_t> {
-    message_length_t msg_size = 0;
-    uint8_t* data = this->data_;
-    data += position;
-    std::copy_n(data, sizeof(message_length_t), &msg_size);
-    data += sizeof(message_length_t);
-    return span(data, msg_size);
+    if (this->remaining(position) < sizeof(message_length_t)) {
+      return span<uint8_t>();
+    } else {
+      message_length_t msg_size = 0;
+      uint8_t* data = this->data_;
+      data += position;
+      std::copy_n(data, sizeof(message_length_t), &msg_size);
+      data += sizeof(message_length_t);
+      return span(data, msg_size);
+    }
   }
 
  private:
@@ -223,6 +242,9 @@ auto MultiplexerPublisher<L, M>::wait_for_subs_to_catch_up_and_wraparound_() noe
   std::ignore = this->buffer_.write(this->position_, span<uint8_t>{});
   this->increment_message_count_();
 
+  BOOST_LOG_TRIVIAL(debug) << "MultiplexerPublisher::wait_for_subs_to_catch_up_and_wraparound_, message_count_: "
+                           << this->message_count_ << ", position_: " << this->position_ << " ... waiting ...";
+
   // busy-wait
   while (true) {
     const uint64_t x = this->wraparound_sync_->load();
@@ -240,24 +262,37 @@ auto MultiplexerPublisher<L, M>::wait_for_subs_to_catch_up_and_wraparound_() noe
 template <size_t L, uint16_t M>
   requires(L >= M + 2 && M > 0)
 [[nodiscard]] auto MultiplexerSubscriber<L, M>::next() noexcept -> const span<uint8_t> {
+  BOOST_LOG_TRIVIAL(debug) << "MultiplexerSubscriber::next() position_: " << this->position_
+                           << ", read_message_count_: " << this->read_message_count_;
+
   if (!this->has_next()) {
     return span<uint8_t>();
+  }
+
+  const span<uint8_t>& result = this->buffer_.read(this->position_);
+  this->read_message_count_ += 1;
+  const size_t msg_size = result.size();
+  assert(msg_size <= M);
+
+  if (msg_size > 0) {
+    this->position_ += msg_size;
+    this->position_ += sizeof(uint16_t);
+    ASSERT_EX(this->position_ <= L, std::cerr << "failed assertion: " << this->position_ << " <= " << L << '\n');
+    return result;
   } else {
-    const span<uint8_t>& result = this->buffer_.read(this->position_);
-    this->read_message_count_ = +1;
-    const size_t msg_size = result.size();
-    assert(msg_size <= M);
-    if (msg_size > 0) {
-      this->position_ += msg_size + sizeof(uint16_t);
-      assert(this->position_ <= L);
-      return result;
-    } else {
-      // signal that it is ready to wraparound, see doc/adr/ADR003.md for more details
-      assert(this->read_message_count_ == this->available_message_count_);
-      this->position_ = 0;
-      this->wraparound_sync_->fetch_or(this->id_.mask());
-      return span<uint8_t>();
-    }
+    BOOST_LOG_TRIVIAL(debug) << "MultiplexerSubscriber::next() wrapping up, read_message_count_: "
+                             << this->read_message_count_
+                             << ", available_message_count_: " << this->available_message_count_
+                             << ", position_: " << this->position_;
+
+    // signal that it is ready to wraparound, see doc/adr/ADR003.md for more details
+    assert(this->read_message_count_ == this->available_message_count_);
+    // ASSERT_EX(this->read_message_count_ == this->available_message_count_,
+    //           std::cerr << "failed assertion: " << this->read_message_count_
+    //                     << " == " << this->available_message_count_ << '\n');
+    this->position_ = 0;
+    this->wraparound_sync_->fetch_or(this->id_.mask());
+    return span<uint8_t>();
   }
 }
 

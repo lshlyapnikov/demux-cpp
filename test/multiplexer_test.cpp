@@ -5,13 +5,17 @@
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <future>
 #include <iostream>
 #include <memory>
+#include <ranges>
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include "../src/domain.h"
 
 using ShmSequencer::MessageBuffer;
@@ -34,6 +38,23 @@ auto create_test_array(const size_t size) -> unique_ptr<uint8_t[]> {
   return result;
 }
 
+auto assert_eq(const span<uint8_t>& left, const span<uint8_t>& right) {
+  ASSERT_EQ(left.size(), right.size());
+  for (size_t i = 0; i < right.size(); ++i) {
+    ASSERT_EQ(left[i], right[i]) << "index: " << i;
+  }
+}
+
+auto nonempty_only(const vector<vector<uint8_t>>& messages) -> vector<vector<uint8_t>> {
+  vector<vector<uint8_t>> result;
+  for (const vector<uint8_t>& m : messages) {
+    if (!m.empty()) {
+      result.push_back(m);
+    }
+  }
+  return result;
+}
+
 TEST(MultiplexerTest, Atomic) {
   ASSERT_EQ(std::atomic<uint8_t>{}.is_lock_free(), true);
   ASSERT_EQ(std::atomic<uint16_t>{}.is_lock_free(), true);
@@ -44,7 +65,7 @@ TEST(MultiplexerTest, Atomic) {
 }
 
 TEST(MessageBufferTest, MessageBufferRemaining) {
-  rc::check("MessageBuffer::remaining", [](const uint8_t position) {
+  rc::check([](const uint8_t position) {
     std::cout << "position: " << static_cast<int>(position) << '\n';
 
     constexpr size_t BUF_SIZE = 32;
@@ -62,7 +83,7 @@ TEST(MessageBufferTest, MessageBufferRemaining) {
 }
 
 TEST(MessageBufferTest, WriteToSharedMemory) {
-  rc::check("MessageBuffer::write", [](std::vector<uint8_t> message) {
+  rc::check([](std::vector<uint8_t> message) {
     constexpr size_t BUF_SIZE = 32;
 
     std::array<uint8_t, BUF_SIZE> data{0};
@@ -90,7 +111,7 @@ TEST(MessageBufferTest, WriteToSharedMemory) {
 }
 
 TEST(MessageBufferTest, MessageBufferWriteRead) {
-  rc::check("MessageBuffer::write", [](const uint8_t position, const uint8_t src_size) {
+  rc::check([](const uint8_t position, const uint8_t src_size) {
     std::cout << "position: " << static_cast<int>(position) << ", src_size: " << static_cast<int>(src_size) << '\n';
 
     constexpr size_t BUF_SIZE = 32;
@@ -132,7 +153,7 @@ TEST(MessageBufferTest, MessageBufferWriteEmpty) {
 }
 
 TEST(MultiplexerPublisherTest, ConstructorDoesNotThrow) {
-  rc::check("MultiplexerPublisher::Constructor", [](const uint8_t all_subs_mask) {
+  rc::check([](const uint8_t all_subs_mask) {
     array<uint8_t, 32> buffer;
     atomic<uint64_t> msg_counter_sync{0};
     atomic<uint64_t> wraparound_sync{0};
@@ -146,10 +167,7 @@ TEST(MultiplexerPublisherTest, ConstructorDoesNotThrow) {
 
 // NOLINTBEGIN(misc - include - cleaner, cppcoreguidelines - avoid - magic - numbers, readability - magic - numbers)
 TEST(MultiplexerPublisherTest, Roundtrip1) {
-  rc::check("MultiplexerPublisher::Roundtrip1", [](vector<uint8_t> message) {
-    if (message.size() == 0) {
-      return;
-    }
+  rc::check([](vector<uint8_t> message) {
     array<uint8_t, 128> buffer;
     atomic<uint64_t> msg_counter_sync{0};
     atomic<uint64_t> wraparound_sync{0};
@@ -159,28 +177,86 @@ TEST(MultiplexerPublisherTest, Roundtrip1) {
     MultiplexerPublisher<128, 64> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
     MultiplexerSubscriber<128, 64> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
 
-    const bool ok = publisher.send(span<uint8_t>{message.data(), message.size()});
-    ASSERT_TRUE(ok);
-    ASSERT_EQ(1, publisher.message_count());
+    const bool ok = publisher.send(message);
 
-    const span<uint8_t> read = subscriber.next();
-    ASSERT_EQ(read.size(), message.size());
-    ASSERT_EQ(1, subscriber.message_count());
+    if (message.size() == 0) {
+      RC_CLASSIFY(message.empty());
 
-    for (size_t i = 0; i < message.size(); ++i) {
-      ASSERT_EQ(read[i], message[i]);
+      ASSERT_FALSE(ok);
+      ASSERT_EQ(0, publisher.message_count());
+
+      const span<uint8_t> read = subscriber.next();
+      ASSERT_EQ(0, read.size());
+      ASSERT_EQ(0, subscriber.message_count());
+    } else {
+      RC_CLASSIFY(!message.empty());
+
+      ASSERT_TRUE(ok);
+      ASSERT_EQ(1, publisher.message_count());
+
+      const span<uint8_t> read = subscriber.next();
+      ASSERT_EQ(1, subscriber.message_count());
+      assert_eq(read, message);
     }
   });
 }
 // NOLINTEND(misc - include - cleaner, cppcoreguidelines - avoid - magic - numbers, readability - magic - numbers)
 
-// TEST(MultiplexerTest, MessageBuffer_constructor) {
-//   rc::check("MessageBuffer::constructor", [](const uint8_t size) {
-//     if (size >= TEST_MAX_MSG_SIZE + sizeof(uint16_t)) {
-//       MessageBuffer buf(size);
-//       ASSERT_EQ(size, buf.remaining(0));
-//     } else {
-//       ASSERT_THROW({ std::ignore = MessageBuffer(size); }, std::invalid_argument);
-//     }
-//   });
-// }
+TEST(MultiplexerPublisherTest, RoundtripX) {
+  rc::check([](const vector<vector<uint8_t>>& messages) {
+    using namespace std::chrono_literals;
+
+    if (messages.empty()) {
+      return;
+    }
+
+    const vector<vector<uint8_t>> nonempty_messages = nonempty_only(messages);
+    const size_t message_num = nonempty_messages.size();
+
+    array<uint8_t, 128> buffer;
+    atomic<uint64_t> msg_counter_sync{0};
+    atomic<uint64_t> wraparound_sync{0};
+    const uint8_t all_subs_mask = 0b1;
+    const SubscriberId subId = SubscriberId::create(1);
+
+    MultiplexerPublisher<128, 64> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
+    MultiplexerSubscriber<128, 64> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
+
+    std::future<size_t> sent_count_future = std::async(std::launch::async, [&nonempty_messages, &publisher] {
+      size_t result = 0;
+      for (auto m : nonempty_messages) {
+        const bool ok = publisher.send(m);
+        if (ok) {
+          result += 1;
+        }
+      }
+      return result;
+    });
+
+    std::future<vector<vector<uint8_t>>> received_messages_future =
+        std::async(std::launch::async, [message_num, &subscriber] {
+          vector<vector<uint8_t>> result;
+          while (result.size() < message_num) {
+            const span<uint8_t> m = subscriber.next();
+            if (!m.empty()) {
+              vector<uint8_t> v{m.begin(), m.end()};
+              result.push_back(v);
+            }
+          }
+          return result;
+        });
+
+    sent_count_future.wait_for(5s);
+    ASSERT_TRUE(sent_count_future.valid());
+
+    received_messages_future.wait_for(5s);
+    ASSERT_TRUE(received_messages_future.valid());
+
+    ASSERT_EQ(message_num, sent_count_future.get());
+    ASSERT_EQ(message_num, received_messages_future.get().size());
+
+    // assert_eq(nonempty_messages, received_messages_future.get());
+
+    // const bool ok = publisher.send(span<uint8_t>{message});
+  });
+}
