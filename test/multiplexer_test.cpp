@@ -5,6 +5,9 @@
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
 #include <array>
 #include <atomic>
+#include <boost/log/core.hpp>         // NOLINT(misc-include-cleaner)
+#include <boost/log/expressions.hpp>  // NOLINT(misc-include-cleaner)
+#include <boost/log/trivial.hpp>
 #include <boost/serialization/strong_typedef.hpp>
 #include <chrono>
 #include <cstddef>
@@ -258,11 +261,16 @@ template <size_t L, uint16_t M>
 auto read_n(const size_t message_num, MultiplexerSubscriber<L, M>& subscriber) -> vector<TestMessage> {
   vector<TestMessage> result;
   while (result.size() < message_num) {
-    const span<uint8_t> m = subscriber.next();
+    const span<uint8_t>& m = subscriber.next();
     if (!m.empty()) {
       result.emplace_back(TestMessage(vector<uint8_t>{m.begin(), m.end()}));
     }
   }
+
+  // read one more to unblock the subscriber, which might be waiting for wraparound unblock
+  const span<uint8_t>& m = subscriber.next();
+  assert(0 == m.size());
+
   return result;
 }
 
@@ -307,6 +315,7 @@ TEST(MultiplexerPublisherTest, SendReceiveX) {
 }
 
 TEST(MultiplexerPublisherTest, MultipleSubsReceiveX) {
+  // GTEST_SKIP();
   rc::check([](const vector<TestMessage>& nonempty_messages) {
     if (nonempty_messages.empty()) {
       return;
@@ -361,4 +370,11 @@ TEST(TestMessageGenerator, CheckDistribution1) {
     RC_CLASSIFY(0 < message_size && message_size <= 32, "0 < size <= 32");
     RC_CLASSIFY(message_size > 32, "size > 32");
   });
+}
+
+auto main(int argc, char** argv) -> int {
+  namespace logging = boost::log;
+  logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::debug);
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }
