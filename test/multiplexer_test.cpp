@@ -41,12 +41,16 @@ using std::uint8_t;
 using std::unique_ptr;
 using std::vector;
 
+constexpr size_t L = 128;
+constexpr uint16_t M = 64;
+
 namespace rc {
 
 template <>
 struct Arbitrary<TestMessage> {
   static Gen<TestMessage> arbitrary() {
-    Gen<vector<uint8_t>> nonempty_vec_gen = gen::nonEmpty<vector<uint8_t>>();
+    // Gen<vector<uint8_t>> nonempty_vec_gen = gen::arbitrary<vector<uint8_t>>();
+    Gen<vector<uint8_t>> nonempty_vec_gen = gen::resize(M, gen::nonEmpty<vector<uint8_t>>());
     return gen::map(nonempty_vec_gen, [](vector<uint8_t> xs) { return TestMessage(xs); });
   }
 };
@@ -66,6 +70,16 @@ auto assert_eq(const span<uint8_t>& left, const span<uint8_t>& right) {
   for (size_t i = 0; i < right.size(); ++i) {
     ASSERT_EQ(left[i], right[i]) << "index: " << i;
   }
+}
+
+auto filter_valid_messages(const vector<TestMessage> messages) -> vector<TestMessage> {
+  vector<TestMessage> result;
+  for (auto m : messages) {
+    if (0 < m.t.size() && m.t.size() <= M) {
+      result.emplace_back(m);
+    }
+  }
+  return result;
 }
 
 auto assert_eq(const TestMessage& left, const TestMessage& right) {
@@ -195,9 +209,6 @@ TEST(MultiplexerPublisherTest, ConstructorDoesNotThrow) {
 }
 
 TEST(MultiplexerPublisherTest, SendEmptyMessage) {
-  constexpr size_t L = 128;
-  constexpr uint16_t M = 64;
-
   array<uint8_t, L> buffer;
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
@@ -220,9 +231,6 @@ TEST(MultiplexerPublisherTest, SendEmptyMessage) {
 // NOLINTBEGIN(misc - include - cleaner, cppcoreguidelines - avoid - magic - numbers, readability - magic - numbers)
 TEST(MultiplexerPublisherTest, SendReceive1) {
   rc::check([](TestMessage message) {
-    constexpr size_t L = 128;
-    constexpr uint16_t M = 64;
-
     array<uint8_t, L> buffer;
     atomic<uint64_t> msg_counter_sync{0};
     atomic<uint64_t> wraparound_sync{0};
@@ -246,14 +254,17 @@ TEST(MultiplexerPublisherTest, SendReceive1) {
 // NOLINTEND(misc - include - cleaner, cppcoreguidelines - avoid - magic - numbers, readability - magic - numbers)
 
 template <size_t L, uint16_t M>
-auto send_all(const vector<TestMessage>& nonempty_messages, MultiplexerPublisher<L, M>& publisher) -> size_t {
+auto send_all(const vector<TestMessage>& messages, MultiplexerPublisher<L, M>& publisher) -> size_t {
   size_t result = 0;
-  for (auto m : nonempty_messages) {
+  for (size_t i = 0; i < messages.size();) {
+    TestMessage m = messages[i];
     const bool ok = publisher.send(m.t);
     if (ok) {
       result += 1;
+      i += 1;
     }
   }
+  assert(result == messages.size());
   return result;
 }
 
@@ -275,15 +286,14 @@ auto read_n(const size_t message_num, MultiplexerSubscriber<L, M>& subscriber) -
 }
 
 TEST(MultiplexerPublisherTest, SendReceiveX) {
-  rc::check([](const vector<TestMessage>& nonempty_messages) {
-    if (nonempty_messages.empty()) {
+  rc::check([](const vector<TestMessage>& messages) {
+    const vector<TestMessage> valid_messages = filter_valid_messages(messages);
+
+    if (valid_messages.empty()) {
       return;
     }
 
-    constexpr size_t L = 128;
-    constexpr uint16_t M = 64;
-
-    const size_t message_num = nonempty_messages.size();
+    const size_t message_num = valid_messages.size();
 
     array<uint8_t, L> buffer;
     atomic<uint64_t> msg_counter_sync{0};
@@ -294,8 +304,8 @@ TEST(MultiplexerPublisherTest, SendReceiveX) {
     MultiplexerPublisher<L, M> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
     MultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
 
-    std::future<size_t> sent_count_future = std::async(
-        std::launch::async, [&nonempty_messages, &publisher] { return send_all(nonempty_messages, publisher); });
+    std::future<size_t> sent_count_future =
+        std::async(std::launch::async, [&valid_messages, &publisher] { return send_all(valid_messages, publisher); });
 
     std::future<vector<TestMessage>> received_messages_future =
         std::async(std::launch::async, [message_num, &subscriber] { return read_n(message_num, subscriber); });
@@ -310,23 +320,21 @@ TEST(MultiplexerPublisherTest, SendReceiveX) {
     ASSERT_EQ(message_num, sent_count);
 
     const auto received_messages = received_messages_future.get();
-    assert_eq(nonempty_messages, received_messages);
+    assert_eq(valid_messages, received_messages);
   });
 }
 
 TEST(MultiplexerPublisherTest, MultipleSubsReceiveX) {
-  // GTEST_SKIP();
-  rc::check([](const vector<TestMessage>& nonempty_messages) {
-    if (nonempty_messages.empty()) {
+  rc::check([](const vector<TestMessage>& messages) {
+    const vector<TestMessage> valid_messages = filter_valid_messages(messages);
+
+    if (valid_messages.empty()) {
       return;
     }
 
-    constexpr size_t L = 128;
-    constexpr uint16_t M = 64;
-
     constexpr uint8_t SUB_NUM = 7;
 
-    const size_t message_num = nonempty_messages.size();
+    const size_t message_num = valid_messages.size();
 
     array<uint8_t, L> buffer;
     atomic<uint64_t> msg_counter_sync{0};
@@ -341,8 +349,8 @@ TEST(MultiplexerPublisherTest, MultipleSubsReceiveX) {
 
     MultiplexerPublisher<L, M> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
 
-    std::future<size_t> future_pub_result = std::async(
-        std::launch::async, [&nonempty_messages, &publisher] { return send_all(nonempty_messages, publisher); });
+    std::future<size_t> future_pub_result =
+        std::async(std::launch::async, [&valid_messages, &publisher] { return send_all(valid_messages, publisher); });
 
     vector<std::future<vector<TestMessage>>> future_sub_results;
     for (auto& subscriber : subscribers) {
@@ -357,7 +365,7 @@ TEST(MultiplexerPublisherTest, MultipleSubsReceiveX) {
     for (auto& future_sub_result : future_sub_results) {
       future_sub_result.wait_for(DEFAULT_WAIT);
       ASSERT_TRUE(future_sub_result.valid());
-      assert_eq(nonempty_messages, future_sub_result.get());
+      assert_eq(valid_messages, future_sub_result.get());
     }
   });
 }
@@ -369,6 +377,8 @@ TEST(TestMessageGenerator, CheckDistribution1) {
     RC_CLASSIFY(message_size == 1, "size == 1");
     RC_CLASSIFY(0 < message_size && message_size <= 32, "0 < size <= 32");
     RC_CLASSIFY(message_size > 32, "size > 32");
+    RC_CLASSIFY(message_size == M, "size == M");
+    RC_CLASSIFY(message_size > M, "size > M");
   });
 }
 
