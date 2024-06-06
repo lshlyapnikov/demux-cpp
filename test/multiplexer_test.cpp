@@ -295,7 +295,7 @@ TEST(TestMessageGenerator, CheckDistribution1) {
 
 auto main(int argc, char** argv) -> int {
   namespace logging = boost::log;
-  logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::debug);
+  logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::warning);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
