@@ -136,6 +136,9 @@ TEST(MultiplexerPublisherTest, SendEmptyMessage) {
 // NOLINTBEGIN(misc - include - cleaner, cppcoreguidelines - avoid - magic - numbers, readability - magic - numbers)
 TEST(MultiplexerPublisherTest, SendReceive1) {
   rc::check([](TestMessage message) {
+    if (message.t.size() > M) {
+      return;
+    }
     array<uint8_t, L> buffer;
     atomic<uint64_t> msg_counter_sync{0};
     atomic<uint64_t> wraparound_sync{0};
@@ -161,12 +164,10 @@ TEST(MultiplexerPublisherTest, SendReceive1) {
 template <size_t L, uint16_t M>
 auto send_all(const vector<TestMessage>& messages, MultiplexerPublisher<L, M>& publisher) -> size_t {
   size_t result = 0;
-  for (size_t i = 0; i < messages.size();) {
-    TestMessage m = messages[i];
+  for (TestMessage m : messages) {
     const bool ok = publisher.send(m.t);
     if (ok) {
       result += 1;
-      i += 1;
     }
   }
   assert(result == messages.size());

@@ -155,7 +155,7 @@ auto MultiplexerPublisher<L, M>::send_(const span<uint8_t>& source, uint8_t recu
     return true;
   } else {
     if (recursion_level > 1) {
-      BOOST_LOG_TRIVIAL(warning) << "MultiplexerPublisher::send_ recursion_level: " << recursion_level;
+      BOOST_LOG_TRIVIAL(error) << "MultiplexerPublisher::send_ recursion_level: " << recursion_level;
       return false;
     } else {
       this->wait_for_subs_to_catch_up_and_wraparound_();
