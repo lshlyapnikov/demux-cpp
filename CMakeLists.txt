@@ -183,7 +183,6 @@ add_executable(
 target_link_libraries(
   multiplexer_test
   multiplexer
-  sequencer
   domain
   atomic
   GTest::gtest_main

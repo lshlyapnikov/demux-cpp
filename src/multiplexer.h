@@ -19,6 +19,12 @@ using std::span;
 using std::uint64_t;
 using std::uint8_t;
 
+enum SendResult {
+  Success,  // message sent
+  Repeat,   // wraparound required, resend the last message
+  Error,    // message cannot be sent, log error and drop it
+};
+
 // TODO(Leo): make sure the size of the shares memory is a multiple of the page size. Because the operating system
 // TODO(Leo): performs mapping operations over whole pages. So, you don't waste memory.
 //
