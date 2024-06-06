@@ -161,6 +161,22 @@ target_compile_options(
 gtest_discover_tests(sequencer_test)
 
 add_executable(
+  message_buffer_test
+  test/message_buffer_test.cpp
+)
+target_link_libraries(
+  message_buffer_test
+  GTest::gtest_main
+  rapidcheck
+  Boost::log
+)
+target_compile_options(
+  message_buffer_test
+  PRIVATE ${MY_CXX_FLAGS}
+)
+gtest_discover_tests(message_buffer_test)
+
+add_executable(
   multiplexer_test
   test/multiplexer_test.cpp
 )

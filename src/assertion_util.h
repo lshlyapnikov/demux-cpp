@@ -1,4 +1,0 @@
-#ifndef ASSERTION_UTIL_H
-#define ASSERTION_UTIL_H
-
-#endif /* ASSERTION_UTIL_H */
