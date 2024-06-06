@@ -50,9 +50,13 @@ namespace rc {
 template <>
 struct Arbitrary<TestMessage> {
   static Gen<TestMessage> arbitrary() {
-    // Gen<vector<uint8_t>> nonempty_vec_gen = gen::arbitrary<vector<uint8_t>>();
     Gen<vector<uint8_t>> nonempty_vec_gen = gen::resize(M, gen::nonEmpty<vector<uint8_t>>());
-    return gen::map(nonempty_vec_gen, [](vector<uint8_t> xs) { return TestMessage(xs); });
+    // The above generator might still generate a vector with `size() > M`, `gen::resize` does not always work.
+    // Run TestMessageGenerator.CheckDistribution1 500 times and check `RC_CLASSIFY(message_size > M, "size > M")`
+    Gen<vector<uint8_t>> valid_size_vec_gen =
+        gen::suchThat(nonempty_vec_gen, [](vector<uint8_t> xs) { return xs.size() > 0 && xs.size() <= M; });
+
+    return gen::map(valid_size_vec_gen, [](vector<uint8_t> xs) { return TestMessage(xs); });
   }
 };
 
@@ -66,13 +70,14 @@ auto assert_eq(const span<uint8_t>& left, const span<uint8_t>& right) {
 }
 
 auto filter_valid_messages(const vector<TestMessage> messages) -> vector<TestMessage> {
-  vector<TestMessage> result;
-  for (auto m : messages) {
-    if (0 < m.t.size() && m.t.size() <= M) {
-      result.emplace_back(m);
-    }
-  }
-  return result;
+  // vector<TestMessage> result;
+  // for (auto m : messages) {
+  //   if (0 < m.t.size() && m.t.size() <= M) {
+  //     result.emplace_back(m);
+  //   }
+  // }
+  // return result;
+  return messages;
 }
 
 auto assert_eq(const TestMessage& left, const TestMessage& right) {
