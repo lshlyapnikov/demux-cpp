@@ -31,7 +31,8 @@ enum SendResult {
 /// @brief Multiplexer publisher.
 /// @tparam L total buffer size in bytes.
 /// @tparam M max message size in bytes.
-template <size_t L, uint16_t M>
+/// @tparam B if true send can block while waiting for the subscribers to catch up during the wraparound.
+template <size_t L, uint16_t M, bool B = true>
   requires(L >= M + 2 && M > 0)
 class MultiplexerPublisher {
  public:
@@ -43,16 +44,31 @@ class MultiplexerPublisher {
         buffer_(buffer),
         message_count_sync_(message_count_sync),
         wraparound_sync_(wraparound_sync) {
-    BOOST_LOG_TRIVIAL(info) << "MultiplexerPublisher::constructor L: " << L << ", M: " << M
+    BOOST_LOG_TRIVIAL(info) << "MultiplexerPublisher::constructor L: " << L << ", M: " << M << ", B: " << B
                             << ", all_subs_mask_: " << this->all_subs_mask_;
   }
 
-  [[nodiscard]] auto send(const span<uint8_t>& source) noexcept -> bool { return this->send_(source, 1); }
+  [[nodiscard]] auto send(const span<uint8_t>& source) noexcept -> SendResult {
+    const size_t n = source.size();
+    if (n == 0 || n > M) {
+      BOOST_LOG_TRIVIAL(error) << "MultiplexerPublisher::send invalid message length: " << n;
+      return SendResult::Error;
+    }
+    if constexpr (B) {
+      return this->send_blocking_(source, 1);
+    } else {
+      return this->send_non_blocking_(source);
+    }
+  }
 
   template <uint16_t N>
     requires(0 < N && N <= M)
-  [[nodiscard]] auto send_safe(const span<uint8_t, N>& source) noexcept -> bool {
-    return this->send_(source, 1);
+  [[nodiscard]] auto send_safe(const span<uint8_t, N>& source) noexcept -> SendResult {
+    if constexpr (B) {
+      return this->send_blocking_(source, 1);
+    } else {
+      return this->send_non_blocking_(source);
+    }
   }
 
   [[nodiscard]] auto message_count() const noexcept -> uint64_t { return this->message_count_; }
@@ -72,9 +88,17 @@ class MultiplexerPublisher {
   /// @param source -- message to send.
   /// @param recursion_level
   /// @return true if message was sent.
-  [[nodiscard]] auto send_(const span<uint8_t>& source, uint8_t recursion_level) noexcept -> bool;
+  [[nodiscard]] auto send_blocking_(const span<uint8_t>& source, uint8_t recursion_level) noexcept -> SendResult;
+
+  [[nodiscard]] auto send_non_blocking_(const span<uint8_t>& source) noexcept -> SendResult;
 
   auto wait_for_subs_to_catch_up_and_wraparound_() noexcept -> void;
+
+  inline auto initiate_wraparound_() noexcept -> void;
+
+  inline auto complete_wraparound_() noexcept -> void;
+
+  [[nodiscard]] auto all_subs_caught_up_() noexcept -> bool;
 
   auto increment_message_count_() noexcept -> void {
     this->message_count_ += 1;
@@ -87,6 +111,7 @@ class MultiplexerPublisher {
   size_t position_{0};
   uint64_t message_count_{0};
   MessageBuffer<L> buffer_;
+  bool wraparound_{false};
   atomic<uint64_t>* message_count_sync_;
   atomic<uint64_t>* wraparound_sync_;
 };
@@ -137,14 +162,43 @@ class MultiplexerSubscriber {
   atomic<uint64_t>* wraparound_sync_;
 };
 
-template <size_t L, uint16_t M>
+template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
-auto MultiplexerPublisher<L, M>::send_(const span<uint8_t>& source, uint8_t recursion_level) noexcept -> bool {
+auto MultiplexerPublisher<L, M, B>::send_blocking_(const span<uint8_t>& source, uint8_t recursion_level) noexcept
+    -> SendResult {
+  // it either writes the entire message or nothing
+  const size_t written = this->buffer_.write(this->position_, source);
+  if (written > 0) {
+    this->position_ += written;
+    this->increment_message_count_();
+    return SendResult::Success;
+  } else {
+    if (recursion_level > 1) {
+      BOOST_LOG_TRIVIAL(error) << "MultiplexerPublisher::send_ recursion_level: " << recursion_level;
+      return SendResult::Error;
+    } else {
+      this->wait_for_subs_to_catch_up_and_wraparound_();
+      return this->send_blocking_(source, recursion_level + 1);
+    }
+  }
+}
+
+template <size_t L, uint16_t M, bool B>
+  requires(L >= M + 2 && M > 0)
+auto MultiplexerPublisher<L, M, B>::send_non_blocking_(const span<uint8_t>& source) noexcept -> SendResult {
   const size_t n = source.size();
 
   if (n == 0 || n > M) {
     BOOST_LOG_TRIVIAL(error) << "MultiplexerPublisher::send_ invalid message length: " << n;
-    return false;
+    return SendResult::Error;
+  }
+
+  if (this->wraparound_) {
+    if (this->all_subs_caught_up_()) {
+      this->complete_wraparound_();
+    } else {
+      return SendResult::Repeat;
+    }
   }
 
   // it either writes the entire message or nothing
@@ -152,25 +206,17 @@ auto MultiplexerPublisher<L, M>::send_(const span<uint8_t>& source, uint8_t recu
   if (written > 0) {
     this->position_ += written;
     this->increment_message_count_();
-    return true;
+    return SendResult::Success;
   } else {
-    if (recursion_level > 1) {
-      BOOST_LOG_TRIVIAL(error) << "MultiplexerPublisher::send_ recursion_level: " << recursion_level;
-      return false;
-    } else {
-      this->wait_for_subs_to_catch_up_and_wraparound_();
-      return this->send_(source, recursion_level + 1);
-    }
+    this->initiate_wraparound_();
+    return SendResult::Repeat;
   }
 }
 
-template <size_t L, uint16_t M>
+template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
-auto MultiplexerPublisher<L, M>::wait_for_subs_to_catch_up_and_wraparound_() noexcept -> void {
-  // see doc/adr/ADR003.md for more details
-  this->wraparound_sync_->store(0);
-  std::ignore = this->buffer_.write(this->position_, span<uint8_t>{});
-  this->increment_message_count_();
+auto MultiplexerPublisher<L, M, B>::wait_for_subs_to_catch_up_and_wraparound_() noexcept -> void {
+  this->initiate_wraparound_();
 
 #ifndef NDEBUG
   BOOST_LOG_TRIVIAL(debug) << "MultiplexerPublisher::wait_for_subs_to_catch_up_and_wraparound_, message_count_: "
@@ -178,17 +224,34 @@ auto MultiplexerPublisher<L, M>::wait_for_subs_to_catch_up_and_wraparound_() noe
 #endif
 
   // busy-wait
-  while (true) {
-    const uint64_t x = this->wraparound_sync_->load();
-    if (x == this->all_subs_mask_) {
-      break;
-    }
+  while (!this->all_subs_caught_up_()) {
   }
 
-  // wait
-  // this->wraparound_sync_->wait(this->all_subs_mask_);
+  this->complete_wraparound_();
+}
 
+template <size_t L, uint16_t M, bool B>
+  requires(L >= M + 2 && M > 0)
+inline auto MultiplexerPublisher<L, M, B>::initiate_wraparound_() noexcept -> void {
+  // see doc/adr/ADR003.md for more details
+  this->wraparound_ = true;
+  this->wraparound_sync_->store(0);
+  std::ignore = this->buffer_.write(this->position_, {});
+  this->increment_message_count_();
+}
+
+template <size_t L, uint16_t M, bool B>
+  requires(L >= M + 2 && M > 0)
+inline auto MultiplexerPublisher<L, M, B>::complete_wraparound_() noexcept -> void {
   this->position_ = 0;
+  this->wraparound_ = false;
+}
+
+template <size_t L, uint16_t M, bool B>
+  requires(L >= M + 2 && M > 0)
+inline auto MultiplexerPublisher<L, M, B>::all_subs_caught_up_() noexcept -> bool {
+  const uint64_t x = this->wraparound_sync_->load();
+  return x == this->all_subs_mask_;
 }
 
 template <size_t L, uint16_t M>

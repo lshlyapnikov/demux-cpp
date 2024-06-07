@@ -13,8 +13,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <future>
-#include <iostream>
-#include <memory>
 #include <span>
 #include <vector>
 #include "../src/domain.h"
@@ -32,6 +30,7 @@ using ShmSequencer::DEFAULT_WAIT;
 using ShmSequencer::MessageBuffer;
 using ShmSequencer::MultiplexerPublisher;
 using ShmSequencer::MultiplexerSubscriber;
+using ShmSequencer::SendResult;
 using ShmSequencer::SubscriberId;
 using ShmSequencer::TestMessage;
 using std::array;
@@ -39,7 +38,6 @@ using std::atomic;
 using std::span;
 using std::uint16_t;
 using std::uint8_t;
-using std::unique_ptr;
 using std::vector;
 
 constexpr size_t L = 128;
@@ -49,14 +47,14 @@ namespace rc {
 
 template <>
 struct Arbitrary<TestMessage> {
-  static Gen<TestMessage> arbitrary() {
-    Gen<vector<uint8_t>> nonempty_vec_gen = gen::resize(M, gen::nonEmpty<vector<uint8_t>>());
+  static auto arbitrary() -> Gen<TestMessage> {
+    const Gen<vector<uint8_t>> nonempty_vec_gen = gen::resize(M, gen::nonEmpty<vector<uint8_t>>());
     // The above generator might still generate a vector with `size() > M`, `gen::resize` does not always work.
     // Run TestMessageGenerator.CheckDistribution1 500 times and check `RC_CLASSIFY(message_size > M, "size > M")`
     Gen<vector<uint8_t>> valid_size_vec_gen =
-        gen::suchThat(nonempty_vec_gen, [](vector<uint8_t> xs) { return xs.size() > 0 && xs.size() <= M; });
+        gen::suchThat(nonempty_vec_gen, [](const vector<uint8_t>& xs) { return xs.size() > 0 && xs.size() <= M; });
 
-    return gen::map(valid_size_vec_gen, [](vector<uint8_t> xs) { return TestMessage(xs); });
+    return gen::map(valid_size_vec_gen, [](const vector<uint8_t>& xs) { return TestMessage(xs); });
   }
 };
 
@@ -96,6 +94,44 @@ auto assert_eq(const vector<TestMessage>& left, const vector<TestMessage>& right
   }
 }
 
+template <size_t L, uint16_t M>
+auto send_all(const vector<TestMessage>& messages, MultiplexerPublisher<L, M>& publisher) -> size_t {
+  size_t result = 0;
+  for (size_t i = 0; i < messages.size();) {
+    TestMessage m = messages[i];
+    switch (publisher.send(m.t)) {
+      case SendResult::Success:
+        i += 1;
+        result += 1;
+        break;
+      case SendResult::Repeat:
+        break;
+      case SendResult::Error:
+        goto end_loop;
+    }
+  }
+end_loop:
+  assert(result == messages.size());
+  return result;
+}
+
+template <size_t L, uint16_t M>
+auto read_n(const size_t message_num, MultiplexerSubscriber<L, M>& subscriber) -> vector<TestMessage> {
+  vector<TestMessage> result;
+  while (result.size() < message_num) {
+    const span<uint8_t>& m = subscriber.next();
+    if (!m.empty()) {
+      result.emplace_back(TestMessage(vector<uint8_t>{m.begin(), m.end()}));
+    }
+  }
+
+  // read one more to unblock the subscriber, which might be waiting for the wraparound unblock
+  const span<uint8_t>& m = subscriber.next();
+  assert(0 == m.size());
+
+  return result;
+}
+
 TEST(MultiplexerTest, Atomic) {
   ASSERT_EQ(std::atomic<uint8_t>{}.is_lock_free(), true);
   ASSERT_EQ(std::atomic<uint16_t>{}.is_lock_free(), true);
@@ -128,14 +164,64 @@ TEST(MultiplexerPublisherTest, SendEmptyMessage) {
   MultiplexerPublisher<L, M> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
   MultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
 
-  const bool ok = publisher.send({});
+  const SendResult result = publisher.send({});
 
-  ASSERT_FALSE(ok);
+  ASSERT_EQ(SendResult::Error, result);
   ASSERT_EQ(0, publisher.message_count());
 
   const span<uint8_t> read = subscriber.next();
   ASSERT_EQ(0, read.size());
   ASSERT_EQ(0, subscriber.message_count());
+}
+
+TEST(MultiplexerPublisherTest, SendInvalidLargeMessage) {
+  array<uint8_t, L> buffer;
+  atomic<uint64_t> msg_counter_sync{0};
+  atomic<uint64_t> wraparound_sync{0};
+  const uint8_t all_subs_mask = 0b1;
+  const SubscriberId subId = SubscriberId::create(1);
+
+  MultiplexerPublisher<L, M> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
+  MultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
+
+  array<uint8_t, L> m{1};  // this should not fit into the buffer given M + 2 requirement
+  const SendResult result = publisher.send(m);
+  ASSERT_EQ(SendResult::Error, result);
+  ASSERT_EQ(0, publisher.message_count());
+
+  const span<uint8_t> read = subscriber.next();
+  ASSERT_EQ(0, read.size());
+  ASSERT_EQ(0, subscriber.message_count());
+}
+
+TEST(MultiplexerPublisherTest, SendWhenBufferIfFullAndGetSendRepeatResult) {
+  array<uint8_t, L> buffer;
+  atomic<uint64_t> msg_counter_sync{0};
+  atomic<uint64_t> wraparound_sync{0};
+  const uint8_t all_subs_mask = 0b1;
+  const SubscriberId subId = SubscriberId::create(1);
+
+  MultiplexerPublisher<L, M, false> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
+  MultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
+
+  ASSERT_EQ(L, M * 2);
+
+  array<uint8_t, M> m1{1};
+  const SendResult result1 = publisher.send(m1);
+  ASSERT_EQ(SendResult::Success, result1);
+  ASSERT_EQ(1, publisher.message_count());
+
+  array<uint8_t, M> m2{2};
+  const SendResult result2 = publisher.send(m2);
+  ASSERT_EQ(SendResult::Repeat, result2);
+  ASSERT_EQ(2, publisher.message_count());  // empty message written during the wraparound counts
+
+  const span<uint8_t> read1 = subscriber.next();
+  ASSERT_EQ(1, subscriber.message_count());
+  assert_eq(m1, read1);
+
+  const span<uint8_t> read2 = subscriber.next();
+  ASSERT_EQ(0, read2.size());
 }
 
 // NOLINTBEGIN(misc - include - cleaner, cppcoreguidelines - avoid - magic - numbers, readability - magic - numbers)
@@ -153,9 +239,9 @@ TEST(MultiplexerPublisherTest, SendReceive1) {
     MultiplexerPublisher<L, M> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
     MultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
 
-    const bool ok = publisher.send(message.t);
+    const SendResult result = publisher.send(message.t);
 
-    ASSERT_TRUE(ok);
+    ASSERT_EQ(SendResult::Success, result);
     ASSERT_EQ(1, publisher.message_count());
 
     const span<uint8_t> read = subscriber.next();
@@ -165,36 +251,6 @@ TEST(MultiplexerPublisherTest, SendReceive1) {
   });
 }
 // NOLINTEND(misc - include - cleaner, cppcoreguidelines - avoid - magic - numbers, readability - magic - numbers)
-
-template <size_t L, uint16_t M>
-auto send_all(const vector<TestMessage>& messages, MultiplexerPublisher<L, M>& publisher) -> size_t {
-  size_t result = 0;
-  for (TestMessage m : messages) {
-    const bool ok = publisher.send(m.t);
-    if (ok) {
-      result += 1;
-    }
-  }
-  assert(result == messages.size());
-  return result;
-}
-
-template <size_t L, uint16_t M>
-auto read_n(const size_t message_num, MultiplexerSubscriber<L, M>& subscriber) -> vector<TestMessage> {
-  vector<TestMessage> result;
-  while (result.size() < message_num) {
-    const span<uint8_t>& m = subscriber.next();
-    if (!m.empty()) {
-      result.emplace_back(TestMessage(vector<uint8_t>{m.begin(), m.end()}));
-    }
-  }
-
-  // read one more to unblock the subscriber, which might be waiting for wraparound unblock
-  const span<uint8_t>& m = subscriber.next();
-  assert(0 == m.size());
-
-  return result;
-}
 
 TEST(MultiplexerPublisherTest, SendReceiveX) {
   rc::check([](const vector<TestMessage>& messages) {
