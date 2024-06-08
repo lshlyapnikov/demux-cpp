@@ -11,7 +11,7 @@
 #include "./domain.h"
 #include "./message_buffer.h"
 
-namespace ShmSequencer {
+namespace demux {
 
 using std::atomic;
 using std::size_t;
@@ -326,6 +326,6 @@ template <size_t L, uint16_t M>
   }
 }
 
-}  // namespace ShmSequencer
+}  // namespace demux
 
 #endif  // SHM_SEQUENCER_DEMULTIPLEXER_H

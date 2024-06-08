@@ -1,7 +1,7 @@
 #include "./domain.h"
 #include <iostream>
 
-namespace ShmSequencer {
+namespace demux {
 
 auto my_pow(uint8_t x, uint8_t p) -> uint64_t {
   if (p == 0) {
@@ -19,4 +19,4 @@ auto operator<<(std::ostream& os, const SubscriberId& sub) -> std::ostream& {
   return os;
 }
 
-}  // namespace ShmSequencer
+}  // namespace demux

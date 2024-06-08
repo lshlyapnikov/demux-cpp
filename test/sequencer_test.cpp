@@ -3,7 +3,7 @@
 #include <sstream>
 
 TEST(SequencerTest, PrintStatus2) {
-  ShmSequencer::Sequencer const sut(2, "abcd");
+  demux::Sequencer const sut(2, "abcd");
   EXPECT_EQ(2, sut.client_number());
   std::ostringstream out;
   out << sut;
@@ -13,7 +13,7 @@ TEST(SequencerTest, PrintStatus2) {
 }
 
 TEST(SequencerTest, PrintStatus3) {
-  ShmSequencer::Sequencer<128, 16> const sut(3, "dummy1");
+  demux::Sequencer<128, 16> const sut(3, "dummy1");
   EXPECT_EQ(3, sut.client_number());
   std::ostringstream out;
   out << sut;
@@ -23,7 +23,7 @@ TEST(SequencerTest, PrintStatus3) {
 }
 
 TEST(SequencerTest, PrintStatus5) {
-  ShmSequencer::Sequencer<256, 32> const sut(5, "dummy2");
+  demux::Sequencer<256, 32> const sut(5, "dummy2");
   EXPECT_EQ(5, sut.client_number());
   std::ostringstream out;
   out << sut;
@@ -35,24 +35,24 @@ TEST(SequencerTest, PrintStatus5) {
 TEST(SequencerTest, PrintSequenceError) {
   std::ostringstream out;
 
-  out << ShmSequencer::SequencerError::SharedMemoryCreate;
+  out << demux::SequencerError::SharedMemoryCreate;
   EXPECT_STREQ(out.str().c_str(), "SequencerError::SharedMemoryCreate");
 
   out.str("");
   out.clear();
 
-  out << ShmSequencer::SequencerError::SharedMemoryWrite;
+  out << demux::SequencerError::SharedMemoryWrite;
   EXPECT_STREQ(out.str().c_str(), "SequencerError::SharedMemoryWrite");
 
   out.str("");
   out.clear();
 
-  out << ShmSequencer::SequencerError::SharedMemoryRead;
+  out << demux::SequencerError::SharedMemoryRead;
   EXPECT_STREQ(out.str().c_str(), "SequencerError::SharedMemoryRead");
 
   out.str("");
   out.clear();
 
-  out << ShmSequencer::SequencerError::Unexpected;
+  out << demux::SequencerError::Unexpected;
   EXPECT_STREQ(out.str().c_str(), "SequencerError::Unexpected");
 }

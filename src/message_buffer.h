@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <span>
 
-namespace ShmSequencer {
+namespace demux {
 
 using std::span;
 using std::uint16_t;
@@ -78,6 +78,6 @@ struct MessageBuffer {
   uint8_t* data_;
 };
 
-}  // namespace ShmSequencer
+}  // namespace demux
 
 #endif  // SHM_SEQUENCER_MESSAGE_BUFFER_H

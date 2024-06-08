@@ -11,7 +11,7 @@
 #include <span>
 #include <vector>
 
-using ShmSequencer::MessageBuffer;
+using demux::MessageBuffer;
 using std::array;
 using std::span;
 using std::uint8_t;

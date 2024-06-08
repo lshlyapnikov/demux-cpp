@@ -8,10 +8,10 @@
 #include <tuple>
 #include "./domain_test.h"
 
-using ShmSequencer::SubscriberId;
+using demux::SubscriberId;
 
 TEST(DomainTest, Constants) {
-  EXPECT_EQ(ShmSequencer::MAX_SUBSCRIBER_NUM, 64);
+  EXPECT_EQ(demux::MAX_SUBSCRIBER_NUM, 64);
 }
 
 // NOLINTBEGIN(readability-function-cognitive-complexity)
@@ -83,7 +83,7 @@ TEST(DomainTest, SubscriberIdManualCheck) {
 // NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner)
 TEST(DomainTest, SubscriberId) {
   rc::check([](const uint8_t num) {
-    if (num > ShmSequencer::MAX_SUBSCRIBER_NUM || num == 0) {
+    if (num > demux::MAX_SUBSCRIBER_NUM || num == 0) {
       ASSERT_THROW({ std::ignore = SubscriberId::create(num); }, std::invalid_argument);
     } else {
       const SubscriberId sub_id = SubscriberId::create(num);
@@ -97,7 +97,7 @@ TEST(DomainTest, SubscriberId) {
 // NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner)
 TEST(DomainTest, AllSubscribersMask) {
   rc::check([](const uint8_t num) {
-    if (num > ShmSequencer::MAX_SUBSCRIBER_NUM || num == 0) {
+    if (num > demux::MAX_SUBSCRIBER_NUM || num == 0) {
       ASSERT_THROW({ std::ignore = SubscriberId::all_subscribers_mask(num); }, std::invalid_argument);
     } else {
       const uint64_t all_mask = SubscriberId::all_subscribers_mask(num);

@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-namespace ShmSequencer {
+namespace demux {
 
 using std::optional;
 using std::size_t;
@@ -63,6 +63,6 @@ auto operator<<(std::ostream& output, const Sequencer<MaxMsgSize, DownstreamQueu
   return obj.print_status(output);
 }
 
-}  // namespace ShmSequencer
+}  // namespace demux
 
 #endif  // SHM_SEQUENCER_SEQUENCER_H

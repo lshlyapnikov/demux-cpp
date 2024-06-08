@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace ShmSequencer {
+namespace demux {
 
 using std::size_t;
 using std::uint16_t;
@@ -78,6 +78,6 @@ class SubscriberId {
   size_t index_;
 };
 
-}  // namespace ShmSequencer
+}  // namespace demux
 
 #endif  // SHM_SEQUENCER_DOMAIN_H

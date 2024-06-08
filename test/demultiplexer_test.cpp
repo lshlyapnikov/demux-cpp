@@ -22,21 +22,21 @@
 #include "../src/message_buffer.h"
 #include "./domain_test.h"
 
-namespace ShmSequencer {
+namespace demux {
 
 const std::chrono::seconds DEFAULT_WAIT(5);  // NOLINT(cert-err58-cpp)
 
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
 BOOST_STRONG_TYPEDEF(std::vector<uint8_t>, TestMessage);
 
-}  // namespace ShmSequencer
+}  // namespace demux
 
-using ShmSequencer::DEFAULT_WAIT;
-using ShmSequencer::DemultiplexerPublisher;
-using ShmSequencer::DemultiplexerSubscriber;
-using ShmSequencer::SendResult;
-using ShmSequencer::SubscriberId;
-using ShmSequencer::TestMessage;
+using demux::DEFAULT_WAIT;
+using demux::DemultiplexerPublisher;
+using demux::DemultiplexerSubscriber;
+using demux::SendResult;
+using demux::SubscriberId;
+using demux::TestMessage;
 using std::array;
 using std::atomic;
 using std::span;

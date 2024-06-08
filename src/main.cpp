@@ -7,7 +7,7 @@
 // #include "./multiplexer.h"
 #include "./sequencer.h"
 
-using ShmSequencer::Sequencer;
+using demux::Sequencer;
 
 namespace logging = boost::log;
 
@@ -82,11 +82,11 @@ auto main() -> int {
   // std::array<uint8_t, 1024> buf{};
   // arr.fill(0);
 
-  // auto x1 = new (buf.data()) ShmSequencer::DownstreamPacket<256>();
+  // auto x1 = new (buf.data()) demux::DownstreamPacket<256>();
 
   std::atomic<uint64_t> actual(1);
   // actual.store(1024);
-  const uint64_t y = ShmSequencer::wait_and_acquire(actual, 1024);
+  const uint64_t y = demux::wait_and_acquire(actual, 1024);
   std::cout << "y: " << y << '\n';
   */
   return 0;
