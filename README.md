@@ -1,6 +1,6 @@
-# shm-sequencer
+# C++ Demultiplexer Queue
 
-Shared Memory Sequencer.
+Shared Memory Demultiplexer Queue. Single input (publisher), multiple outputs (subscribers).
 
 ## Building and Testing
 
