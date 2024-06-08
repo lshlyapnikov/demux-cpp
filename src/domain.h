@@ -35,7 +35,7 @@ using std::uint8_t;
 //   uint16_t value_;
 // };
 
-const size_t MAX_SUBSCRIBER_NUM = sizeof(uint64_t) * 8;  // 64
+const uint8_t MAX_SUBSCRIBER_NUM = sizeof(uint64_t) * 8;  // 64
 
 [[nodiscard]] constexpr auto is_valid_subscriber_number(uint8_t num) noexcept -> bool {
   return 1 <= num && num <= MAX_SUBSCRIBER_NUM;

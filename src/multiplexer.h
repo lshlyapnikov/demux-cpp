@@ -32,7 +32,7 @@ enum SendResult {
 /// @tparam L total buffer size in bytes.
 /// @tparam M max message size in bytes.
 /// @tparam B if true send can block while waiting for the subscribers to catch up during the wraparound.
-template <size_t L, uint16_t M, bool B = true>
+template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
 class MultiplexerPublisher {
  public:
@@ -73,6 +73,14 @@ class MultiplexerPublisher {
 
   [[nodiscard]] auto message_count() const noexcept -> uint64_t { return this->message_count_; }
 
+  [[nodiscard]] auto is_subscriber(const SubscriberId& id) const noexcept -> bool {
+    return this->all_subs_mask_ & id.mask();
+  }
+
+  auto add_subscriber(const SubscriberId& id) noexcept -> void { this->all_subs_mask_ |= id.mask(); }
+
+  auto remove_subscriber(const SubscriberId& id) noexcept -> void { this->all_subs_mask_ &= ~id.mask(); }
+
 #ifdef UNIT_TEST
 
   auto data() const noexcept -> span<uint8_t> { return {this->buffers_.data(), this->position_}; }
@@ -86,10 +94,13 @@ class MultiplexerPublisher {
  private:
   /// @brief will block while waiting for subscribers to catch up before wrapping around.
   /// @param source -- message to send.
-  /// @param recursion_level
-  /// @return true if message was sent.
+  /// @param recursion_level.
+  /// @return SendResult.
   [[nodiscard]] auto send_blocking_(const span<uint8_t>& source, uint8_t recursion_level) noexcept -> SendResult;
 
+  /// @brief does not block while waiting for subscriber to catch up, returns SendResult::Repeat instead.
+  /// @param source -- message to send.
+  /// @return SendResult.
   [[nodiscard]] auto send_non_blocking_(const span<uint8_t>& source) noexcept -> SendResult;
 
   auto wait_for_subs_to_catch_up_and_wraparound_() noexcept -> void;
@@ -106,7 +117,7 @@ class MultiplexerPublisher {
   }
 
   // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
-  const uint64_t all_subs_mask_;
+  uint64_t all_subs_mask_;
 
   size_t position_{0};
   uint64_t message_count_{0};

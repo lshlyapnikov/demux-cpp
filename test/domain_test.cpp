@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <string>
 #include <tuple>
+#include "./domain_test.h"
 
 using ShmSequencer::SubscriberId;
 
@@ -68,7 +69,6 @@ TEST(DomainTest, SubscriberIdManualCheck) {
     const uint64_t mask = SubscriberId::all_subscribers_mask(32);
     ASSERT_EQ(0b11111111111111111111111111111111, mask);
   }
-
   {
     const SubscriberId sub_id = SubscriberId::create(64);
     ASSERT_EQ(63, sub_id.index());
@@ -82,7 +82,7 @@ TEST(DomainTest, SubscriberIdManualCheck) {
 
 // NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner)
 TEST(DomainTest, SubscriberId) {
-  rc::check("SubscriberId::create", [](const uint8_t num) {
+  rc::check([](const uint8_t num) {
     if (num > ShmSequencer::MAX_SUBSCRIBER_NUM || num == 0) {
       ASSERT_THROW({ std::ignore = SubscriberId::create(num); }, std::invalid_argument);
     } else {
@@ -96,7 +96,7 @@ TEST(DomainTest, SubscriberId) {
 
 // NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner)
 TEST(DomainTest, AllSubscribersMask) {
-  rc::check("SubscriberId::all_subscribers_mask", [](const uint8_t num) {
+  rc::check([](const uint8_t num) {
     if (num > ShmSequencer::MAX_SUBSCRIBER_NUM || num == 0) {
       ASSERT_THROW({ std::ignore = SubscriberId::all_subscribers_mask(num); }, std::invalid_argument);
     } else {
@@ -106,3 +106,8 @@ TEST(DomainTest, AllSubscribersMask) {
   });
 }
 // NOLINTEND(readability-function-cognitive-complexity, misc-include-cleaner)
+
+// NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner)
+TEST(DomainTest, SubscriberIdGenerator) {
+  rc::check([](const SubscriberId& sub) { RC_TAG(sub.index()); });
+}
