@@ -15,7 +15,7 @@ cd "${__root}"
 count=500
 for i in $(seq $count); do
     echo "Attempt $i ---------"
-    rm -rf ./multiplexer_test.out
-    #./build/multiplexer_test > ./multiplexer_test.out
-    ./build/multiplexer_test > /dev/null
+    rm -rf ./demultiplexer_test.out
+    #./build/demultiplexer_test > ./demultiplexer_test.out
+    ./build/demultiplexer_test > /dev/null
 done

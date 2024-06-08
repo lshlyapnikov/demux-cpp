@@ -31,7 +31,8 @@ enum SendResult {
 /// @brief Demultiplexer publisher.
 /// @tparam L total buffer size in bytes.
 /// @tparam M max message size in bytes.
-/// @tparam B if true send can block while waiting for the subscribers to catch up during the wraparound.
+/// @tparam B if true send will busy-spin while waiting for all subscribers to catch up during a wraparound, if false
+///   it returns with SendResult::Repeat immediately.
 template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
 class DemultiplexerPublisher {
@@ -92,7 +93,7 @@ class DemultiplexerPublisher {
 #endif  // UNIT_TEST
 
  private:
-  /// @brief will block while waiting for subscribers to catch up before wrapping around.
+  /// @brief will block/busy-spin while waiting for subscribers to catch up before a wraparound.
   /// @param source -- message to send.
   /// @param recursion_level.
   /// @return SendResult.
@@ -135,9 +136,9 @@ template <size_t L, uint16_t M>
 class DemultiplexerSubscriber {
  public:
   DemultiplexerSubscriber(const SubscriberId& subscriber_id,
-                        span<uint8_t, L> buffer,
-                        atomic<uint64_t>* message_count_sync,
-                        atomic<uint64_t>* wraparound_sync) noexcept
+                          span<uint8_t, L> buffer,
+                          atomic<uint64_t>* message_count_sync,
+                          atomic<uint64_t>* wraparound_sync) noexcept
       : id_(subscriber_id),
         buffer_(buffer),
         message_count_sync_(message_count_sync),
