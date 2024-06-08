@@ -1,5 +1,7 @@
 #define UNIT_TEST
 
+// NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner)
+
 #include "../src/demultiplexer.h"
 #include <gtest/gtest.h>
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
@@ -9,6 +11,7 @@
 #include <boost/log/expressions.hpp>  // NOLINT(misc-include-cleaner)
 #include <boost/log/trivial.hpp>
 #include <boost/serialization/strong_typedef.hpp>
+#include <cassert>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -21,8 +24,9 @@
 
 namespace ShmSequencer {
 
-const std::chrono::seconds DEFAULT_WAIT(5);
+const std::chrono::seconds DEFAULT_WAIT(5);  // NOLINT(cert-err58-cpp)
 
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
 BOOST_STRONG_TYPEDEF(std::vector<uint8_t>, TestMessage);
 
 }  // namespace ShmSequencer
@@ -30,7 +34,6 @@ BOOST_STRONG_TYPEDEF(std::vector<uint8_t>, TestMessage);
 using ShmSequencer::DEFAULT_WAIT;
 using ShmSequencer::DemultiplexerPublisher;
 using ShmSequencer::DemultiplexerSubscriber;
-using ShmSequencer::MessageBuffer;
 using ShmSequencer::SendResult;
 using ShmSequencer::SubscriberId;
 using ShmSequencer::TestMessage;
@@ -52,8 +55,8 @@ struct Arbitrary<TestMessage> {
     const Gen<vector<uint8_t>> nonempty_vec_gen = gen::resize(M, gen::nonEmpty<vector<uint8_t>>());
     // The above generator might still generate a vector with `size() > M`, `gen::resize` does not always work.
     // Run TestMessageGenerator.CheckDistribution1 500 times and check `RC_CLASSIFY(message_size > M, "size > M")`
-    Gen<vector<uint8_t>> valid_size_vec_gen =
-        gen::suchThat(nonempty_vec_gen, [](const vector<uint8_t>& xs) { return xs.size() > 0 && xs.size() <= M; });
+    const Gen<vector<uint8_t>> valid_size_vec_gen =
+        gen::suchThat(nonempty_vec_gen, [](const vector<uint8_t>& xs) { return !xs.empty() && xs.size() <= M; });
 
     return gen::map(valid_size_vec_gen, [](const vector<uint8_t>& xs) { return TestMessage(xs); });
   }
@@ -66,17 +69,6 @@ auto assert_eq(const span<uint8_t>& left, const span<uint8_t>& right) {
   for (size_t i = 0; i < right.size(); ++i) {
     ASSERT_EQ(left[i], right[i]) << "index: " << i;
   }
-}
-
-auto filter_valid_messages(const vector<TestMessage> messages) -> vector<TestMessage> {
-  // vector<TestMessage> result;
-  // for (auto m : messages) {
-  //   if (0 < m.t.size() && m.t.size() <= M) {
-  //     result.emplace_back(m);
-  //   }
-  // }
-  // return result;
-  return messages;
 }
 
 auto assert_eq(const TestMessage& left, const TestMessage& right) {
@@ -108,11 +100,10 @@ auto send_all(const vector<TestMessage>& messages, DemultiplexerPublisher<L, M, 
       case SendResult::Repeat:
         break;
       case SendResult::Error:
-        goto end_loop;
+        return result;
     }
   }
-end_loop:
-  assert(result == messages.size());
+
   return result;
 }
 
@@ -128,7 +119,7 @@ auto read_n(const size_t message_num, DemultiplexerSubscriber<L, M>& subscriber)
 
   // read one more to unblock the subscriber, which might be waiting for the wraparound unblock
   const span<uint8_t>& m = subscriber.next();
-  assert(0 == m.size());
+  assert(m.empty());
 
   return result;
 }
@@ -144,11 +135,11 @@ TEST(MultiplexerTest, Atomic) {
 
 template <bool Blocking>
 auto publisher_constructor_does_not_throw(const uint8_t all_subs_mask) -> void {
-  array<uint8_t, 32> buffer;
+  array<uint8_t, 32> buffer{};  // NOLINT(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
 
-  const DemultiplexerPublisher<32, 4, Blocking> m(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
+  const DemultiplexerPublisher<32, 4, Blocking> m(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
   ASSERT_EQ(0, m.message_count());
   ASSERT_EQ(0, m.position());
   ASSERT_EQ(all_subs_mask, m.all_subs_mask());
@@ -164,14 +155,14 @@ TEST(NonBlockingDemultiplexerPublisherTest, ConstructorDoesNotThrow) {
 
 template <bool Blocking>
 auto publisher_send_empty_message() {
-  array<uint8_t, L> buffer;
+  array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
   const uint8_t all_subs_mask = 0b1;
   const SubscriberId subId = SubscriberId::create(1);
 
-  DemultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
-  DemultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerSubscriber<L, M> subscriber(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
   const SendResult result = publisher.send({});
 
@@ -193,14 +184,14 @@ TEST(NonBlockingDemultiplexerPublisherTest, SendEmptyMessage) {
 
 template <bool Blocking>
 auto publisher_send_invalid_large_message() -> void {
-  array<uint8_t, L> buffer;
+  array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
   const uint8_t all_subs_mask = 0b1;
   const SubscriberId subId = SubscriberId::create(1);
 
-  DemultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
-  DemultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerSubscriber<L, M> subscriber(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
   array<uint8_t, L> m{1};  // this should not fit into the buffer given M + 2 requirement
   const SendResult result = publisher.send(m);
@@ -221,14 +212,14 @@ TEST(NonBlockingDemultiplexerPublisherTest, SendInvalidLargeMessage) {
 }
 
 TEST(NonBlockingDeDemultiplexerPublisherTest, SendWhenBufferIfFullAndGetSendRepeatResult) {
-  array<uint8_t, L> buffer;
+  array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
   const uint8_t all_subs_mask = 0b1;
   const SubscriberId subId = SubscriberId::create(1);
 
-  DemultiplexerPublisher<L, M, false> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
-  DemultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerPublisher<L, M, false> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerSubscriber<L, M> subscriber(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
   ASSERT_EQ(L, M * 2);
 
@@ -255,14 +246,14 @@ auto publisher_send_and_receive_1(TestMessage message) {
   if (message.t.size() > M) {
     return;
   }
-  array<uint8_t, L> buffer;
+  array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
   const uint8_t all_subs_mask = 0b1;
   const SubscriberId subId = SubscriberId::create(1);
 
-  DemultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
-  DemultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerSubscriber<L, M> subscriber(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
   const SendResult result = publisher.send(message.t);
 
@@ -284,23 +275,21 @@ TEST(NonBlockingDemultiplexerPublisherTest, SendReceive1) {
 }
 
 template <bool Blocking>
-auto publisher_one_sub_receive_x(const vector<TestMessage>& messages) {
-  const vector<TestMessage> valid_messages = filter_valid_messages(messages);
-
+auto publisher_one_sub_receive_x(const vector<TestMessage>& valid_messages) {
   if (valid_messages.empty()) {
     return;
   }
 
   const size_t message_num = valid_messages.size();
 
-  array<uint8_t, L> buffer;
+  array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
   const uint8_t all_subs_mask = 0b1;
   const SubscriberId subId = SubscriberId::create(1);
 
-  DemultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
-  DemultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerSubscriber<L, M> subscriber(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
   std::future<size_t> sent_count_future =
       std::async(std::launch::async, [&valid_messages, &publisher] { return send_all(valid_messages, publisher); });
@@ -311,11 +300,11 @@ auto publisher_one_sub_receive_x(const vector<TestMessage>& messages) {
   sent_count_future.wait_for(DEFAULT_WAIT);
   ASSERT_TRUE(sent_count_future.valid());
 
-  received_messages_future.wait_for(DEFAULT_WAIT);
-  ASSERT_TRUE(received_messages_future.valid());
-
   const size_t sent_count = sent_count_future.get();
   ASSERT_EQ(message_num, sent_count);
+
+  received_messages_future.wait_for(DEFAULT_WAIT);
+  ASSERT_TRUE(received_messages_future.valid());
 
   const auto received_messages = received_messages_future.get();
   assert_eq(valid_messages, received_messages);
@@ -330,9 +319,7 @@ TEST(NonBlockingDemultiplexerPublisherTest, OneSubReceiveX) {
 }
 
 template <bool Blocking>
-auto publisher_multiple_subs_receive_x(const vector<TestMessage>& messages) {
-  const vector<TestMessage> valid_messages = filter_valid_messages(messages);
-
+auto publisher_multiple_subs_receive_x(const vector<TestMessage>& valid_messages) {
   if (valid_messages.empty()) {
     return;
   }
@@ -341,23 +328,26 @@ auto publisher_multiple_subs_receive_x(const vector<TestMessage>& messages) {
 
   const size_t message_num = valid_messages.size();
 
-  array<uint8_t, L> buffer;
+  array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
   const uint64_t all_subs_mask = SubscriberId::all_subscribers_mask(SUB_NUM);
 
-  vector<DemultiplexerSubscriber<L, M>> subscribers;
+  vector<DemultiplexerSubscriber<L, M>> subscribers{};
+  subscribers.reserve(SUB_NUM);
   for (uint8_t i = 1; i <= SUB_NUM; ++i) {
-    subscribers.emplace_back(
-        DemultiplexerSubscriber<L, M>(SubscriberId::create(i), buffer, &msg_counter_sync, &wraparound_sync));
+    const SubscriberId id = SubscriberId::create(i);
+    const DemultiplexerSubscriber<L, M> sub{id, span{buffer}, &msg_counter_sync, &wraparound_sync};
+    subscribers.emplace_back(sub);
   }
 
-  DemultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
   std::future<size_t> future_pub_result =
       std::async(std::launch::async, [&valid_messages, &publisher] { return send_all(valid_messages, publisher); });
 
-  vector<std::future<vector<TestMessage>>> future_sub_results;
+  vector<std::future<vector<TestMessage>>> future_sub_results{};
+  future_sub_results.reserve(SUB_NUM);
   for (auto& subscriber : subscribers) {
     future_sub_results.emplace_back(
         std::async(std::launch::async, [message_num, &subscriber] { return read_n(message_num, subscriber); }));
@@ -383,7 +373,7 @@ TEST(NonBlockingDemultiplexerPublisherTest, MultipleSubsReceiveX) {
 }
 
 TEST(TestMessageGenerator, CheckDistribution1) {
-  rc::check([](TestMessage message) {
+  rc::check([](const TestMessage& message) {
     const size_t message_size = message.t.size();
     RC_CLASSIFY(message_size == 0, "size == 0");
     RC_CLASSIFY(message_size == 1, "size == 1");
@@ -395,11 +385,11 @@ TEST(TestMessageGenerator, CheckDistribution1) {
 }
 
 template <bool Blocking>
-auto publisher_add_remove_subscriber(const vector<SubscriberId> subs) {
-  array<uint8_t, L> buffer;
+auto publisher_add_remove_subscriber(const vector<SubscriberId>& subs) {
+  array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
-  DemultiplexerPublisher<L, M, Blocking> publisher(0, buffer, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerPublisher<L, M, Blocking> publisher(0, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
   ASSERT_EQ(0, publisher.all_subs_mask());
 
@@ -439,3 +429,4 @@ auto main(int argc, char** argv) -> int {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
+// NOLINTEND(readability-function-cognitive-complexity, misc-include-cleaner)

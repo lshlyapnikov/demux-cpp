@@ -163,8 +163,7 @@ class DemultiplexerSubscriber {
 #endif  // UNIT_TEST
 
  private:
-  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
-  const SubscriberId id_;
+  SubscriberId id_;
 
   size_t position_{0};
   uint64_t available_message_count_{0};
