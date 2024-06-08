@@ -1,6 +1,6 @@
 #define UNIT_TEST
 
-#include "../src/multiplexer.h"
+#include "../src/demultiplexer.h"
 #include <gtest/gtest.h>
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
 #include <array>
@@ -28,9 +28,9 @@ BOOST_STRONG_TYPEDEF(std::vector<uint8_t>, TestMessage);
 }  // namespace ShmSequencer
 
 using ShmSequencer::DEFAULT_WAIT;
+using ShmSequencer::DemultiplexerPublisher;
+using ShmSequencer::DemultiplexerSubscriber;
 using ShmSequencer::MessageBuffer;
-using ShmSequencer::MultiplexerPublisher;
-using ShmSequencer::MultiplexerSubscriber;
 using ShmSequencer::SendResult;
 using ShmSequencer::SubscriberId;
 using ShmSequencer::TestMessage;
@@ -96,7 +96,7 @@ auto assert_eq(const vector<TestMessage>& left, const vector<TestMessage>& right
 }
 
 template <size_t L, uint16_t M, bool B>
-auto send_all(const vector<TestMessage>& messages, MultiplexerPublisher<L, M, B>& publisher) -> size_t {
+auto send_all(const vector<TestMessage>& messages, DemultiplexerPublisher<L, M, B>& publisher) -> size_t {
   size_t result = 0;
   for (size_t i = 0; i < messages.size();) {
     TestMessage m = messages[i];
@@ -117,7 +117,7 @@ end_loop:
 }
 
 template <size_t L, uint16_t M>
-auto read_n(const size_t message_num, MultiplexerSubscriber<L, M>& subscriber) -> vector<TestMessage> {
+auto read_n(const size_t message_num, DemultiplexerSubscriber<L, M>& subscriber) -> vector<TestMessage> {
   vector<TestMessage> result;
   while (result.size() < message_num) {
     const span<uint8_t>& m = subscriber.next();
@@ -148,17 +148,17 @@ auto publisher_constructor_does_not_throw(const uint8_t all_subs_mask) -> void {
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
 
-  const MultiplexerPublisher<32, 4, Blocking> m(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
+  const DemultiplexerPublisher<32, 4, Blocking> m(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
   ASSERT_EQ(0, m.message_count());
   ASSERT_EQ(0, m.position());
   ASSERT_EQ(all_subs_mask, m.all_subs_mask());
 }
 
-TEST(BlockingMultiplexerPublisherTest, ConstructorDoesNotThrow) {
+TEST(BlockingDemultiplexerPublisherTest, ConstructorDoesNotThrow) {
   rc::check(publisher_constructor_does_not_throw<true>);
 }
 
-TEST(NonBlockingMultiplexerPublisherTest, ConstructorDoesNotThrow) {
+TEST(NonBlockingDemultiplexerPublisherTest, ConstructorDoesNotThrow) {
   rc::check(publisher_constructor_does_not_throw<false>);
 }
 
@@ -170,8 +170,8 @@ auto publisher_send_empty_message() {
   const uint8_t all_subs_mask = 0b1;
   const SubscriberId subId = SubscriberId::create(1);
 
-  MultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
-  MultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
 
   const SendResult result = publisher.send({});
 
@@ -183,11 +183,11 @@ auto publisher_send_empty_message() {
   ASSERT_EQ(0, subscriber.message_count());
 }
 
-TEST(BlockingMultiplexerPublisherTest, SendEmptyMessage) {
+TEST(BlockingDemultiplexerPublisherTest, SendEmptyMessage) {
   publisher_send_empty_message<true>();
 }
 
-TEST(NonBlockingMultiplexerPublisherTest, SendEmptyMessage) {
+TEST(NonBlockingDemultiplexerPublisherTest, SendEmptyMessage) {
   publisher_send_empty_message<false>();
 }
 
@@ -199,8 +199,8 @@ auto publisher_send_invalid_large_message() -> void {
   const uint8_t all_subs_mask = 0b1;
   const SubscriberId subId = SubscriberId::create(1);
 
-  MultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
-  MultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
 
   array<uint8_t, L> m{1};  // this should not fit into the buffer given M + 2 requirement
   const SendResult result = publisher.send(m);
@@ -212,23 +212,23 @@ auto publisher_send_invalid_large_message() -> void {
   ASSERT_EQ(0, subscriber.message_count());
 }
 
-TEST(BlockingMultiplexerPublisherTest, SendInvalidLargeMessage) {
+TEST(BlockingDemultiplexerPublisherTest, SendInvalidLargeMessage) {
   publisher_send_invalid_large_message<true>();
 }
 
-TEST(NonBlockingMultiplexerPublisherTest, SendInvalidLargeMessage) {
+TEST(NonBlockingDemultiplexerPublisherTest, SendInvalidLargeMessage) {
   publisher_send_invalid_large_message<false>();
 }
 
-TEST(NonBlockingMultiplexerPublisherTest, SendWhenBufferIfFullAndGetSendRepeatResult) {
+TEST(NonBlockingDeDemultiplexerPublisherTest, SendWhenBufferIfFullAndGetSendRepeatResult) {
   array<uint8_t, L> buffer;
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
   const uint8_t all_subs_mask = 0b1;
   const SubscriberId subId = SubscriberId::create(1);
 
-  MultiplexerPublisher<L, M, false> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
-  MultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerPublisher<L, M, false> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
 
   ASSERT_EQ(L, M * 2);
 
@@ -261,8 +261,8 @@ auto publisher_send_and_receive_1(TestMessage message) {
   const uint8_t all_subs_mask = 0b1;
   const SubscriberId subId = SubscriberId::create(1);
 
-  MultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
-  MultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
 
   const SendResult result = publisher.send(message.t);
 
@@ -275,11 +275,11 @@ auto publisher_send_and_receive_1(TestMessage message) {
   assert_eq(read, message.t);
 }
 
-TEST(BlockingMultiplexerPublisherTest, SendReceive1) {
+TEST(BlockingDemultiplexerPublisherTest, SendReceive1) {
   rc::check(publisher_send_and_receive_1<true>);
 }
 
-TEST(NonBlockingMultiplexerPublisherTest, SendReceive1) {
+TEST(NonBlockingDemultiplexerPublisherTest, SendReceive1) {
   rc::check(publisher_send_and_receive_1<false>);
 }
 
@@ -299,8 +299,8 @@ auto publisher_one_sub_receive_x(const vector<TestMessage>& messages) {
   const uint8_t all_subs_mask = 0b1;
   const SubscriberId subId = SubscriberId::create(1);
 
-  MultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
-  MultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerSubscriber<L, M> subscriber(subId, buffer, &msg_counter_sync, &wraparound_sync);
 
   std::future<size_t> sent_count_future =
       std::async(std::launch::async, [&valid_messages, &publisher] { return send_all(valid_messages, publisher); });
@@ -321,11 +321,11 @@ auto publisher_one_sub_receive_x(const vector<TestMessage>& messages) {
   assert_eq(valid_messages, received_messages);
 }
 
-TEST(BlockingMultiplexerPublisherTest, OneSubReceiveX) {
+TEST(BlockingDemultiplexerPublisherTest, OneSubReceiveX) {
   rc::check(publisher_one_sub_receive_x<true>);
 }
 
-TEST(NonBlockingMultiplexerPublisherTest, OneSubReceiveX) {
+TEST(NonBlockingDemultiplexerPublisherTest, OneSubReceiveX) {
   rc::check(publisher_one_sub_receive_x<false>);
 }
 
@@ -346,13 +346,13 @@ auto publisher_multiple_subs_receive_x(const vector<TestMessage>& messages) {
   atomic<uint64_t> wraparound_sync{0};
   const uint64_t all_subs_mask = SubscriberId::all_subscribers_mask(SUB_NUM);
 
-  vector<MultiplexerSubscriber<L, M>> subscribers;
+  vector<DemultiplexerSubscriber<L, M>> subscribers;
   for (uint8_t i = 1; i <= SUB_NUM; ++i) {
     subscribers.emplace_back(
-        MultiplexerSubscriber<L, M>(SubscriberId::create(i), buffer, &msg_counter_sync, &wraparound_sync));
+        DemultiplexerSubscriber<L, M>(SubscriberId::create(i), buffer, &msg_counter_sync, &wraparound_sync));
   }
 
-  MultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, buffer, &msg_counter_sync, &wraparound_sync);
 
   std::future<size_t> future_pub_result =
       std::async(std::launch::async, [&valid_messages, &publisher] { return send_all(valid_messages, publisher); });
@@ -374,11 +374,11 @@ auto publisher_multiple_subs_receive_x(const vector<TestMessage>& messages) {
   }
 }
 
-TEST(BlockingMultiplexerPublisherTest, MultipleSubsReceiveX) {
+TEST(BlockingDemultiplexerPublisherTest, MultipleSubsReceiveX) {
   rc::check(publisher_multiple_subs_receive_x<true>);
 }
 
-TEST(NonBlockingMultiplexerPublisherTest, MultipleSubsReceiveX) {
+TEST(NonBlockingDemultiplexerPublisherTest, MultipleSubsReceiveX) {
   rc::check(publisher_multiple_subs_receive_x<false>);
 }
 
@@ -399,7 +399,7 @@ auto publisher_add_remove_subscriber(const vector<SubscriberId> subs) {
   array<uint8_t, L> buffer;
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
-  MultiplexerPublisher<L, M, Blocking> publisher(0, buffer, &msg_counter_sync, &wraparound_sync);
+  DemultiplexerPublisher<L, M, Blocking> publisher(0, buffer, &msg_counter_sync, &wraparound_sync);
 
   ASSERT_EQ(0, publisher.all_subs_mask());
 
@@ -425,11 +425,11 @@ auto publisher_add_remove_subscriber(const vector<SubscriberId> subs) {
   ASSERT_EQ(0, publisher.all_subs_mask());
 }
 
-TEST(BlockingMultiplexerPublisherTest, AddRemoveSubscriber) {
+TEST(BlockingDemultiplexerPublisherTest, AddRemoveSubscriber) {
   rc::check(publisher_add_remove_subscriber<true>);
 }
 
-TEST(NonBlockingMultiplexerPublisherTest, AddRemoveSubscriber) {
+TEST(NonBlockingDemultiplexerPublisherTest, AddRemoveSubscriber) {
   rc::check(publisher_add_remove_subscriber<false>);
 }
 

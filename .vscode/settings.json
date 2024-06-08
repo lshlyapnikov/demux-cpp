@@ -3,6 +3,7 @@
   "my.terminal.run.cmd2": "clear; cmake --build ./build && cmake --build ./build --target test",
   // "my.terminal.run.cmd3": "clear; ./bin/run-clang-tidy.sh",
   "cSpell.words": [
+    "Demultiplexer",
     "Interprocess",
     "NOLINTNEXTLINE",
     "Rapidcheck",

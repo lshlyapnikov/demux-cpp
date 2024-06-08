@@ -115,11 +115,11 @@ target_compile_options(
 )
 
 add_library(
-  multiplexer
-  OBJECT src/multiplexer.cpp
+  demultiplexer
+  OBJECT src/demultiplexer.cpp
 )
 target_compile_options(
-  multiplexer
+  demultiplexer
   PRIVATE ${MY_CXX_FLAGS}
 )
 
@@ -149,7 +149,7 @@ add_executable(
 target_link_libraries(
   sequencer_test
   sequencer
-  multiplexer
+  demultiplexer
   domain
   atomic
   GTest::gtest_main
@@ -177,12 +177,12 @@ target_compile_options(
 gtest_discover_tests(message_buffer_test)
 
 add_executable(
-  multiplexer_test
-  test/multiplexer_test.cpp
+  demultiplexer_test
+  test/demultiplexer_test.cpp
 )
 target_link_libraries(
-  multiplexer_test
-  multiplexer
+  demultiplexer_test
+  demultiplexer
   domain
   atomic
   GTest::gtest_main
@@ -190,7 +190,7 @@ target_link_libraries(
   Boost::log
 )
 target_compile_options(
-  multiplexer_test
+  demultiplexer_test
   PRIVATE ${MY_CXX_FLAGS}
 )
-gtest_discover_tests(multiplexer_test)
+gtest_discover_tests(demultiplexer_test)
