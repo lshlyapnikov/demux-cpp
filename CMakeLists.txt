@@ -22,6 +22,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wconversion -Wsign-conversion -Werror")
 set(MY_CXX_FLAGS -Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wconversion -Wsign-conversion -Werror)
 
+# valgrind needs -gdwarf-4
+set(CMAKE_CXX_FLAGS_DEBUG "-gdwarf-4 -O0")
+
 #
 # tools
 #
