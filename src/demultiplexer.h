@@ -25,7 +25,7 @@ enum SendResult {
   Error,    // message cannot be sent, log error and drop it
 };
 
-// TODO(Leo): make sure the size of the shares memory is a multiple of the page size. Because the operating system
+// TODO(Leo): make sure the size of the shared memory is a multiple of the page size. Because the operating system
 // TODO(Leo): performs mapping operations over whole pages. So, you don't waste memory.
 //
 /// @brief Demultiplexer publisher.

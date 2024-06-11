@@ -55,11 +55,12 @@ struct Arbitrary<TestMessage> {
     const Gen<vector<uint8_t>> nonempty_vec_gen = gen::resize(M, gen::nonEmpty<vector<uint8_t>>());
     // The above generator might still generate a vector with `size() > M`, `gen::resize` does not always work.
     // Run TestMessageGenerator.CheckDistribution1 500 times and check `RC_CLASSIFY(message_size > M, "size > M")`
-    const Gen<vector<uint8_t>> valid_size_vec_gen =
-        gen::suchThat(nonempty_vec_gen, [](const vector<uint8_t>& xs) { return !xs.empty() && xs.size() <= M; });
+    const Gen<vector<uint8_t>> valid_size_vec_gen = gen::suchThat(nonempty_vec_gen, is_valid_length);
 
     return gen::map(valid_size_vec_gen, [](const vector<uint8_t>& xs) { return TestMessage(xs); });
   }
+
+  static auto is_valid_length(const vector<uint8_t>& xs) -> bool { return !xs.empty() && xs.size() <= M; }
 };
 
 }  // namespace rc
@@ -372,15 +373,24 @@ TEST(NonBlockingDemultiplexerPublisherTest, MultipleSubsReceiveX) {
   rc::check(publisher_multiple_subs_receive_x<false>);
 }
 
-TEST(TestMessageGenerator, CheckDistribution1) {
+TEST(TestMessageGenerator, CheckLengthDistribution) {
   rc::check([](const TestMessage& message) {
     const size_t message_size = message.t.size();
-    RC_CLASSIFY(message_size == 0, "size == 0");
-    RC_CLASSIFY(message_size == 1, "size == 1");
-    RC_CLASSIFY(0 < message_size && message_size <= 32, "0 < size <= 32");
-    RC_CLASSIFY(message_size > 32, "size > 32");
-    RC_CLASSIFY(message_size == M, "size == M");
-    RC_CLASSIFY(message_size > M, "size > M");
+    // RC_CLASSIFY(message_size == 0, "size == 0");
+    // RC_CLASSIFY(message_size == 1, "size == 1");
+    // RC_CLASSIFY(0 < message_size && message_size <= 32, "0 < size <= 32");
+    // RC_CLASSIFY(message_size > 32, "size > 32");
+    // RC_CLASSIFY(message_size == M, "size == M");
+    // RC_CLASSIFY(message_size > M, "size > M");
+    RC_TAG(message_size);
+  });
+}
+
+TEST(TestMessageGenerator, CheckByteDistribution) {
+  rc::check([](const TestMessage& message) {
+    for (const uint8_t x : message.t) {
+      RC_TAG(x);
+    }
   });
 }
 
