@@ -1,6 +1,6 @@
-#define UNIT_TEST
-
 // NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner)
+
+#define UNIT_TEST
 
 #include "../src/demultiplexer.h"
 #include <gtest/gtest.h>

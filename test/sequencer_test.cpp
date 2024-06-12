@@ -1,3 +1,7 @@
+// NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner)
+
+#define UNIT_TEST
+
 #include "../src/sequencer.h"
 #include <gtest/gtest.h>
 #include <sstream>
@@ -56,3 +60,5 @@ TEST(SequencerTest, PrintSequenceError) {
   out << demux::SequencerError::Unexpected;
   EXPECT_STREQ(out.str().c_str(), "SequencerError::Unexpected");
 }
+
+// NOLINTEND(readability-function-cognitive-complexity, misc-include-cleaner)

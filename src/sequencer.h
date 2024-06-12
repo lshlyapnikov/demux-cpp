@@ -1,5 +1,5 @@
-#ifndef SHM_SEQUENCER_SEQUENCER_H
-#define SHM_SEQUENCER_SEQUENCER_H
+#ifndef DEMUX_CPP_DEMUX_SEQUENCER_H
+#define DEMUX_CPP_DEMUX_SEQUENCER_H
 
 #include <algorithm>
 #include <cstddef>
@@ -65,4 +65,4 @@ auto operator<<(std::ostream& output, const Sequencer<MaxMsgSize, DownstreamQueu
 
 }  // namespace demux
 
-#endif  // SHM_SEQUENCER_SEQUENCER_H
+#endif  // DEMUX_CPP_DEMUX_SEQUENCER_H

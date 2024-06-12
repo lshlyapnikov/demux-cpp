@@ -1,5 +1,5 @@
 ---
 # * -- enable all and a list of disabled checks
-Checks: "*,-abseil-*,-altera-*,-android-*,-darwin-*,-fuchsia-*,-linuxkernel-*,-llvm-*,-llvmlibc-*,-objc-*,-openmp-*,-zircon-*,-readability-identifier-length,-readability-else-after-return,-bugprone-easily-swappable-parameters"
+Checks: "*,-abseil-*,-altera-*,-android-*,-darwin-*,-fuchsia-*,-hicpp-*,,-linuxkernel-*,-llvm-*,-llvmlibc-*,-objc-*,-openmp-*,-zircon-*,-readability-identifier-length,-readability-else-after-return,-bugprone-easily-swappable-parameters"
 #Checks: "clang-analyzer-*"
 #WarningsAsErrors: true

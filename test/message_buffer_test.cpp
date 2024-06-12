@@ -1,3 +1,5 @@
+// NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner)
+
 #define UNIT_TEST
 
 #include "../src/message_buffer.h"
@@ -98,6 +100,7 @@ TEST(MessageBufferTest, MessageBufferWriteRead) {
     MessageBuffer<BUF_SIZE> buf(data);
 
     const size_t remaining = buf.remaining(position);
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays)
     const unique_ptr<uint8_t[]> src = create_test_array(src_size);
     const size_t written = buf.write(position, span(src.get(), src_size));
     if (remaining >= src_size + sizeof(uint16_t)) {
@@ -129,3 +132,5 @@ TEST(MessageBufferTest, MessageBufferWriteEmpty) {
   const span<uint8_t> read = buf.read(0);
   ASSERT_EQ(read.size(), 0);
 }
+
+// NOLINTEND(readability-function-cognitive-complexity, misc-include-cleaner)

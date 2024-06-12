@@ -1,10 +1,13 @@
+// NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner)
+
+#define UNIT_TEST
+
 #include "../src/domain.h"
 #include <gtest/gtest.h>
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
 #include <cmath>
 #include <cstdint>
 #include <stdexcept>
-#include <string>
 #include <tuple>
 #include "./domain_test.h"
 
@@ -14,7 +17,6 @@ TEST(DomainTest, Constants) {
   EXPECT_EQ(demux::MAX_SUBSCRIBER_NUM, 64);
 }
 
-// NOLINTBEGIN(readability-function-cognitive-complexity)
 TEST(DomainTest, SubscriberIdManualCheck) {
   for (const uint8_t num :
        {static_cast<uint8_t>(0), static_cast<uint8_t>(65), static_cast<uint8_t>(128), static_cast<uint8_t>(255)}) {
@@ -78,9 +80,7 @@ TEST(DomainTest, SubscriberIdManualCheck) {
     ASSERT_EQ(0b1111111111111111111111111111111111111111111111111111111111111111, mask);
   }
 }
-// NOLINTEND(readability-function-cognitive-complexity)
 
-// NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner)
 TEST(DomainTest, SubscriberId) {
   rc::check([](const uint8_t num) {
     if (num > demux::MAX_SUBSCRIBER_NUM || num == 0) {
@@ -92,9 +92,7 @@ TEST(DomainTest, SubscriberId) {
     }
   });
 }
-// NOLINTEND(readability-function-cognitive-complexity, misc-include-cleaner)
 
-// NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner)
 TEST(DomainTest, AllSubscribersMask) {
   rc::check([](const uint8_t num) {
     if (num > demux::MAX_SUBSCRIBER_NUM || num == 0) {
@@ -105,9 +103,9 @@ TEST(DomainTest, AllSubscribersMask) {
     }
   });
 }
-// NOLINTEND(readability-function-cognitive-complexity, misc-include-cleaner)
 
-// NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner)
 TEST(DomainTest, SubscriberIdGenerator) {
   rc::check([](const SubscriberId& sub) { RC_TAG(sub.index()); });
 }
+
+// NOLINTEND(readability-function-cognitive-complexity, misc-include-cleaner)

@@ -1,7 +1,10 @@
-#ifndef SHM_SEQUENCER_DOMAIN_TEST_H
-#define SHM_SEQUENCER_DOMAIN_TEST_H
+// NOLINTBEGIN(misc-include-cleaner)
+
+#ifndef DEMUX_CPP_DEMUX_DOMAIN_TEST_H
+#define DEMUX_CPP_DEMUX_DOMAIN_TEST_H
 
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
+#include <cstdint>
 #include "../src/domain.h"
 
 namespace rc {
@@ -21,4 +24,6 @@ struct Arbitrary<demux::SubscriberId> {
 
 }  // namespace rc
 
-#endif  // SHM_SEQUENCER_DOMAIN_TEST_H
+#endif  // DEMUX_CPP_DEMUX_DOMAIN_TEST_H
+
+// NOLINTEND(misc-include-cleaner)

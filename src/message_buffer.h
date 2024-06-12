@@ -1,5 +1,5 @@
-#ifndef SHM_SEQUENCER_MESSAGE_BUFFER_H
-#define SHM_SEQUENCER_MESSAGE_BUFFER_H
+#ifndef DEMUX_CPP_DEMUX_MESSAGE_BUFFER_H
+#define DEMUX_CPP_DEMUX_MESSAGE_BUFFER_H
 
 #include <algorithm>
 #include <cstddef>
@@ -80,4 +80,4 @@ struct MessageBuffer {
 
 }  // namespace demux
 
-#endif  // SHM_SEQUENCER_MESSAGE_BUFFER_H
+#endif  // DEMUX_CPP_DEMUX_MESSAGE_BUFFER_H

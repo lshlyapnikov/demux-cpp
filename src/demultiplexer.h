@@ -1,5 +1,5 @@
-#ifndef SHM_SEQUENCER_DEMULTIPLEXER_H
-#define SHM_SEQUENCER_DEMULTIPLEXER_H
+#ifndef DEMUX_CPP_DEMUX_DEMULTIPLEXER_H
+#define DEMUX_CPP_DEMUX_DEMULTIPLEXER_H
 
 #include <atomic>
 #include <boost/log/trivial.hpp>
@@ -328,4 +328,4 @@ template <size_t L, uint16_t M>
 
 }  // namespace demux
 
-#endif  // SHM_SEQUENCER_DEMULTIPLEXER_H
+#endif  // DEMUX_CPP_DEMUX_DEMULTIPLEXER_H

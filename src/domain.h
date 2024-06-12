@@ -1,5 +1,5 @@
-#ifndef SHM_SEQUENCER_DOMAIN_H
-#define SHM_SEQUENCER_DOMAIN_H
+#ifndef DEMUX_CPP_DEMUX_DOMAIN_H
+#define DEMUX_CPP_DEMUX_DOMAIN_H
 
 #include <cstddef>
 #include <cstdint>
@@ -80,4 +80,4 @@ class SubscriberId {
 
 }  // namespace demux
 
-#endif  // SHM_SEQUENCER_DOMAIN_H
+#endif  // DEMUX_CPP_DEMUX_DOMAIN_H
