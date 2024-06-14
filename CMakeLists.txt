@@ -84,18 +84,50 @@ include_directories(
 # artifacts
 #
 
+# add_executable(
+#   ${PROJECT_NAME}
+#   src/main.cpp
+# )
+# target_link_libraries(
+#   ${PROJECT_NAME}
+#   sequencer
+#   atomic
+#   Boost::log
+# )
+# target_compile_options(
+#   ${PROJECT_NAME}
+#   PRIVATE ${MY_CXX_FLAGS}
+# )
+
 add_executable(
-  ${PROJECT_NAME}
-  src/main.cpp
+  shm_demux_pub
+  example/shm_demux_pub.cpp
 )
 target_link_libraries(
-  ${PROJECT_NAME}
-  sequencer
+  shm_demux_pub
+  domain
   atomic
+  rt
   Boost::log
 )
 target_compile_options(
-  ${PROJECT_NAME}
+  shm_demux_pub
+  PRIVATE ${MY_CXX_FLAGS}
+)
+
+add_executable(
+  shm_demux_sub
+  example/shm_demux_sub.cpp
+)
+target_link_libraries(
+  shm_demux_sub
+  domain
+  atomic
+  rt
+  Boost::log
+)
+target_compile_options(
+  shm_demux_sub
   PRIVATE ${MY_CXX_FLAGS}
 )
 
