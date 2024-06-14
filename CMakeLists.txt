@@ -100,34 +100,18 @@ include_directories(
 # )
 
 add_executable(
-  shm_demux_pub
-  example/shm_demux_pub.cpp
+  shm_demux
+  example/shm_demux.cpp
 )
 target_link_libraries(
-  shm_demux_pub
+  shm_demux
   domain
   atomic
   rt
   Boost::log
 )
 target_compile_options(
-  shm_demux_pub
-  PRIVATE ${MY_CXX_FLAGS}
-)
-
-add_executable(
-  shm_demux_sub
-  example/shm_demux_sub.cpp
-)
-target_link_libraries(
-  shm_demux_sub
-  domain
-  atomic
-  rt
-  Boost::log
-)
-target_compile_options(
-  shm_demux_sub
+  shm_demux
   PRIVATE ${MY_CXX_FLAGS}
 )
 

@@ -6,7 +6,7 @@
 
 namespace lshl::demux {
 
-void init_logging() {
+auto init_logging() -> void {
   namespace logging = boost::log;
   // NOLINTNEXTLINE(misc-include-cleaner)
   logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::info);
