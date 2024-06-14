@@ -1,5 +1,5 @@
-#ifndef DEMUX_CPP_DEMUX_SEQUENCER_H
-#define DEMUX_CPP_DEMUX_SEQUENCER_H
+#ifndef DEMUX_CPP_LSHL_DEMUX_SEQUENCER_H
+#define DEMUX_CPP_LSHL_DEMUX_SEQUENCER_H
 
 #include <algorithm>
 #include <cstddef>
@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-namespace demux {
+namespace lshl::demux {
 
 using std::optional;
 using std::size_t;
@@ -63,6 +63,6 @@ auto operator<<(std::ostream& output, const Sequencer<MaxMsgSize, DownstreamQueu
   return obj.print_status(output);
 }
 
-}  // namespace demux
+}  // namespace lshl::demux
 
-#endif  // DEMUX_CPP_DEMUX_SEQUENCER_H
+#endif  // DEMUX_CPP_LSHL_DEMUX_SEQUENCER_H

@@ -4,7 +4,7 @@
 #include "./demux_util.h"
 
 auto main() -> int {
-  demux::init_logging();
+  lshl::demux::init_logging();
   BOOST_LOG_TRIVIAL(info) << "shm_demux_sub ..." << '\n';
 
   return 0;

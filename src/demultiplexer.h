@@ -1,5 +1,5 @@
-#ifndef DEMUX_CPP_DEMUX_DEMULTIPLEXER_H
-#define DEMUX_CPP_DEMUX_DEMULTIPLEXER_H
+#ifndef DEMUX_CPP_LSHL_DEMUX_DEMULTIPLEXER_H
+#define DEMUX_CPP_LSHL_DEMUX_DEMULTIPLEXER_H
 
 #include <atomic>
 #include <boost/log/trivial.hpp>
@@ -11,7 +11,7 @@
 #include "./domain.h"
 #include "./message_buffer.h"
 
-namespace demux {
+namespace lshl::demux {
 
 using std::atomic;
 using std::size_t;
@@ -326,6 +326,6 @@ template <size_t L, uint16_t M>
   }
 }
 
-}  // namespace demux
+}  // namespace lshl::demux
 
-#endif  // DEMUX_CPP_DEMUX_DEMULTIPLEXER_H
+#endif  // DEMUX_CPP_LSHL_DEMUX_DEMULTIPLEXER_H

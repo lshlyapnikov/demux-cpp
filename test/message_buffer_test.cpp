@@ -13,7 +13,7 @@
 #include <span>
 #include <vector>
 
-using demux::MessageBuffer;
+using lshl::demux::MessageBuffer;
 using std::array;
 using std::span;
 using std::uint8_t;

@@ -4,7 +4,7 @@
 #include <boost/log/expressions.hpp>
 #include <boost/log/trivial.hpp>
 
-namespace demux {
+namespace lshl::demux {
 
 void init_logging() {
   namespace logging = boost::log;
@@ -12,6 +12,6 @@ void init_logging() {
   logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::info);
 }
 
-}  // namespace demux
+}  // namespace lshl::demux
 
 #endif  // DEMUX_UTIL_H

@@ -1,5 +1,5 @@
-#ifndef DEMUX_CPP_DEMUX_DOMAIN_H
-#define DEMUX_CPP_DEMUX_DOMAIN_H
+#ifndef DEMUX_CPP_LSHL_DEMUX_DOMAIN_H
+#define DEMUX_CPP_LSHL_DEMUX_DOMAIN_H
 
 #include <cstddef>
 #include <cstdint>
@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace demux {
+namespace lshl::demux {
 
 using std::size_t;
 using std::uint16_t;
@@ -78,6 +78,6 @@ class SubscriberId {
   size_t index_;
 };
 
-}  // namespace demux
+}  // namespace lshl::demux
 
-#endif  // DEMUX_CPP_DEMUX_DOMAIN_H
+#endif  // DEMUX_CPP_LSHL_DEMUX_DOMAIN_H

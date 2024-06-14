@@ -1,12 +1,12 @@
-#ifndef DEMUX_CPP_DEMUX_MESSAGE_BUFFER_H
-#define DEMUX_CPP_DEMUX_MESSAGE_BUFFER_H
+#ifndef DEMUX_CPP_LSHL_DEMUX_MESSAGE_BUFFER_H
+#define DEMUX_CPP_LSHL_DEMUX_MESSAGE_BUFFER_H
 
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <span>
 
-namespace demux {
+namespace lshl::demux {
 
 using std::span;
 using std::uint16_t;
@@ -78,6 +78,6 @@ struct MessageBuffer {
   uint8_t* data_;
 };
 
-}  // namespace demux
+}  // namespace lshl::demux
 
-#endif  // DEMUX_CPP_DEMUX_MESSAGE_BUFFER_H
+#endif  // DEMUX_CPP_LSHL_DEMUX_MESSAGE_BUFFER_H

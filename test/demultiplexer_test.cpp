@@ -22,21 +22,21 @@
 #include "../src/message_buffer.h"
 #include "./domain_test.h"
 
-namespace demux {
+namespace lshl::demux {
 
 const std::chrono::seconds DEFAULT_WAIT(5);  // NOLINT(cert-err58-cpp)
 
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
 BOOST_STRONG_TYPEDEF(std::vector<uint8_t>, TestMessage);
 
-}  // namespace demux
+}  // namespace lshl::demux
 
-using demux::DEFAULT_WAIT;
-using demux::DemultiplexerPublisher;
-using demux::DemultiplexerSubscriber;
-using demux::SendResult;
-using demux::SubscriberId;
-using demux::TestMessage;
+using lshl::demux::DEFAULT_WAIT;
+using lshl::demux::DemultiplexerPublisher;
+using lshl::demux::DemultiplexerSubscriber;
+using lshl::demux::SendResult;
+using lshl::demux::SubscriberId;
+using lshl::demux::TestMessage;
 using std::array;
 using std::atomic;
 using std::span;

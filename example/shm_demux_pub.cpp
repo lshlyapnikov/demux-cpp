@@ -11,7 +11,7 @@ auto main() -> int {
   //   using boost::interprocess::read_write;
   //   using boost::interprocess::shared_memory_object;
 
-  demux::init_logging();
+  lshl::demux::init_logging();
 
   const char* shared_memory_name = "demux_example";
 
@@ -32,7 +32,7 @@ auto main() -> int {
   bipc::managed_shared_memory shm_obj(bipc::open_or_create, shared_memory_name, 65536);
   BOOST_LOG_TRIVIAL(info) << "created shared_memory_object: " << shared_memory_name << '\n';
 
-  //   demux::DemultiplexerPublisher pub();
+  //   lshl::demux::DemultiplexerPublisher pub();
 
   return 0;
 }

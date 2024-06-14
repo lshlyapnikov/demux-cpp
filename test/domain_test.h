@@ -1,7 +1,7 @@
 // NOLINTBEGIN(misc-include-cleaner)
 
-#ifndef DEMUX_CPP_DEMUX_DOMAIN_TEST_H
-#define DEMUX_CPP_DEMUX_DOMAIN_TEST_H
+#ifndef DEMUX_CPP_LSHL_DEMUX_DOMAIN_TEST_H
+#define DEMUX_CPP_LSHL_DEMUX_DOMAIN_TEST_H
 
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
 #include <cstdint>
@@ -10,11 +10,11 @@
 namespace rc {
 
 template <>
-struct Arbitrary<demux::SubscriberId> {
-  static auto arbitrary() -> Gen<demux::SubscriberId> {
-    using demux::is_valid_subscriber_number;
-    using demux::MAX_SUBSCRIBER_NUM;
-    using demux::SubscriberId;
+struct Arbitrary<lshl::demux::SubscriberId> {
+  static auto arbitrary() -> Gen<lshl::demux::SubscriberId> {
+    using lshl::demux::is_valid_subscriber_number;
+    using lshl::demux::MAX_SUBSCRIBER_NUM;
+    using lshl::demux::SubscriberId;
 
     const Gen<uint8_t> range = gen::inRange(static_cast<uint8_t>(1), MAX_SUBSCRIBER_NUM);
     const Gen<uint8_t> filtered = gen::suchThat(range, is_valid_subscriber_number);
@@ -24,6 +24,6 @@ struct Arbitrary<demux::SubscriberId> {
 
 }  // namespace rc
 
-#endif  // DEMUX_CPP_DEMUX_DOMAIN_TEST_H
+#endif  // DEMUX_CPP_LSHL_DEMUX_DOMAIN_TEST_H
 
 // NOLINTEND(misc-include-cleaner)

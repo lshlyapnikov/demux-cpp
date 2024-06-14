@@ -11,10 +11,10 @@
 #include <tuple>
 #include "./domain_test.h"
 
-using demux::SubscriberId;
+using lshl::demux::SubscriberId;
 
 TEST(DomainTest, Constants) {
-  EXPECT_EQ(demux::MAX_SUBSCRIBER_NUM, 64);
+  EXPECT_EQ(lshl::demux::MAX_SUBSCRIBER_NUM, 64);
 }
 
 TEST(DomainTest, SubscriberIdManualCheck) {
@@ -83,7 +83,7 @@ TEST(DomainTest, SubscriberIdManualCheck) {
 
 TEST(DomainTest, SubscriberId) {
   rc::check([](const uint8_t num) {
-    if (num > demux::MAX_SUBSCRIBER_NUM || num == 0) {
+    if (num > lshl::demux::MAX_SUBSCRIBER_NUM || num == 0) {
       ASSERT_THROW({ std::ignore = SubscriberId::create(num); }, std::invalid_argument);
     } else {
       const SubscriberId sub_id = SubscriberId::create(num);
@@ -95,7 +95,7 @@ TEST(DomainTest, SubscriberId) {
 
 TEST(DomainTest, AllSubscribersMask) {
   rc::check([](const uint8_t num) {
-    if (num > demux::MAX_SUBSCRIBER_NUM || num == 0) {
+    if (num > lshl::demux::MAX_SUBSCRIBER_NUM || num == 0) {
       ASSERT_THROW({ std::ignore = SubscriberId::all_subscribers_mask(num); }, std::invalid_argument);
     } else {
       const uint64_t all_mask = SubscriberId::all_subscribers_mask(num);

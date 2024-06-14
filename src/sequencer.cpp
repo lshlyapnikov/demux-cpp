@@ -1,7 +1,7 @@
 #include "./sequencer.h"
 #include <iostream>
 
-namespace demux {
+namespace lshl::demux {
 
 auto operator<<(std::ostream& os, const SequencerError& obj) -> std::ostream& {
   switch (obj) {
@@ -21,4 +21,4 @@ auto operator<<(std::ostream& os, const SequencerError& obj) -> std::ostream& {
   return os;
 }
 
-}  // namespace demux
+}  // namespace lshl::demux
