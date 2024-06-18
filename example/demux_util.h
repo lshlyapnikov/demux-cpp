@@ -8,17 +8,22 @@ namespace lshl::demux::example {
 
 namespace bipc = boost::interprocess;
 
+using std::size_t;
+using std::uint16_t;
+
 // NOLINTNEXTLINE(shadow)
 enum class PublisherResult { Success, SharedMemoryCreateError, UnexpectedError };
 
 // NOLINTNEXTLINE(shadow)
 enum class SubscriberResult { Success, SharedMemoryOpenError, UnexpectedError };
 
-template <size_t SHM, uint16_t M, bool B>
-  requires(SHM >= M + 2 + 8 + 8 && M > 0)
-auto publisher(const char* shared_mem_name, const uint8_t total_subscriber_num) -> PublisherResult;
+template <size_t SHM, size_t L, uint16_t M>
+  requires(SHM > L && L >= M + 2 && M > 0)
+auto publisher(const uint8_t total_subscriber_num) -> PublisherResult;
 
-auto subscriber(const SubscriberId& id) -> SubscriberResult;
+template <size_t L, uint16_t M>
+  requires(L >= M + 2 && M > 0)
+auto subscriber(const uint8_t subscriber_num) -> SubscriberResult;
 
 auto init_logging() -> void {
   namespace logging = boost::log;
