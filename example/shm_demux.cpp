@@ -1,5 +1,6 @@
 // #include <boost/log/core.hpp>
 // #include <boost/interprocess/shared_memory_object.hpp>
+#include "./shm_demux.h"
 #include <array>
 #include <atomic>
 #include <boost/exception/all.hpp>
@@ -9,10 +10,13 @@
 #include <boost/log/trivial.hpp>
 #include <cstdint>
 #include <cstdlib>
+#include <iostream>
 #include <span>
+#include <sstream>
 #include <stdexcept>
+#include <string>
 #include "../src/demultiplexer.h"
-#include "./demux_util.h"
+#include "./domain.h"
 
 namespace bipc = boost::interprocess;
 
@@ -39,13 +43,29 @@ constexpr std::uint16_t MESSAGE_SIZE = 256;
 
 }  // namespace lshl::demux::example
 
-auto main() -> int {
+auto main(int argc, char* argv[]) -> int {
   using namespace lshl::demux::example;
 
   init_logging();
 
-  publisher<SHARED_MEM_SIZE, BUFFER_SIZE, MESSAGE_SIZE>(3);
-  subscriber<BUFFER_SIZE, MESSAGE_SIZE>(1);
+  BOOST_LOG_TRIVIAL(info) << "argc: " << argc << ", argv[0]: " << argv[0];
+
+  if (argc == 1) {
+    // TODO(Leo): read `--total-number-of-subscribers` argument
+    start_publisher<SHARED_MEM_SIZE, BUFFER_SIZE, MESSAGE_SIZE>(3);
+  } else if (argc == 2) {
+    // TODO(Leo): read `--subscriber-number` argument
+    std::istringstream iss(argv[1]);
+    uint8_t subscriber_num;
+    if (iss >> subscriber_num) {
+      start_subscriber<BUFFER_SIZE, MESSAGE_SIZE>(subscriber_num);
+    } else {
+      BOOST_LOG_TRIVIAL(info) << "invalid subscriber number argument: " << argv[1];
+    }
+  } else {
+    BOOST_LOG_TRIVIAL(error)
+        << "Invalid number of arguments, expected 0 or exactly 1 argument which specifies subscriber number\n";
+  }
 
   return 0;
 }
@@ -59,8 +79,8 @@ using std::uint16_t;
 
 template <size_t SHM, size_t L, uint16_t M>
   requires(SHM > L && L >= M + 2 && M > 0)
-auto publisher(const uint8_t total_subscriber_num) -> PublisherResult {
-  BOOST_LOG_TRIVIAL(info) << "publisher SHARED_MEM_NAME: " << SHARED_MEM_NAME << ", size: " << SHM << ", L: " << L
+auto start_publisher(const uint8_t total_subscriber_num) -> PublisherResult {
+  BOOST_LOG_TRIVIAL(info) << "start_publisher SHARED_MEM_NAME: " << SHARED_MEM_NAME << ", size: " << SHM << ", L: " << L
                           << ", M: " << M << ", total_subscriber_num: " << total_subscriber_num;
 
   const ShmRemover remover(SHARED_MEM_NAME);
@@ -104,7 +124,7 @@ auto publisher(const uint8_t total_subscriber_num) -> PublisherResult {
 
 template <size_t L, uint16_t M>
   requires(L >= M + 2 && M > 0)
-auto subscriber(const uint8_t subscriber_num) -> SubscriberResult {
+auto start_subscriber(const uint8_t subscriber_num) -> SubscriberResult {
   BOOST_LOG_TRIVIAL(info) << "subscriber SHARED_MEM_NAME: " << SHARED_MEM_NAME << ", L: " << L << ", M: " << M
                           << ", subscriber_num: " << subscriber_num;
 
