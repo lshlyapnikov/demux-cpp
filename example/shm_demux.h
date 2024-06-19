@@ -47,12 +47,16 @@ auto init_logging() -> void {
   namespace logging = boost::log;
   namespace expr = boost::log::expressions;
   namespace keywords = boost::log::keywords;
+  namespace sinks = boost::log::sinks;
 
+  // Add Scope
   logging::add_common_attributes();
   logging::core::get()->add_global_attribute("Scope", logging::attributes::named_scope());
 
-  logging::add_console_log(
+  // Customize output format and enable auto_flush
+  boost::shared_ptr<sinks::sink> console_sink = logging::add_console_log(
       std::cout,
+      keywords::auto_flush = true,
       keywords::format =
           (expr::stream << expr::format_date_time<boost::posix_time::ptime>("TimeStamp", "%Y-%m-%d %H:%M:%S.%f") << " ["
                         << logging::trivial::severity << "] ["
@@ -60,8 +64,9 @@ auto init_logging() -> void {
                         << expr::format_named_scope("Scope", keywords::format = "%n", keywords::depth = 2) << "] "
                         << expr::smessage));
 
+  // Configure logging severity
   // NOLINTNEXTLINE(misc-include-cleaner)
-  logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::debug);
+  logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::info);
 }
 
 struct ShmRemover {

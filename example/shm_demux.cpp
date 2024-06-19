@@ -9,6 +9,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/log/expressions.hpp>
 #include <boost/log/trivial.hpp>
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
@@ -16,6 +17,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include "../src/demultiplexer.h"
 #include "./market_data.h"
 #include "shm_demux.h"
@@ -39,7 +41,7 @@ constexpr std::size_t PAGE_SIZE = 4096;
 // performs mapping operations over whole pages. So, you don't waste memory.
 constexpr std::size_t SHARED_MEM_SIZE = 16 * PAGE_SIZE;
 // names take up some space in the managed_shared_memory, 512 was enough
-constexpr std::size_t SHARED_MEM_UTIL_SIZE = 512;
+constexpr std::size_t SHARED_MEM_UTIL_SIZE = 512 + 32;
 constexpr std::size_t BUFFER_SIZE = SHARED_MEM_SIZE - SHARED_MEM_UTIL_SIZE;
 constexpr std::uint16_t MESSAGE_SIZE = 256;
 
@@ -118,12 +120,28 @@ auto start_publisher(const uint8_t total_subscriber_num, const uint64_t msg_num)
     array<uint8_t, L>* buffer = segment.construct<array<uint8_t, L>>("buffer")();
     BOOST_LOG_TRIVIAL(info) << "buffer allocated, free_memory: " << segment.get_free_memory();
 
+    atomic<uint64_t>* startup_sync = segment.construct<atomic<uint64_t>>("startup_sync")(0);
+    BOOST_LOG_TRIVIAL(info) << "startup_sync allocated, free_memory: " << segment.get_free_memory();
+
     lshl::demux::DemultiplexerPublisher<L, M, false> pub(
         all_subs_mask, span{*buffer}, message_count_sync, wraparound_sync);
     BOOST_LOG_TRIVIAL(info) << "DemultiplexerPublisher created, free_memory: " << segment.get_free_memory();
 
+    BOOST_LOG_TRIVIAL(info) << "waiting for all subscribers ...";
+    while (true) {
+      const uint64_t x = startup_sync->load();
+      if (x == all_subs_mask) {
+        break;
+      } else {
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(1s);
+      }
+    }
+    BOOST_LOG_TRIVIAL(info) << "all subscribers connected";
+
     run_publisher(pub, msg_num);
     BOOST_LOG_TRIVIAL(info) << "DemultiplexerPublisher completed, free_memory: " << segment.get_free_memory();
+
   } catch (const boost::interprocess::interprocess_exception& e) {
     BOOST_LOG_TRIVIAL(error) << "interprocess_exception: " << boost::diagnostic_information(e);
     return PublisherResult::SharedMemoryCreateError;
@@ -153,9 +171,9 @@ template <size_t L, uint16_t M>
         return false;
       case SendResult::Repeat:
         attempt += 1;
-        if (attempt % 1000 == 0) {
+        if (attempt % 1000000 == 0) {
           BOOST_LOG_TRIVIAL(warning) << "one or more subscribers are lagging, wraparound is blocked, send attempt: "
-                                     << attempt;
+                                     << attempt << ", publisher sequence: " << pub.message_count();
         }
         continue;
     }
@@ -177,6 +195,9 @@ auto run_publisher(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, const 
     const bool ok = send_(pub, std::span<uint8_t>{(uint8_t*)&md, md_size});
     if (!ok) {
       BOOST_LOG_TRIVIAL(error) << "dropping message, could not send: " << md;
+    }
+    if (i % 1000000 == 0) {
+      BOOST_LOG_TRIVIAL(info) << "number of messages sent: " << i;
     }
   }
 
@@ -206,10 +227,15 @@ auto start_subscriber(const uint8_t subscriber_num, const uint64_t msg_num) -> S
     array<uint8_t, L>* buffer = segment.find<array<uint8_t, L>>("buffer").first;
     BOOST_LOG_TRIVIAL(info) << "buffer found, free_memory: " << segment.get_free_memory();
 
+    atomic<uint64_t>* startup_sync = segment.find<atomic<uint64_t>>("startup_sync").first;
+    BOOST_LOG_TRIVIAL(info) << "startup_sync found, free_memory: " << segment.get_free_memory();
+
     const SubscriberId id = SubscriberId::create(subscriber_num);
 
     lshl::demux::DemultiplexerSubscriber<L, M> sub(id, span{*buffer}, message_count_sync, wraparound_sync);
     BOOST_LOG_TRIVIAL(info) << "DemultiplexerSubscriber created, free_memory: " << segment.get_free_memory();
+
+    startup_sync->fetch_or(id.mask());
 
     run_subscriber(sub, msg_num);
     BOOST_LOG_TRIVIAL(info) << "DemultiplexerSubscriber completed, free_memory: " << segment.get_free_memory();
@@ -243,8 +269,13 @@ auto run_subscriber(lshl::demux::DemultiplexerSubscriber<L, M>& sub, const uint6
       i += 1;
       const MarketDataUpdate* md = (MarketDataUpdate*)raw.data();
       BOOST_LOG_TRIVIAL(debug) << *md;
+      if (i % 1000000 == 0) {
+        BOOST_LOG_TRIVIAL(info) << "number of messages received: " << i;
+      }
     }
   }
+
+  BOOST_LOG_TRIVIAL(info) << "subscriber sequence number: " << sub.message_count();
 }
 
 }  // namespace lshl::demux::example
