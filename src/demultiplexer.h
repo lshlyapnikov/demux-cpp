@@ -146,7 +146,9 @@ class DemultiplexerSubscriber {
     BOOST_LOG_TRIVIAL(info) << "DemultiplexerSubscriber::constructor L: " << L << ", M: " << M << ", " << this->id_;
   }
 
-  /// @brief Does not block. Calls has_next.
+  /// @brief Does not block. Calls `has_next`. Returns a `span` pointing to the object in the circular buffer.
+  ///   Do not keep the reference to the returned span between `next` calls, the underlying bytes can be overriden
+  ///   when circular buffer wraps around.
   /// @return message or empty span if no data available.
   [[nodiscard]] auto next() noexcept -> const span<uint8_t>;
 
