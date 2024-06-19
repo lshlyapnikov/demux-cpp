@@ -14,12 +14,13 @@ cd "${__root}"
 
 msg_num=10000000
 
-./build/shm_demux pub 2 ${msg_num} > ./pub.out 2>&1 &
+./build/shm_demux pub 2 ${msg_num} > ./example-pub.out 2>&1 &
 
+# let the publisher start and initialize all shared memory objects
 sleep 2s
 
-./build/shm_demux sub 1 ${msg_num} &> ./sub-1.out &
+./build/shm_demux sub 1 ${msg_num} &> ./example-sub-1.out &
 
-./build/shm_demux sub 2 ${msg_num} &> ./sub-2.out &
+./build/shm_demux sub 2 ${msg_num} &> ./example-sub-2.out &
 
 ps -ef|grep -F "./build/shm_demux"

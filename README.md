@@ -1,6 +1,6 @@
-# C++ Demultiplexer Queue
+# C++ Lock-free Demultiplexer Queue
 
-Shared Memory Demultiplexer Queue. Single input (publisher), multiple outputs (subscribers).
+Lock-free (non-blocking), Shared Memory, Thread-safe Demultiplexer Queue. Single input (publisher), multiple outputs (subscribers).
 
 ## Building and Testing
 
@@ -10,22 +10,36 @@ Shared Memory Demultiplexer Queue. Single input (publisher), multiple outputs (s
 ./bin/init-cmake-build.sh
 ```
 
-### Build
+### Debug Build
 
 ```
 $ cmake --build ./build
 ```
 
-### Clean
+### Release Build
 
 ```
-$ cmake --build ./build --target clean
+$ cmake -DCMAKE_BUILD_TYPE=Release --build ./build
+```
+
+### Run Example
+
+[Shared Memory Demultiplexer Queue Example](./example/shm_demux.cpp)
+
+```
+$ ./bin/run-example.sh
 ```
 
 ### Run Tests
 
 ```
 $ cmake --build ./build --target test
+```
+
+### Clean
+
+```
+$ cmake --build ./build --target clean
 ```
 
 ### Profile with Valgrind
