@@ -82,7 +82,8 @@
     "typeinfo": "cpp",
     "variant": "cpp",
     "span": "cpp",
-    "future": "cpp"
+    "future": "cpp",
+    "strstream": "cpp"
   },
   "C_Cpp.default.cppStandard": "c++20",
   "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"

@@ -102,6 +102,7 @@ include_directories(
 add_executable(
   shm_demux
   example/shm_demux.cpp
+  example/market_data.cpp
 )
 target_link_libraries(
   shm_demux
