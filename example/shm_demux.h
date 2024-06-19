@@ -6,6 +6,7 @@
 #include <boost/log/trivial.hpp>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include "../src/demultiplexer.h"
 
 namespace lshl::demux::example {
@@ -56,6 +57,11 @@ struct ShmRemover {
       BOOST_LOG_TRIVIAL(error) << "could not remove shared_memory_object: " << this->name_;
     }
   }
+
+  ShmRemover(const ShmRemover&) = delete;                          // copy constructor
+  auto operator=(const ShmRemover&) -> ShmRemover& = delete;       // copy assignment
+  ShmRemover(ShmRemover&&) noexcept = default;                     // move constructor
+  auto operator=(ShmRemover&&) noexcept -> ShmRemover& = default;  // move assignment
 
  private:
   const char* name_;
