@@ -4,6 +4,16 @@ Lock-free (non-blocking), Shared Memory, Thread-safe Demultiplexer Queue. Single
 
 ## Building and Testing
 
+### Dev Environment Setup
+
+TODO: finish this section
+
+clang, boost, cltcache, CMake
+
+```
+$ pip3 install cltcache
+```
+
 ### Generate/Regenerate Project Makefile
 
 ```

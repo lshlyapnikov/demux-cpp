@@ -1,40 +1,39 @@
-// #include <boost/log/core.hpp>
-// #include <boost/interprocess/shared_memory_object.hpp>
+// NOLINTBEGIN(misc-include-cleaner)
+
 #include "./shm_demux.h"
 #include <array>
 #include <atomic>
-#include <boost/exception/all.hpp>
-#include <boost/interprocess/allocators/allocator.hpp>
+#include <boost/exception/diagnostic_information.hpp>
+#include <boost/exception/exception.hpp>
 #include <boost/interprocess/managed_shared_memory.hpp>
+#include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/expressions.hpp>
+#include <boost/log/support/date_time.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
+#include <boost/log/utility/setup/console.hpp>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <exception>
 #include <iostream>
+#include <limits>
 #include <span>
-#include <sstream>
-#include <stdexcept>
 #include <string>
 #include <thread>
 #include "../src/demultiplexer.h"
+#include "../src/domain.h"
 #include "./market_data.h"
-#include "shm_demux.h"
-
-namespace bipc = boost::interprocess;
-
-using lshl::demux::DemultiplexerPublisher;
-using lshl::demux::DemultiplexerSubscriber;
-using lshl::demux::SubscriberId;
-using lshl::demux::example::init_logging;
-using lshl::demux::example::PublisherResult;
-using lshl::demux::example::ShmRemover;
-using lshl::demux::example::SubscriberResult;
 
 namespace lshl::demux::example {
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays)
 constexpr char SHARED_MEM_NAME[] = "lshl_demux_example";
+
+constexpr int REPORT_PROGRESS = 1000000;
 
 constexpr std::size_t PAGE_SIZE = 4096;
 // total shared memory size, should be  a multiple of the page size (4kB on Linux). Because the operating system
@@ -56,24 +55,53 @@ auto print_usage(const char* prog) -> void {
             << std::numeric_limits<uint64_t>::max() << "] (uint64_t)\n";
 }
 
-auto main(int argc, char* argv[]) -> int {
-  using namespace lshl::demux::example;
+auto main(int argc, char* argv[]) noexcept -> int {
+  constexpr int ERROR = 100;
+  try {
+    const auto args = std::span<char*>(argv, static_cast<size_t>(argc));
+    return lshl::demux::example::main_(args);
+  } catch (const boost::exception& e) {
+    BOOST_LOG_TRIVIAL(error) << "boost::exception: " << boost::diagnostic_information(e);
+    return ERROR;
+  } catch (const std::exception& e) {
+    BOOST_LOG_TRIVIAL(error) << "std::exception: " << e.what();
+    return ERROR;
+  } catch (...) {
+    BOOST_LOG_TRIVIAL(error) << "unexpected exception";
+    return ERROR;
+  }
+}
+
+namespace lshl::demux::example {
+
+namespace bipc = boost::interprocess;
+
+using lshl::demux::DemultiplexerPublisher;
+using lshl::demux::DemultiplexerSubscriber;
+using lshl::demux::SubscriberId;
+using std::array;
+using std::atomic;
+using std::size_t;
+using std::uint16_t;
+
+auto main_(const std::span<char*> args) noexcept(false) -> int {
+  constexpr int ERROR = 200;
 
   init_logging();
 
-  if (argc != 4) {
-    print_usage(argv[0]);
-    return 1;
+  if (args.size() != 4) {
+    print_usage(args[0]);
+    return ERROR;
   }
 
-  const std::string command(argv[1]);
-  const uint16_t num16 = boost::lexical_cast<uint16_t>(argv[2]);
+  const std::string command(args[1]);
+  const auto num16 = boost::lexical_cast<uint16_t>(args[2]);
   if (num16 < 1 || num16 > std::numeric_limits<uint8_t>::max()) {
-    print_usage(argv[0]);
-    return 2;
+    print_usage(args[0]);
+    return ERROR;
   }
-  const uint8_t num8 = static_cast<uint8_t>(num16);
-  const uint64_t msg_num = boost::lexical_cast<uint64_t>(argv[3]);
+  const auto num8 = static_cast<uint8_t>(num16);
+  const auto msg_num = boost::lexical_cast<uint64_t>(args[3]);
 
   if (command == "pub") {
     BOOST_LOG_NAMED_SCOPE("pub");
@@ -82,85 +110,111 @@ auto main(int argc, char* argv[]) -> int {
     BOOST_LOG_NAMED_SCOPE("sub");
     start_subscriber<BUFFER_SIZE, MESSAGE_SIZE>(num8, msg_num);
   } else {
-    print_usage(argv[0]);
-    return 3;
+    print_usage(args[0]);
+    return ERROR;
   }
 
   return 0;
 }
 
-namespace lshl::demux::example {
+auto init_logging() noexcept -> void {
+  namespace logging = boost::log;
+  namespace expr = boost::log::expressions;
+  namespace keywords = boost::log::keywords;
+  namespace sinks = boost::log::sinks;
 
-using std::array;
-using std::atomic;
-using std::size_t;
-using std::uint16_t;
+  // Add Scope
+  logging::add_common_attributes();
+  logging::core::get()->add_global_attribute("Scope", logging::attributes::named_scope());
+
+  // Customize output format and enable auto_flush
+  const boost::shared_ptr<sinks::sink> console_sink = logging::add_console_log(
+      std::cout,
+      keywords::auto_flush = true,
+      keywords::format =
+          (expr::stream << expr::format_date_time<boost::posix_time::ptime>("TimeStamp", "%Y-%m-%d %H:%M:%S.%f") << " ["
+                        << logging::trivial::severity << "] ["
+                        << expr::attr<boost::log::attributes::current_thread_id::value_type>("ThreadID") << "] ["
+                        << expr::format_named_scope("Scope", keywords::format = "%n", keywords::depth = 2) << "] "
+                        << expr::smessage));
+
+  // Configure logging severity
+  // NOLINTNEXTLINE(misc-include-cleaner)
+  logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::info);
+}
 
 template <size_t SHM, size_t L, uint16_t M>
-  requires(SHM > L && L >= M + 2 && M > 0)
-auto start_publisher(const uint8_t total_subscriber_num, const uint64_t msg_num) -> PublisherResult {
+auto start_publisher(const uint8_t total_subscriber_num, const uint64_t msg_num) noexcept(false) -> void {
   BOOST_LOG_TRIVIAL(info) << "start_publisher SHARED_MEM_NAME: " << SHARED_MEM_NAME << ", size: " << SHM << ", L: " << L
                           << ", M: " << M << ", total_subscriber_num: " << static_cast<int>(total_subscriber_num);
 
   const ShmRemover remover(SHARED_MEM_NAME);
 
-  try {
-    const uint64_t all_subs_mask = lshl::demux::SubscriberId::all_subscribers_mask(total_subscriber_num);
+  const uint64_t all_subs_mask = SubscriberId::all_subscribers_mask(total_subscriber_num);
 
-    bipc::managed_shared_memory segment(bipc::create_only, SHARED_MEM_NAME, SHM);
-    BOOST_LOG_TRIVIAL(info) << "created shared_memory_object: " << SHARED_MEM_NAME
-                            << ", free_memory: " << segment.get_free_memory();
+  bipc::managed_shared_memory segment(bipc::create_only, SHARED_MEM_NAME, SHM);
+  BOOST_LOG_TRIVIAL(info) << "created shared_memory_object: " << SHARED_MEM_NAME
+                          << ", free_memory: " << segment.get_free_memory();
 
-    atomic<uint64_t>* message_count_sync = segment.construct<atomic<uint64_t>>("message_count_sync")(0);
-    BOOST_LOG_TRIVIAL(info) << "message_count_sync allocated, free_memory: " << segment.get_free_memory();
+  atomic<uint64_t>* message_count_sync = segment.construct<atomic<uint64_t>>("message_count_sync")(0);
+  BOOST_LOG_TRIVIAL(info) << "message_count_sync allocated, free_memory: " << segment.get_free_memory();
 
-    atomic<uint64_t>* wraparound_sync = segment.construct<atomic<uint64_t>>("wraparound_sync")(0);
-    BOOST_LOG_TRIVIAL(info) << "wraparound_sync allocated, free_memory: " << segment.get_free_memory();
+  atomic<uint64_t>* wraparound_sync = segment.construct<atomic<uint64_t>>("wraparound_sync")(0);
+  BOOST_LOG_TRIVIAL(info) << "wraparound_sync allocated, free_memory: " << segment.get_free_memory();
 
-    array<uint8_t, L>* buffer = segment.construct<array<uint8_t, L>>("buffer")();
-    BOOST_LOG_TRIVIAL(info) << "buffer allocated, free_memory: " << segment.get_free_memory();
+  array<uint8_t, L>* buffer = segment.construct<array<uint8_t, L>>("buffer")();
+  BOOST_LOG_TRIVIAL(info) << "buffer allocated, free_memory: " << segment.get_free_memory();
 
-    atomic<uint64_t>* startup_sync = segment.construct<atomic<uint64_t>>("startup_sync")(0);
-    BOOST_LOG_TRIVIAL(info) << "startup_sync allocated, free_memory: " << segment.get_free_memory();
+  atomic<uint64_t>* startup_sync = segment.construct<atomic<uint64_t>>("startup_sync")(0);
+  BOOST_LOG_TRIVIAL(info) << "startup_sync allocated, free_memory: " << segment.get_free_memory();
 
-    lshl::demux::DemultiplexerPublisher<L, M, false> pub(
-        all_subs_mask, span{*buffer}, message_count_sync, wraparound_sync);
-    BOOST_LOG_TRIVIAL(info) << "DemultiplexerPublisher created, free_memory: " << segment.get_free_memory();
+  lshl::demux::DemultiplexerPublisher<L, M, false> pub(
+      all_subs_mask, span{*buffer}, message_count_sync, wraparound_sync);
+  BOOST_LOG_TRIVIAL(info) << "DemultiplexerPublisher created, free_memory: " << segment.get_free_memory();
 
-    BOOST_LOG_TRIVIAL(info) << "waiting for all subscribers ...";
-    while (true) {
-      const uint64_t x = startup_sync->load();
-      if (x == all_subs_mask) {
-        break;
-      } else {
-        using namespace std::chrono_literals;
-        std::this_thread::sleep_for(1s);
-      }
+  BOOST_LOG_TRIVIAL(info) << "waiting for all subscribers ...";
+  while (true) {
+    const uint64_t x = startup_sync->load();
+    if (x == all_subs_mask) {
+      break;
+    } else {
+      using namespace std::chrono_literals;
+      std::this_thread::sleep_for(1s);
     }
-    BOOST_LOG_TRIVIAL(info) << "all subscribers connected";
-
-    run_publisher(pub, msg_num);
-    BOOST_LOG_TRIVIAL(info) << "DemultiplexerPublisher completed, free_memory: " << segment.get_free_memory();
-
-  } catch (const boost::interprocess::interprocess_exception& e) {
-    BOOST_LOG_TRIVIAL(error) << "interprocess_exception: " << boost::diagnostic_information(e);
-    return PublisherResult::SharedMemoryCreateError;
-  } catch (const boost::exception& e) {
-    BOOST_LOG_TRIVIAL(error) << "Unexpected boost::exception: " << boost::diagnostic_information(e);
-    return PublisherResult::UnexpectedError;
-  } catch (const std::exception& e) {
-    BOOST_LOG_TRIVIAL(error) << "Unexpected std::exception: " << e.what();
-    return PublisherResult::UnexpectedError;
-  } catch (...) {
-    BOOST_LOG_TRIVIAL(error) << "Unexpected error";
-    return PublisherResult::UnexpectedError;
   }
+  BOOST_LOG_TRIVIAL(info) << "all subscribers connected";
 
-  return PublisherResult::Success;
+  run_publisher_loop(pub, msg_num);
+  BOOST_LOG_TRIVIAL(info) << "DemultiplexerPublisher completed, free_memory: " << segment.get_free_memory();
 }
 
 template <size_t L, uint16_t M>
-[[nodiscard]] inline auto send_(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, const span<uint8_t> md) -> bool {
+auto run_publisher_loop(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, const uint64_t msg_num) noexcept
+    -> void {
+  BOOST_LOG_TRIVIAL(info) << "sending " << msg_num << " md updates ...";
+
+  MarketDataUpdate md{};
+  MarketDataUpdateGenerator md_gen{};
+  const size_t md_size = sizeof(MarketDataUpdate);
+
+  for (uint64_t i = 0; i < msg_num; ++i) {
+    md_gen.generate_market_data_update(&md);
+    BOOST_LOG_TRIVIAL(debug) << md;
+    const bool ok = send_(pub, std::span<uint8_t>{reinterpret_cast<uint8_t*>(&md), md_size});
+    if (!ok) {
+      BOOST_LOG_TRIVIAL(error) << "dropping message, could not send: " << md;
+    }
+    if (i % REPORT_PROGRESS == 0) {
+      BOOST_LOG_TRIVIAL(info) << "number of messages sent: " << i;
+    }
+  }
+
+  BOOST_LOG_TRIVIAL(info) << "publisher sequence number: " << pub.message_count();
+}
+
+template <size_t L, uint16_t M>
+[[nodiscard]] inline auto send_(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, const span<uint8_t> md) noexcept
+    -> bool {
   int attempt = 0;
   while (true) {
     const SendResult result = pub.send(md);
@@ -171,7 +225,7 @@ template <size_t L, uint16_t M>
         return false;
       case SendResult::Repeat:
         attempt += 1;
-        if (attempt % 1000000 == 0) {
+        if (attempt % REPORT_PROGRESS == 0) {
           BOOST_LOG_TRIVIAL(warning) << "one or more subscribers are lagging, wraparound is blocked, send attempt: "
                                      << attempt << ", publisher sequence: " << pub.message_count();
         }
@@ -181,85 +235,42 @@ template <size_t L, uint16_t M>
 }
 
 template <size_t L, uint16_t M>
-  requires(L >= M + 2 && M > 0)
-auto run_publisher(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, const uint64_t msg_num) -> void {
-  BOOST_LOG_TRIVIAL(info) << "sending " << msg_num << " md updates ...";
-
-  MarketDataUpdate md;
-  MarketDataUpdateGenerator md_gen;
-  const size_t md_size = sizeof(MarketDataUpdate);
-
-  for (uint64_t i = 0; i < msg_num; ++i) {
-    md_gen.generate_market_data_update(&md);
-    BOOST_LOG_TRIVIAL(debug) << md;
-    const bool ok = send_(pub, std::span<uint8_t>{(uint8_t*)&md, md_size});
-    if (!ok) {
-      BOOST_LOG_TRIVIAL(error) << "dropping message, could not send: " << md;
-    }
-    if (i % 1000000 == 0) {
-      BOOST_LOG_TRIVIAL(info) << "number of messages sent: " << i;
-    }
-  }
-
-  BOOST_LOG_TRIVIAL(info) << "publisher sequence number: " << pub.message_count();
-}
-
-template <size_t L, uint16_t M>
-  requires(L >= M + 2 && M > 0)
-auto start_subscriber(const uint8_t subscriber_num, const uint64_t msg_num) -> SubscriberResult {
+auto start_subscriber(const uint8_t subscriber_num, const uint64_t msg_num) noexcept(false) -> void {
   using lshl::demux::example::SHARED_MEM_NAME;
   using std::atomic;
 
   BOOST_LOG_TRIVIAL(info) << "subscriber SHARED_MEM_NAME: " << SHARED_MEM_NAME << ", L: " << L << ", M: " << M
                           << ", subscriber_num: " << static_cast<int>(subscriber_num);
 
-  try {
-    bipc::managed_shared_memory segment(bipc::open_only, SHARED_MEM_NAME);
-    BOOST_LOG_TRIVIAL(info) << "opened shared_memory_object: " << SHARED_MEM_NAME
-                            << ", free_memory: " << segment.get_free_memory();
+  bipc::managed_shared_memory segment(bipc::open_only, SHARED_MEM_NAME);
+  BOOST_LOG_TRIVIAL(info) << "opened shared_memory_object: " << SHARED_MEM_NAME
+                          << ", free_memory: " << segment.get_free_memory();
 
-    atomic<uint64_t>* message_count_sync = segment.find<atomic<uint64_t>>("message_count_sync").first;
-    BOOST_LOG_TRIVIAL(info) << "message_count_sync found, free_memory: " << segment.get_free_memory();
+  atomic<uint64_t>* message_count_sync = segment.find<atomic<uint64_t>>("message_count_sync").first;
+  BOOST_LOG_TRIVIAL(info) << "message_count_sync found, free_memory: " << segment.get_free_memory();
 
-    atomic<uint64_t>* wraparound_sync = segment.find<atomic<uint64_t>>("wraparound_sync").first;
-    BOOST_LOG_TRIVIAL(info) << "wraparound_sync found, free_memory: " << segment.get_free_memory();
+  atomic<uint64_t>* wraparound_sync = segment.find<atomic<uint64_t>>("wraparound_sync").first;
+  BOOST_LOG_TRIVIAL(info) << "wraparound_sync found, free_memory: " << segment.get_free_memory();
 
-    array<uint8_t, L>* buffer = segment.find<array<uint8_t, L>>("buffer").first;
-    BOOST_LOG_TRIVIAL(info) << "buffer found, free_memory: " << segment.get_free_memory();
+  array<uint8_t, L>* buffer = segment.find<array<uint8_t, L>>("buffer").first;
+  BOOST_LOG_TRIVIAL(info) << "buffer found, free_memory: " << segment.get_free_memory();
 
-    atomic<uint64_t>* startup_sync = segment.find<atomic<uint64_t>>("startup_sync").first;
-    BOOST_LOG_TRIVIAL(info) << "startup_sync found, free_memory: " << segment.get_free_memory();
+  atomic<uint64_t>* startup_sync = segment.find<atomic<uint64_t>>("startup_sync").first;
+  BOOST_LOG_TRIVIAL(info) << "startup_sync found, free_memory: " << segment.get_free_memory();
 
-    const SubscriberId id = SubscriberId::create(subscriber_num);
+  const SubscriberId id = SubscriberId::create(subscriber_num);
 
-    lshl::demux::DemultiplexerSubscriber<L, M> sub(id, span{*buffer}, message_count_sync, wraparound_sync);
-    BOOST_LOG_TRIVIAL(info) << "DemultiplexerSubscriber created, free_memory: " << segment.get_free_memory();
+  lshl::demux::DemultiplexerSubscriber<L, M> sub(id, span{*buffer}, message_count_sync, wraparound_sync);
+  BOOST_LOG_TRIVIAL(info) << "DemultiplexerSubscriber created, free_memory: " << segment.get_free_memory();
 
-    startup_sync->fetch_or(id.mask());
+  startup_sync->fetch_or(id.mask());
 
-    run_subscriber(sub, msg_num);
-    BOOST_LOG_TRIVIAL(info) << "DemultiplexerSubscriber completed, free_memory: " << segment.get_free_memory();
-
-  } catch (const boost::interprocess::interprocess_exception& e) {
-    BOOST_LOG_TRIVIAL(error) << "interprocess_exception: " << boost::diagnostic_information(e);
-    return SubscriberResult::SharedMemoryOpenError;
-  } catch (const boost::exception& e) {
-    BOOST_LOG_TRIVIAL(error) << "Unexpected boost::exception: " << boost::diagnostic_information(e);
-    return SubscriberResult::UnexpectedError;
-  } catch (const std::exception& e) {
-    BOOST_LOG_TRIVIAL(error) << "Unexpected std::exception: " << e.what();
-    return SubscriberResult::UnexpectedError;
-  } catch (...) {
-    BOOST_LOG_TRIVIAL(error) << "Unexpected error";
-    return SubscriberResult::UnexpectedError;
-  }
-
-  return SubscriberResult::Success;
+  run_subscriber_loop(sub, msg_num);
+  BOOST_LOG_TRIVIAL(info) << "DemultiplexerSubscriber completed, free_memory: " << segment.get_free_memory();
 }
 
 template <size_t L, uint16_t M>
-  requires(L >= M + 2 && M > 0)
-auto run_subscriber(lshl::demux::DemultiplexerSubscriber<L, M>& sub, const uint64_t msg_num) -> void {
+auto run_subscriber_loop(lshl::demux::DemultiplexerSubscriber<L, M>& sub, const uint64_t msg_num) noexcept -> void {
   assert(sub.message_count() == 0);
   assert(msg_num > 0);
 
@@ -267,9 +278,9 @@ auto run_subscriber(lshl::demux::DemultiplexerSubscriber<L, M>& sub, const uint6
     const span<uint8_t> raw = sub.next();
     if (!raw.empty()) {
       i += 1;
-      const MarketDataUpdate* md = (MarketDataUpdate*)raw.data();
+      const MarketDataUpdate* md = reinterpret_cast<MarketDataUpdate*>(raw.data());
       BOOST_LOG_TRIVIAL(debug) << *md;
-      if (i % 1000000 == 0) {
+      if (i % REPORT_PROGRESS == 0) {
         BOOST_LOG_TRIVIAL(info) << "number of messages received: " << i;
       }
     }
@@ -279,3 +290,5 @@ auto run_subscriber(lshl::demux::DemultiplexerSubscriber<L, M>& sub, const uint6
 }
 
 }  // namespace lshl::demux::example
+
+// NOLINTEND(misc-include-cleaner)

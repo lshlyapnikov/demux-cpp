@@ -1,76 +1,41 @@
 #ifndef LSHL_DEMUX_EXAMPLE_DEMUX_H
 #define LSHL_DEMUX_EXAMPLE_DEMUX_H
 
-#include <boost/interprocess/managed_shared_memory.hpp>
-#include <boost/log/attributes.hpp>
+#include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/log/attributes/named_scope.hpp>
-#include <boost/log/attributes/scoped_attribute.hpp>
-#include <boost/log/core.hpp>
-#include <boost/log/expressions.hpp>
-#include <boost/log/support/date_time.hpp>
 #include <boost/log/trivial.hpp>
-#include <boost/log/utility/setup/common_attributes.hpp>
-#include <boost/log/utility/setup/console.hpp>
-#include <iostream>
+#include <cstddef>
+#include <cstdint>
 #include "../src/demultiplexer.h"
 
 namespace lshl::demux::example {
 
-namespace bipc = boost::interprocess;
-
 using std::size_t;
 using std::uint16_t;
 
-// NOLINTNEXTLINE(shadow)
-enum class PublisherResult { Success, SharedMemoryCreateError, UnexpectedError };
-
-// NOLINTNEXTLINE(shadow)
-enum class SubscriberResult { Success, SharedMemoryOpenError, UnexpectedError };
+auto main_(std::span<char*> args) noexcept(false) -> int;
 
 template <size_t SHM, size_t L, uint16_t M>
-  requires(SHM > L && L >= M + 2 && M > 0)
-auto start_publisher(const uint8_t total_subscriber_num, const uint64_t msg_num) -> PublisherResult;
+auto start_publisher(uint8_t total_subscriber_num, uint64_t msg_num) noexcept(false) -> void;
 
 template <size_t L, uint16_t M>
-  requires(L >= M + 2 && M > 0)
-auto run_publisher(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, const uint64_t msg_num) -> void;
+auto run_publisher_loop(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, uint64_t msg_num) noexcept -> void;
 
 template <size_t L, uint16_t M>
-  requires(L >= M + 2 && M > 0)
-auto start_subscriber(const uint8_t subscriber_num, const uint64_t msg_num) -> SubscriberResult;
+[[nodiscard]] inline auto send_(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, span<uint8_t> md) noexcept
+    -> bool;
 
 template <size_t L, uint16_t M>
-  requires(L >= M + 2 && M > 0)
-auto run_subscriber(lshl::demux::DemultiplexerSubscriber<L, M>& sub, const uint64_t msg_num) -> void;
+auto start_subscriber(uint8_t subscriber_num, uint64_t msg_num) noexcept(false) -> void;
 
-auto init_logging() -> void {
-  namespace logging = boost::log;
-  namespace expr = boost::log::expressions;
-  namespace keywords = boost::log::keywords;
-  namespace sinks = boost::log::sinks;
+template <size_t L, uint16_t M>
+auto run_subscriber_loop(lshl::demux::DemultiplexerSubscriber<L, M>& sub, uint64_t msg_num) noexcept -> void;
 
-  // Add Scope
-  logging::add_common_attributes();
-  logging::core::get()->add_global_attribute("Scope", logging::attributes::named_scope());
-
-  // Customize output format and enable auto_flush
-  boost::shared_ptr<sinks::sink> console_sink = logging::add_console_log(
-      std::cout,
-      keywords::auto_flush = true,
-      keywords::format =
-          (expr::stream << expr::format_date_time<boost::posix_time::ptime>("TimeStamp", "%Y-%m-%d %H:%M:%S.%f") << " ["
-                        << logging::trivial::severity << "] ["
-                        << expr::attr<boost::log::attributes::current_thread_id::value_type>("ThreadID") << "] ["
-                        << expr::format_named_scope("Scope", keywords::format = "%n", keywords::depth = 2) << "] "
-                        << expr::smessage));
-
-  // Configure logging severity
-  // NOLINTNEXTLINE(misc-include-cleaner)
-  logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::info);
-}
+auto init_logging() noexcept -> void;
 
 struct ShmRemover {
-  ShmRemover(const char* name) : name_(name) {
+  explicit ShmRemover(const char* name) : name_(name) {
+    namespace bipc = boost::interprocess;
     BOOST_LOG_NAMED_SCOPE("startup");
     const bool ok = bipc::shared_memory_object::remove(this->name_);
     if (ok) {
@@ -82,6 +47,7 @@ struct ShmRemover {
   }
 
   ~ShmRemover() {
+    namespace bipc = boost::interprocess;
     BOOST_LOG_NAMED_SCOPE("shutdown");
     const bool ok = bipc::shared_memory_object::remove(this->name_);
     if (ok) {

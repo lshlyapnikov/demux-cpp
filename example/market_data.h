@@ -1,8 +1,6 @@
 #ifndef LSHL_DEMUX_EXAMPLE_MARKET_DATA_H
 #define LSHL_DEMUX_EXAMPLE_MARKET_DATA_H
 
-#include <chrono>
-#include <cstddef>
 #include <cstdint>
 #include <iostream>
 #include <random>
@@ -32,13 +30,15 @@ class MarketDataUpdateGenerator {
  public:
   auto generate_market_data_update(MarketDataUpdate* output) -> void;
 
+  static constexpr uint64_t PRICE_MULTIPLIER = 1000000000;
+  static constexpr uint32_t SIZE_MULTIPLIER = 100;
+
  private:
   auto generate_side_() -> Side;
   auto generate_level_() -> uint8_t;
   auto generate_price_() -> uint64_t;
   auto generate_size_() -> uint32_t;
 
-  std::chrono::steady_clock clock_;
   std::mt19937 engine_;
   std::uniform_int_distribution<uint32_t> distU32_;
   std::uniform_int_distribution<uint8_t> distU8_;

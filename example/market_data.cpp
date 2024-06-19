@@ -1,10 +1,16 @@
 #include "./market_data.h"
 #include <chrono>
+#include <cstdint>
 #include <iostream>
+#include <limits>
 #include <random>
 #include "market_data.h"
 
 namespace lshl::demux::example {
+
+using std::uint32_t;
+using std::uint64_t;
+using std::uint8_t;
 
 auto operator<<(std::ostream& os, const Side& side) -> std::ostream& {
   switch (side) {
@@ -24,7 +30,8 @@ auto operator<<(std::ostream& os, const MarketDataUpdate& md) -> std::ostream& {
 }
 
 auto MarketDataUpdateGenerator::generate_market_data_update(MarketDataUpdate* output) -> void {
-  const std::chrono::time_point<std::chrono::steady_clock, std::chrono::nanoseconds> now = this->clock_.now();
+  const std::chrono::time_point<std::chrono::steady_clock, std::chrono::nanoseconds> now =
+      std::chrono::steady_clock::now();
   const uint64_t x = static_cast<uint64_t>(now.time_since_epoch().count());
   output->timestamp = x;
   output->instrument_id = this->distU32_(engine_);
@@ -44,11 +51,11 @@ inline auto MarketDataUpdateGenerator::generate_level_() -> uint8_t {
 }
 
 inline auto MarketDataUpdateGenerator::generate_price_() -> uint64_t {
-  return static_cast<uint64_t>(1000000000) * (distU32_(engine_) % std::numeric_limits<uint16_t>::max());
+  return MarketDataUpdateGenerator::PRICE_MULTIPLIER * (distU32_(engine_) % std::numeric_limits<uint16_t>::max());
 }
 
 inline auto MarketDataUpdateGenerator::generate_size_() -> uint32_t {
-  return static_cast<uint32_t>(100) * (distU32_(engine_) % std::numeric_limits<uint16_t>::max());
+  return MarketDataUpdateGenerator::SIZE_MULTIPLIER * (distU32_(engine_) % std::numeric_limits<uint16_t>::max());
 }
 
 }  // namespace lshl::demux::example
