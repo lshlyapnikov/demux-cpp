@@ -1,6 +1,7 @@
 // NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner)
 
 #define UNIT_TEST
+#undef NDEBUG  // for assert to work in release build
 
 #include "../src/demultiplexer.h"
 #include <gtest/gtest.h>
