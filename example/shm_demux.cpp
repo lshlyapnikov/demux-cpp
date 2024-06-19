@@ -201,10 +201,10 @@ auto run_publisher_loop(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, c
   for (uint64_t i = 0; i < msg_num; ++i) {
     md_gen.generate_market_data_update(&md);
     BOOST_LOG_TRIVIAL(debug) << md;
-    // serialize the object
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-    const span<uint8_t> data{reinterpret_cast<uint8_t*>(&md), md_size};
-    const bool ok = send_(pub, data);
+    const span<uint8_t> raw{reinterpret_cast<uint8_t*>(&md), md_size};
+    // send will copy the raw bytes into the circular buffer, we can re-use the md object
+    const bool ok = send_(pub, raw);
     if (!ok) {
       BOOST_LOG_TRIVIAL(error) << "dropping message, could not send: " << md;
     }
@@ -282,7 +282,7 @@ auto run_subscriber_loop(lshl::demux::DemultiplexerSubscriber<L, M>& sub, const 
     const span<uint8_t> raw = sub.next();
     if (!raw.empty()) {
       i += 1;
-      // deserialize the object
+      // do NOT keep the reference to the object retrieved from the circular buffer, it may get overriden!!!
       // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
       const MarketDataUpdate* md = reinterpret_cast<MarketDataUpdate*>(raw.data());
       BOOST_LOG_TRIVIAL(debug) << *md;
