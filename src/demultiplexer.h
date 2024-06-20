@@ -166,7 +166,7 @@ class DemultiplexerSubscriber {
 
   template <class T>
   [[nodiscard]] auto next_object() noexcept -> const std::optional<const T*> {
-    const span<uint8_t> raw = next();
+    const span<uint8_t> raw = this->next();
     if (raw.empty()) {
       return std::nullopt;
     } else {
