@@ -1,58 +1,87 @@
 # C++ Lock-free Demultiplexer Queue
 
-Lock-free (non-blocking), Shared Memory, Thread-safe Demultiplexer Queue. Single input (publisher), multiple outputs (subscribers).
+**A Lock-free, Thread-safe, Shared Memory Friendly Demultiplexer Queue** designed for high-performance concurrent programming. This queue supports a single producer (publisher) and multiple consumers (subscribers), ensuring efficient data distribution without the need for locking mechanisms. The architecture is optimized for shared memory environments, making it ideal for applications that require fast, non-blocking communication between threads.
 
-## Building and Testing
+_Description generated with the assistance of ChatGPT._
 
-### Dev Environment Setup
+## Development Environment
 
-TODO: finish this section
+This project was developed and tested exclusively on Linux using Clang version 17.0.6.
 
-clang, boost, cltcache, CMake
+**Prerequisites:**
+
+- **CMake 3.16.3**
+- **Boost 1.83.0:** Configured in the [CMakeList.txt](./CMakeLists.txt)
+- **Clang 17.0.6:** Configured in the [.envrc](./.envrc)
+- **direnv** (optional): An environment variable manager for your shell. More information can be found [here](https://direnv.net/)
+
+## Setting Project Environment Variables
+
+### Using `direnv`
 
 ```
-$ pip3 install cltcache
+$ direnv allow .
 ```
 
-### Generate/Regenerate Project Makefile
+### Without `direnv`
 
 ```
-./bin/init-cmake-build.sh
+$ source ./.envrc
 ```
 
-### Debug Build
+## Generate Project Makefile with CMake
+
+To generate the Makefile for your project using CMake:
+
+```
+$ ./bin/init-cmake-build.sh
+```
+
+## Build (Debug)
+
+To build the project in debug mode:
 
 ```
 $ cmake --build ./build
 ```
 
-### Release Build
+## Build (Release)
+
+To build the project in release mode:
 
 ```
 $ cmake -DCMAKE_BUILD_TYPE=Release --build ./build
 ```
 
-### Run Example
+## Run Tests
 
-[Shared Memory Demultiplexer Queue Example](./example/shm_demux.cpp)
-
-```
-$ ./bin/run-example.sh
-```
-
-### Run Tests
+Execute tests using the following command:
 
 ```
 $ cmake --build ./build --target test
 ```
 
-### Clean
+## Run Example
+
+Explore a usage example of the Shared Memory Demultiplexer Queue: [./example/shm_demux.cpp](./example/shm_demux.cpp)
+
+To run the example:
+
+```
+$ ./bin/run-example.sh
+```
+
+## Clean Build Artifacts
+
+To clean build artifacts:
 
 ```
 $ cmake --build ./build --target clean
 ```
 
-### Profile with Valgrind
+## Profiling with Valgrind
+
+For memory profiling with Valgrind:
 
 ```
 $ valgrind --leak-check=full --show-leak-kinds=all ./build/demultiplexer_test
@@ -69,9 +98,11 @@ $ valgrind --leak-check=full --show-leak-kinds=all ./build/demultiplexer_test
   - [Arbitrary Generators](https://github.com/emil-e/rapidcheck/blob/master/doc/generators.md#arbitrary)
   - [Configuration](https://github.com/emil-e/rapidcheck/blob/master/doc/configuration.md)
 - [Boost Library Documentation](https://www.boost.org/doc/libs/)
-  - [Boost.Program_options](https://www.boost.org/doc/libs/1_83_0/doc/html/program_options.html)
   - [Boost.Interprocess](https://www.boost.org/doc/libs/1_83_0/doc/html/interprocess.html)
     - [Sharing memory between processes](https://www.boost.org/doc/libs/1_83_0/doc/html/interprocess/sharedmemorybetweenprocesses.html)
     - [Managed Memory Segments](https://www.boost.org/doc/libs/1_83_0/doc/html/interprocess/managed_memory_segments.html)
-- [MoldUDP64 Protocol Specification](https://www.nasdaqtrader.com/content/technicalsupport/specifications/dataproducts/moldudp64.pdf)
+  - [Boost.Program_options](https://www.boost.org/doc/libs/1_83_0/doc/html/program_options.html)
+- [xxHash - Extremely fast hash algorithm](https://github.com/Cyan4973/xxHash)
+- [Valgrind](https://valgrind.org/)
 - [FlatBuffers](https://flatbuffers.dev/flatbuffers_guide_use_cpp.html)
+- [MoldUDP64 Protocol Specification](https://www.nasdaqtrader.com/content/technicalsupport/specifications/dataproducts/moldudp64.pdf)

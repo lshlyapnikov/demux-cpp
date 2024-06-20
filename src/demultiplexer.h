@@ -67,7 +67,7 @@ class DemultiplexerPublisher {
   template <class T>
     requires(sizeof(T) <= M)
   [[nodiscard]] auto send_object(const T& source) -> SendResult {
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-type-const-cast, modernize-use-auto)
     uint8_t* x = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(&source));
     constexpr size_t X = sizeof(T);
     const span<uint8_t, X> raw{x, X};
@@ -129,7 +129,6 @@ class DemultiplexerPublisher {
     this->message_count_sync_->store(this->message_count_);
   }
 
-  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
   uint64_t all_subs_mask_;
 
   size_t position_{0};
@@ -165,11 +164,12 @@ class DemultiplexerSubscriber {
   [[nodiscard]] auto next() noexcept -> const span<uint8_t>;
 
   template <class T>
-  [[nodiscard]] auto next_object() noexcept -> const std::optional<const T*> {
+  [[nodiscard]] auto next_object() noexcept -> std::optional<const T*> {
     const span<uint8_t> raw = this->next();
     if (raw.empty()) {
       return std::nullopt;
     } else {
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
       const T* x = reinterpret_cast<const T*>(raw.data());
       return std::make_optional(std::move(x));
     }

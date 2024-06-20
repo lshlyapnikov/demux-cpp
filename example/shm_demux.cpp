@@ -1,4 +1,6 @@
-// NOLINTBEGIN(misc-include-cleaner)
+// NOLINTBEGIN(misc-include-cleaner, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
+
+#define XXH_INLINE_ALL  // <xxhash.h>
 
 #include "./shm_demux.h"
 #include <xxhash.h>
@@ -24,6 +26,7 @@
 #include <limits>
 #include <optional>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include "../src/demultiplexer.h"
@@ -36,6 +39,7 @@ namespace lshl::demux::example {
 constexpr char SHARED_MEM_NAME[] = "lshl_demux_example";
 
 constexpr int REPORT_PROGRESS = 1000000;
+constexpr size_t INT64_HEX_MAX_CHAR_LEN = 16;
 
 constexpr std::size_t PAGE_SIZE = 4096;
 // total shared memory size, should be  a multiple of the page size (4kB on Linux). Because the operating system
@@ -142,7 +146,7 @@ auto init_logging() noexcept -> void {
                         << expr::smessage));
 
   // Configure logging severity
-  logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::debug);
+  logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::info);
 }
 
 template <size_t SHM, size_t L, uint16_t M>
@@ -191,13 +195,21 @@ auto start_publisher(const uint8_t total_subscriber_num, const uint64_t msg_num)
 }
 
 template <size_t L, uint16_t M>
-auto run_publisher_loop(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, const uint64_t msg_num) noexcept
+auto run_publisher_loop(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, const uint64_t msg_num) noexcept(false)
     -> void {
   BOOST_LOG_TRIVIAL(info) << "sending " << msg_num << " md updates ...";
 
+  XXH64_state_t* const state = XXH64_createState();
+  if (nullptr == state) {
+    throw std::domain_error("XXH64_createState failed");
+  }
+  const XXH64_state_remover remover{state};
+  if (XXH64_reset(state, 0) == XXH_ERROR) {
+    throw std::domain_error("XXH64_reset failed");
+  }
+
   MarketDataUpdate md{};
   MarketDataUpdateGenerator md_gen{};
-  // const size_t md_size = sizeof(MarketDataUpdate);
 
   for (uint64_t i = 0; i < msg_num; ++i) {
     md_gen.generate_market_data_update(&md);
@@ -205,13 +217,20 @@ auto run_publisher_loop(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, c
     const bool ok = send_(pub, md);
     if (!ok) {
       BOOST_LOG_TRIVIAL(error) << "dropping message, could not send: " << md;
+      continue;
     }
     if (i % REPORT_PROGRESS == 0) {
       BOOST_LOG_TRIVIAL(info) << "number of messages sent: " << i;
     }
+    if (XXH64_update(state, &md, sizeof(MarketDataUpdate)) == XXH_ERROR) {
+      BOOST_LOG_TRIVIAL(error) << "XXH64_update failed for: " << md;
+    }
   }
 
-  BOOST_LOG_TRIVIAL(info) << "publisher sequence number: " << pub.message_count();
+  XXH64_hash_t const hash = XXH64_digest(state);
+
+  BOOST_LOG_TRIVIAL(info) << "publisher sequence number: " << pub.message_count() << ", XXH64_hash: " << std::hex
+                          << std::setw(INT64_HEX_MAX_CHAR_LEN) << std::setfill('0') << hash << std::dec;
 }
 
 template <class T, size_t L, uint16_t M>
@@ -271,25 +290,38 @@ auto start_subscriber(const uint8_t subscriber_num, const uint64_t msg_num) noex
 }
 
 template <size_t L, uint16_t M>
-auto run_subscriber_loop(lshl::demux::DemultiplexerSubscriber<L, M>& sub, const uint64_t msg_num) noexcept -> void {
-  assert(sub.message_count() == 0);
-  assert(msg_num > 0);
+auto run_subscriber_loop(lshl::demux::DemultiplexerSubscriber<L, M>& sub, const uint64_t msg_num) noexcept(false)
+    -> void {
+  XXH64_state_t* const state = XXH64_createState();
+  if (nullptr == state) {
+    throw std::domain_error("XXH64_createState failed");
+  }
+  const XXH64_state_remover remover{state};
+  if (XXH64_reset(state, 0) == XXH_ERROR) {
+    throw std::domain_error("XXH64_reset failed");
+  }
 
   for (uint64_t i = 0; i < msg_num;) {
     const std::optional<const MarketDataUpdate*> read = sub.template next_object<MarketDataUpdate>();
     if (read.has_value()) {
-      i += 1;
       const MarketDataUpdate* md = read.value();
+      i += 1;
       BOOST_LOG_TRIVIAL(debug) << *md;
       if (i % REPORT_PROGRESS == 0) {
         BOOST_LOG_TRIVIAL(info) << "number of messages received: " << i;
       }
+      if (XXH64_update(state, md, sizeof(MarketDataUpdate)) == XXH_ERROR) {
+        BOOST_LOG_TRIVIAL(error) << "XXH64_update failed for: " << md;
+      }
     }
   }
 
-  BOOST_LOG_TRIVIAL(info) << "subscriber sequence number: " << sub.message_count();
+  XXH64_hash_t const hash = XXH64_digest(state);
+
+  BOOST_LOG_TRIVIAL(info) << "subscriber sequence number: " << sub.message_count() << ", XXH64_hash: " << std::hex
+                          << std::setw(INT64_HEX_MAX_CHAR_LEN) << std::setfill('0') << hash << std::dec;
 }
 
 }  // namespace lshl::demux::example
 
-// NOLINTEND(misc-include-cleaner)
+// NOLINTEND(misc-include-cleaner, cppcoreguidelines-pro-bounds-array-to-pointer-decay)

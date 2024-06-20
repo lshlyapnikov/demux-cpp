@@ -6,6 +6,8 @@ BasedOnStyle: Chromium
 Language: Cpp
 ColumnLimit: 120
 
+CommentPragmas: "^NOLINT"
+
 BinPackArguments: false
 BinPackParameters: false
 # AllowAllArgumentsOnNextLine: true

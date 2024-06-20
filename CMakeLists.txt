@@ -93,21 +93,6 @@ include_directories(
 # artifacts
 #
 
-# add_executable(
-#   ${PROJECT_NAME}
-#   src/main.cpp
-# )
-# target_link_libraries(
-#   ${PROJECT_NAME}
-#   sequencer
-#   atomic
-#   Boost::log
-# )
-# target_compile_options(
-#   ${PROJECT_NAME}
-#   PRIVATE ${MY_CXX_FLAGS}
-# )
-
 add_executable(
   shm_demux
   example/shm_demux.cpp
@@ -131,15 +116,6 @@ add_library(
 )
 target_compile_options(
   domain
-  PRIVATE ${MY_CXX_FLAGS}
-)
-
-add_library(
-  sequencer
-  OBJECT src/sequencer.cpp
-)
-target_compile_options(
-  sequencer
   PRIVATE ${MY_CXX_FLAGS}
 )
 
@@ -170,24 +146,6 @@ target_compile_options(
   PRIVATE ${MY_CXX_FLAGS}
 )
 gtest_discover_tests(domain_test)
-
-add_executable(
-  sequencer_test
-  test/sequencer_test.cpp
-)
-target_link_libraries(
-  sequencer_test
-  sequencer
-  demultiplexer
-  domain
-  atomic
-  GTest::gtest_main
-)
-target_compile_options(
-  sequencer_test
-  PRIVATE ${MY_CXX_FLAGS}
-)
-gtest_discover_tests(sequencer_test)
 
 add_executable(
   message_buffer_test

@@ -18,6 +18,7 @@ echo "Running clang-tidy..."
 #     find "${HOME}/.cltcache" -mtime +60 -0 | xargs rm
 # fi
 
-cltcache clang-tidy-17 -p=./build "$@"
+clang-tidy-17 -p=./build "$@"
+# cltcache clang-tidy-17 -p=./build "$@"
 # clang-tidy-17 -p=./build ./src/* ./test/*
 # clang-tidy-17 -p=./build ./src/*.cpp ./test/*.cpp

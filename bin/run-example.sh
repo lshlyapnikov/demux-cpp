@@ -12,16 +12,26 @@ __root="$(cd "$(dirname "${__dir}")" && pwd)"
 
 cd "${__root}"
 
-#msg_num=10000000
-msg_num=100
+msg_num=${1:-10000000}
 
-./build/shm_demux pub 2 ${msg_num} > ./example-pub.out 2>&1 &
+# start publisher
+./build/shm_demux pub 2 "${msg_num}" > ./example-pub.out 2>&1 &
+pub_pid="$!"
 
 # let the publisher start and initialize all shared memory objects
 sleep 2s
 
-./build/shm_demux sub 1 ${msg_num} &> ./example-sub-1.out &
+# start subscribers
 
-./build/shm_demux sub 2 ${msg_num} &> ./example-sub-2.out &
+./build/shm_demux sub 1 "${msg_num}" &> ./example-sub-1.out &
+./build/shm_demux sub 2 "${msg_num}" &> ./example-sub-2.out &
 
-ps -ef|grep -F "./build/shm_demux"
+# report the state
+#ps -ef|grep -F "./build/shm_demux"
+pgrep --full --list-full "./build/shm_demux"
+
+# wait for publisher to exist
+wait "$pub_pid"
+
+# find the generated XXH64_hash values
+grep --color=auto -F "XXH64_hash:" ./example-*.out

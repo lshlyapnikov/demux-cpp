@@ -25,17 +25,7 @@ using std::uint8_t;
 //   T value_;
 // };
 
-// class ClientId {
-//  public:
-//   ClientId(uint16_t value) : value_(value) {}
-
-//   auto value() const noexcept -> uint16_t { return this->value_; }
-
-//  private:
-//   uint16_t value_;
-// };
-
-const uint8_t MAX_SUBSCRIBER_NUM = sizeof(uint64_t) * 8;  // 64
+constexpr uint8_t MAX_SUBSCRIBER_NUM = sizeof(uint64_t) * 8;  // 64
 
 [[nodiscard]] constexpr auto is_valid_subscriber_number(uint8_t num) noexcept -> bool {
   return 1 <= num && num <= MAX_SUBSCRIBER_NUM;

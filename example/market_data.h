@@ -15,7 +15,16 @@ enum class Side { Bid, Ask };
 
 auto operator<<(std::ostream& os, const Side& side) -> std::ostream&;
 
+// NOLINTBEGIN(misc-non-private-member-variables-in-classes)
 struct MarketDataUpdate {
+  MarketDataUpdate() = default;   // constructor
+  ~MarketDataUpdate() = default;  // destructor
+  // guarantees that it is only passed by reference or via a pointer
+  MarketDataUpdate(const MarketDataUpdate&) = delete;                         // copy constructor
+  auto operator=(const MarketDataUpdate&) -> MarketDataUpdate& = delete;      // copy assignment
+  MarketDataUpdate(MarketDataUpdate&&) noexcept = delete;                     // move constructor
+  auto operator=(MarketDataUpdate&&) noexcept -> MarketDataUpdate& = delete;  // move assignment
+
   uint64_t timestamp;
   uint32_t instrument_id;
   Side side;
@@ -23,6 +32,7 @@ struct MarketDataUpdate {
   uint64_t price;
   uint32_t size;
 };
+// NOLINTEND(misc-non-private-member-variables-in-classes)
 
 auto operator<<(std::ostream& os, const MarketDataUpdate& md) -> std::ostream&;
 
