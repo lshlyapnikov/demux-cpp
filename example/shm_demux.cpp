@@ -1,6 +1,7 @@
 // NOLINTBEGIN(misc-include-cleaner)
 
 #include "./shm_demux.h"
+#include <xxhash.h>
 #include <array>
 #include <atomic>
 #include <boost/exception/diagnostic_information.hpp>
@@ -21,6 +22,7 @@
 #include <exception>
 #include <iostream>
 #include <limits>
+#include <optional>
 #include <span>
 #include <string>
 #include <thread>
@@ -140,8 +142,7 @@ auto init_logging() noexcept -> void {
                         << expr::smessage));
 
   // Configure logging severity
-  // NOLINTNEXTLINE(misc-include-cleaner)
-  logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::info);
+  logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::debug);
 }
 
 template <size_t SHM, size_t L, uint16_t M>
@@ -196,15 +197,12 @@ auto run_publisher_loop(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, c
 
   MarketDataUpdate md{};
   MarketDataUpdateGenerator md_gen{};
-  const size_t md_size = sizeof(MarketDataUpdate);
+  // const size_t md_size = sizeof(MarketDataUpdate);
 
   for (uint64_t i = 0; i < msg_num; ++i) {
     md_gen.generate_market_data_update(&md);
     BOOST_LOG_TRIVIAL(debug) << md;
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-    const span<uint8_t> raw{reinterpret_cast<uint8_t*>(&md), md_size};
-    // send will copy the raw bytes into the circular buffer, we can re-use the md object
-    const bool ok = send_(pub, raw);
+    const bool ok = send_(pub, md);
     if (!ok) {
       BOOST_LOG_TRIVIAL(error) << "dropping message, could not send: " << md;
     }
@@ -216,12 +214,11 @@ auto run_publisher_loop(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, c
   BOOST_LOG_TRIVIAL(info) << "publisher sequence number: " << pub.message_count();
 }
 
-template <size_t L, uint16_t M>
-[[nodiscard]] inline auto send_(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, const span<uint8_t> md) noexcept
-    -> bool {
+template <class T, size_t L, uint16_t M>
+[[nodiscard]] inline auto send_(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, const T& md) noexcept -> bool {
   int attempt = 0;
   while (true) {
-    const SendResult result = pub.send(md);
+    const SendResult result = pub.send_object(md);
     switch (result) {
       case SendResult::Success:
         return true;
@@ -279,12 +276,10 @@ auto run_subscriber_loop(lshl::demux::DemultiplexerSubscriber<L, M>& sub, const 
   assert(msg_num > 0);
 
   for (uint64_t i = 0; i < msg_num;) {
-    const span<uint8_t> raw = sub.next();
-    if (!raw.empty()) {
+    const std::optional<const MarketDataUpdate*> read = sub.template next_object<MarketDataUpdate>();
+    if (read.has_value()) {
       i += 1;
-      // do NOT keep the reference to the object retrieved from the circular buffer, it may get overriden!!!
-      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-      const MarketDataUpdate* md = reinterpret_cast<MarketDataUpdate*>(raw.data());
+      const MarketDataUpdate* md = read.value();
       BOOST_LOG_TRIVIAL(debug) << *md;
       if (i % REPORT_PROGRESS == 0) {
         BOOST_LOG_TRIVIAL(info) << "number of messages received: " << i;

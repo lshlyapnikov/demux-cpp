@@ -12,7 +12,8 @@ __root="$(cd "$(dirname "${__dir}")" && pwd)"
 
 cd "${__root}"
 
-msg_num=10000000
+#msg_num=10000000
+msg_num=100
 
 ./build/shm_demux pub 2 ${msg_num} > ./example-pub.out 2>&1 &
 

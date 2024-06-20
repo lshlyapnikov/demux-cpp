@@ -6,8 +6,10 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <span>
 #include <tuple>
+#include <utility>
 #include "./domain.h"
 #include "./message_buffer.h"
 
@@ -60,6 +62,16 @@ class DemultiplexerPublisher {
     } else {
       return this->send_non_blocking_(source);
     }
+  }
+
+  template <class T>
+    requires(sizeof(T) <= M)
+  [[nodiscard]] auto send_object(const T& source) -> SendResult {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    uint8_t* x = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(&source));
+    constexpr size_t X = sizeof(T);
+    const span<uint8_t, X> raw{x, X};
+    return this->send_safe<X>(raw);
   }
 
   template <uint16_t N>
@@ -151,6 +163,17 @@ class DemultiplexerSubscriber {
   ///   when circular buffer wraps around. Copy the content of the returned span if you need to keep the reference.
   /// @return message or empty span if no data available.
   [[nodiscard]] auto next() noexcept -> const span<uint8_t>;
+
+  template <class T>
+  [[nodiscard]] auto next_object() noexcept -> const std::optional<const T*> {
+    const span<uint8_t> raw = next();
+    if (raw.empty()) {
+      return std::nullopt;
+    } else {
+      const T* x = reinterpret_cast<const T*>(raw.data());
+      return std::make_optional(std::move(x));
+    }
+  }
 
   [[nodiscard]] auto has_next() noexcept -> bool;
 

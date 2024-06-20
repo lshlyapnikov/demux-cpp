@@ -59,6 +59,14 @@ include(FetchContent)
 set(FETCHCONTENT_QUIET OFF)
 
 FetchContent_Declare(
+  xxhash
+  SYSTEM
+  GIT_REPOSITORY git@github.com:Cyan4973/xxHash.git
+  GIT_TAG 805c00b68fa754200ada0c207ffeaa7a4409377c
+)
+FetchContent_MakeAvailable(xxhash)
+
+FetchContent_Declare(
   googletest
   SYSTEM
   URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
@@ -77,6 +85,7 @@ FetchContent_MakeAvailable(rapidcheck)
 # system include directories do not raise compiler warnings
 include_directories(
   SYSTEM ${Boost_INCLUDE_DIR}
+  SYSTEM ${xxhash_SOURCE_DIR}
   SYSTEM ${rapidcheck_SOURCE_DIR}/include
 )
 

@@ -22,9 +22,8 @@ auto start_publisher(uint8_t total_subscriber_num, uint64_t msg_num) noexcept(fa
 template <size_t L, uint16_t M>
 auto run_publisher_loop(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, uint64_t msg_num) noexcept -> void;
 
-template <size_t L, uint16_t M>
-[[nodiscard]] inline auto send_(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, span<uint8_t> md) noexcept
-    -> bool;
+template <class T, size_t L, uint16_t M>
+[[nodiscard]] inline auto send_(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, const T& md) noexcept -> bool;
 
 template <size_t L, uint16_t M>
 auto start_subscriber(uint8_t subscriber_num, uint64_t msg_num) noexcept(false) -> void;
