@@ -33,8 +33,8 @@ enum SendResult {
 /// @brief Demultiplexer publisher.
 /// @tparam L total buffer size in bytes.
 /// @tparam M max message size in bytes.
-/// @tparam B if true send will busy-spin while waiting for all subscribers to catch up during a wraparound, if false
-///   it returns with SendResult::Repeat immediately.
+/// @tparam B if true send will busy-spin while waiting for all subscribers to catch up during a wraparound,
+/// if false it returns with SendResult::Repeat immediately.
 template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
 class DemultiplexerPublisher {
@@ -64,6 +64,13 @@ class DemultiplexerPublisher {
     }
   }
 
+  /// @brief Serializes the `source` object of type `T` using `reinterpret_cast` and copies it into the circular
+  /// buffer. `T` must be a simple, flat class without references to other objects; otherwise, behavior is
+  /// unspecified.
+  /// @see [reinterpret_cast documentation](https://en.cppreference.com/w/cpp/language/reinterpret_cast)
+  /// @tparam T
+  /// @param source
+  /// @return
   template <class T>
     requires(sizeof(T) <= M)
   [[nodiscard]] auto send_object(const T& source) -> SendResult {
@@ -163,6 +170,12 @@ class DemultiplexerSubscriber {
   /// @return message or empty span if no data available.
   [[nodiscard]] auto next() noexcept -> const span<uint8_t>;
 
+  /// @brief Receives a reference to the next message in the circular buffer and deserializes the raw bytes into the
+  /// object of type `T` using `reinterpret_cast`. `T` must be a simple, flat class without references to other
+  /// objects; otherwise, behavior is unspecified.
+  /// @see [reinterpret_cast documentation](https://en.cppreference.com/w/cpp/language/reinterpret_cast)
+  /// @tparam T
+  /// @return optional `T`.
   template <class T>
   [[nodiscard]] auto next_object() noexcept -> std::optional<const T*> {
     const span<uint8_t> raw = this->next();
