@@ -48,7 +48,7 @@ constexpr std::size_t SHARED_MEM_SIZE = 16 * PAGE_SIZE;
 // names take up some space in the managed_shared_memory, 512 was enough
 constexpr std::size_t SHARED_MEM_UTIL_SIZE = 512 + 32;
 constexpr std::size_t BUFFER_SIZE = SHARED_MEM_SIZE - SHARED_MEM_UTIL_SIZE;
-constexpr std::uint16_t MESSAGE_SIZE = 256;
+constexpr std::uint16_t MAX_MESSAGE_SIZE = 256;
 
 }  // namespace lshl::demux::example
 
@@ -112,10 +112,10 @@ auto main_(const span<char*> args) noexcept(false) -> int {
 
   if (command == "pub") {
     BOOST_LOG_NAMED_SCOPE("pub");
-    start_publisher<SHARED_MEM_SIZE, BUFFER_SIZE, MESSAGE_SIZE>(num8, msg_num);
+    start_publisher<SHARED_MEM_SIZE, BUFFER_SIZE, MAX_MESSAGE_SIZE>(num8, msg_num);
   } else if (command == "sub") {
     BOOST_LOG_NAMED_SCOPE("sub");
-    start_subscriber<BUFFER_SIZE, MESSAGE_SIZE>(num8, msg_num);
+    start_subscriber<BUFFER_SIZE, MAX_MESSAGE_SIZE>(num8, msg_num);
   } else {
     print_usage(args[0]);
     return ERROR;
@@ -211,7 +211,7 @@ auto run_publisher_loop(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, c
   MarketDataUpdate md{};
   MarketDataUpdateGenerator md_gen{};
 
-  for (uint64_t i = 0; i < msg_num; ++i) {
+  for (uint64_t i = 1; i <= msg_num; ++i) {
     md_gen.generate_market_data_update(&md);
     BOOST_LOG_TRIVIAL(debug) << md;
     const bool ok = send_(pub, md);

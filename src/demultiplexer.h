@@ -27,14 +27,13 @@ enum SendResult {
   Error,    // message cannot be sent, log error and drop it
 };
 
-// TODO(Leo): make sure the size of the shared memory is a multiple of the page size. Because the operating system
-// TODO(Leo): performs mapping operations over whole pages. So, you don't waste memory.
-//
 /// @brief Demultiplexer publisher.
-/// @tparam L total buffer size in bytes.
-/// @tparam M max message size in bytes.
-/// @tparam B if true send will busy-spin while waiting for all subscribers to catch up during a wraparound,
-/// if false it returns with SendResult::Repeat immediately.
+/// @tparam `L` The size of the circular buffer in bytes. When allocating the buffer in shared memory,
+/// ensure that `L` is a multiple of the OS page size. This is because the Linux operating system
+/// maps memory in whole pages, preventing memory waste.
+/// @tparam `M` The maximum message size in bytes.
+/// @tparam `B` If `true`, `send` will block/busy-spin while waiting for all subscribers to catch up during a
+/// wraparound synchronization. If `false`, it will return immediately with `SendResult::Repeat`.
 template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
 class DemultiplexerPublisher {
@@ -51,6 +50,9 @@ class DemultiplexerPublisher {
                             << ", all_subs_mask_: " << this->all_subs_mask_;
   }
 
+  /// @brief Sends/copies the `source` into the buffer.
+  /// @param `source` message that will be copied into the circular buffer.
+  /// @return
   [[nodiscard]] auto send(const span<uint8_t>& source) noexcept -> SendResult {
     const size_t n = source.size();
     if (n == 0 || n > M) {
@@ -66,10 +68,11 @@ class DemultiplexerPublisher {
 
   /// @brief Serializes the `source` object of type `T` using `reinterpret_cast` and copies it into the circular
   /// buffer. `T` must be a simple, flat class without references to other objects; otherwise, behavior is
-  /// unspecified.
+  /// unspecified. Consider using custom serialization/deserialization with `send` and `next` that take and return
+  /// `span`.
   /// @see [reinterpret_cast documentation](https://en.cppreference.com/w/cpp/language/reinterpret_cast)
-  /// @tparam T
-  /// @param source
+  /// @tparam `T`
+  /// @param `source` message that will be copied into the circular buffer.
   /// @return
   template <class T>
     requires(sizeof(T) <= M)
@@ -81,6 +84,10 @@ class DemultiplexerPublisher {
     return this->send_safe<X>(raw);
   }
 
+  /// @brief does not check the size of the `span`, it is checked at compiles time, see the `requires` clause.
+  /// @tparam `N` the message size.
+  /// @param `source` message that will be copied into the circular buffer.
+  /// @return
   template <uint16_t N>
     requires(0 < N && N <= M)
   [[nodiscard]] auto send_safe(const span<uint8_t, N>& source) noexcept -> SendResult {
@@ -112,15 +119,15 @@ class DemultiplexerPublisher {
 #endif  // UNIT_TEST
 
  private:
-  /// @brief will block/busy-spin while waiting for subscribers to catch up before a wraparound.
-  /// @param source -- message to send.
+  /// @brief Blocks/busy-spins while waiting for subscribers to catch up during a wraparound.
+  /// @param `source` message to send.
   /// @param recursion_level.
   /// @return SendResult.
   [[nodiscard]] auto send_blocking_(const span<uint8_t>& source, uint8_t recursion_level) noexcept -> SendResult;
 
-  /// @brief does not block while waiting for subscriber to catch up, returns SendResult::Repeat instead.
-  /// @param source -- message to send.
-  /// @return SendResult.
+  /// @brief does not block while waiting for subscribers to catch up, returns `SendResult::Repeat` instead.
+  /// @param `source` message to send.
+  /// @return `SendResult`.
   [[nodiscard]] auto send_non_blocking_(const span<uint8_t>& source) noexcept -> SendResult;
 
   auto wait_for_subs_to_catch_up_and_wraparound_() noexcept -> void;
@@ -147,8 +154,8 @@ class DemultiplexerPublisher {
 };
 
 /// @brief Demultiplexer subscriber. Should be mapped into shared memory allocated by DemultiplexerPublisher.
-/// @tparam L total buffer size in bytes.
-/// @tparam M max message size in bytes.
+/// @tparam `L` The size of the circular buffer in bytes.
+/// @tparam `M` The max message size in bytes.
 template <size_t L, uint16_t M>
   requires(L >= M + 2 && M > 0)
 class DemultiplexerSubscriber {
@@ -165,14 +172,15 @@ class DemultiplexerSubscriber {
   }
 
   /// @brief Does not block. Calls `has_next`. Returns a `span` pointing to the object in the circular buffer.
-  ///   Do not keep the reference to the returned span between `next` calls, the underlying bytes can be overriden
+  ///   Do not keep the reference to the returned `span` between `next` calls, the underlying bytes can be overriden
   ///   when circular buffer wraps around. Copy the content of the returned span if you need to keep the reference.
   /// @return message or empty span if no data available.
   [[nodiscard]] auto next() noexcept -> const span<uint8_t>;
 
   /// @brief Receives a reference to the next message in the circular buffer and deserializes the raw bytes into the
   /// object of type `T` using `reinterpret_cast`. `T` must be a simple, flat class without references to other
-  /// objects; otherwise, behavior is unspecified.
+  /// objects; otherwise, behavior is unspecified. Consider using custom serialization/deserialization with `send`
+  /// and `next` that take and return `span`.
   /// @see [reinterpret_cast documentation](https://en.cppreference.com/w/cpp/language/reinterpret_cast)
   /// @tparam T
   /// @return optional `T`.
@@ -250,7 +258,7 @@ auto DemultiplexerPublisher<L, M, B>::send_non_blocking_(const span<uint8_t>& so
     }
   }
 
-  // it either writes the entire message or nothing
+  // writes the entire message or nothing
   const size_t written = this->buffer_.write(this->position_, source);
   if (written > 0) {
     this->position_ += written;

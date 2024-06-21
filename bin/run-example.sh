@@ -14,14 +14,18 @@ cd "${__root}"
 
 msg_num=${1:-10000000}
 
-# start publisher
+valgrind_cmd="valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --log-file=valgrind.out"
+
+echo "To enable valgrind profiling place valgrind_cmd infront of the pub or sub: ${valgrind_cmd}"
+
+# start publisher expecting 2 subscribers
 ./build/shm_demux pub 2 "${msg_num}" > ./example-pub.out 2>&1 &
 pub_pid="$!"
 
-# let the publisher start and initialize all shared memory objects
+# let the publisher start and initialize all shared memory objects, it will wait for both subscribers
 sleep 2s
 
-# start subscribers
+# start 2 subscribers
 
 ./build/shm_demux sub 1 "${msg_num}" &> ./example-sub-1.out &
 ./build/shm_demux sub 2 "${msg_num}" &> ./example-sub-2.out &
@@ -30,8 +34,8 @@ sleep 2s
 #ps -ef|grep -F "./build/shm_demux"
 pgrep --full --list-full "./build/shm_demux"
 
-# wait for publisher to exist
+# wait for publisher to exit
 wait "$pub_pid"
 
-# find the generated XXH64_hash values
+# find the generated XXH64_hash values for manual check
 grep --color=auto -F "XXH64_hash:" ./example-*.out

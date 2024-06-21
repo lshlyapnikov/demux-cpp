@@ -1,6 +1,6 @@
 # C++ Lock-free Demultiplexer Queue
 
-**A Lock-free, Thread-safe, Shared Memory Friendly Demultiplexer Queue** designed for high-performance concurrent programming. This queue supports a single producer (publisher) and multiple consumers (subscribers), ensuring efficient data distribution without the need for locking mechanisms. The architecture is optimized for shared memory environments, making it ideal for applications that require fast, non-blocking communication between threads.
+**A Lock-free, Thread-safe, Shared Memory Friendly Demultiplexer Queue** designed for high-performance concurrent programming. This queue supports a single producer (publisher) and multiple consumers (subscribers), ensuring efficient data distribution without the need for locking mechanisms. The queue features zero-copy on the consumer side and is optimized for shared memory environments, making it ideal for applications requiring fast, non-blocking communication between threads or processes.
 
 _Description generated with the assistance of ChatGPT._
 
@@ -81,10 +81,34 @@ $ cmake --build ./build --target clean
 
 ## Profiling with Valgrind
 
-For memory profiling with Valgrind:
+For memory profiling with Valgrind, start a publisher under valgrind:
 
 ```
-$ valgrind --leak-check=full --show-leak-kinds=all ./build/demultiplexer_test
+$ valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --log-file=valgrind.out ./build/shm_demux pub 1 1000
+```
+
+Start a subscriber:
+
+```
+$ ./build/shm_demux sub 1 1000
+```
+
+**Notes:** `--track-origins=yes` can be slow.
+
+You can also uncomment `valgrind_cmd` definition in `./bin/run-example.sh` and place it in front of the publisher or subscriber command:
+
+```
+valgrind_cmd="valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --log-file=valgrind.out"
+
+${valgrind_cmd} ./build/shm_demux pub 2 "${msg_num}" > ./example-pub.out 2>&1 &
+```
+
+or
+
+```
+valgrind_cmd="valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --log-file=valgrind.out"
+
+${valgrind_cmd} ./build/shm_demux sub 1 "${msg_num}" &> ./example-sub-1.out &
 ```
 
 ## Links
@@ -103,6 +127,7 @@ $ valgrind --leak-check=full --show-leak-kinds=all ./build/demultiplexer_test
     - [Managed Memory Segments](https://www.boost.org/doc/libs/1_83_0/doc/html/interprocess/managed_memory_segments.html)
   - [Boost.Program_options](https://www.boost.org/doc/libs/1_83_0/doc/html/program_options.html)
 - [xxHash - Extremely fast hash algorithm](https://github.com/Cyan4973/xxHash)
+- [HdrHistogram](http://hdrhistogram.org/)
 - [Valgrind](https://valgrind.org/)
 - [FlatBuffers](https://flatbuffers.dev/flatbuffers_guide_use_cpp.html)
 - [MoldUDP64 Protocol Specification](https://www.nasdaqtrader.com/content/technicalsupport/specifications/dataproducts/moldudp64.pdf)
