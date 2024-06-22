@@ -1,6 +1,7 @@
 #ifndef LSHL_DEMUX_EXAMPLE_DEMUX_H
 #define LSHL_DEMUX_EXAMPLE_DEMUX_H
 
+#include <hdr/hdr_histogram.h>
 #include <xxhash.h>
 #include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/log/attributes/named_scope.hpp>
@@ -14,6 +15,8 @@ namespace lshl::demux::example {
 
 using std::size_t;
 using std::uint16_t;
+
+auto init_logging() noexcept -> void;
 
 auto main_(std::span<char*> args) noexcept(false) -> int;
 
@@ -33,7 +36,7 @@ auto start_subscriber(uint8_t subscriber_num, uint64_t msg_num) noexcept(false) 
 template <size_t L, uint16_t M>
 auto run_subscriber_loop(lshl::demux::DemultiplexerSubscriber<L, M>& sub, uint64_t msg_num) noexcept(false) -> void;
 
-auto init_logging() noexcept -> void;
+auto calculate_latency(uint64_t x0) -> int64_t;
 
 struct ShmRemover {
   explicit ShmRemover(const char* name) : name_(name) {
@@ -79,6 +82,19 @@ struct XXH64_state_remover {
 
  private:
   XXH64_state_t* const state_;
+};
+
+struct HDR_histogram_remover {
+  explicit HDR_histogram_remover(hdr_histogram* histogram) : histogram_(histogram){};
+  ~HDR_histogram_remover() { hdr_close(this->histogram_); }
+
+  HDR_histogram_remover(const HDR_histogram_remover&) = delete;                         // copy constructor
+  auto operator=(const HDR_histogram_remover&) -> HDR_histogram_remover& = delete;      // copy assignment
+  HDR_histogram_remover(HDR_histogram_remover&&) noexcept = delete;                     // move constructor
+  auto operator=(HDR_histogram_remover&&) noexcept -> HDR_histogram_remover& = delete;  // move assignment
+
+ private:
+  hdr_histogram* const histogram_;
 };
 
 }  // namespace lshl::demux::example

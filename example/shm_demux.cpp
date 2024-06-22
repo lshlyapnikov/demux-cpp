@@ -3,6 +3,7 @@
 #define XXH_INLINE_ALL  // <xxhash.h>
 
 #include "./shm_demux.h"
+#include <hdr/hdr_histogram.h>
 #include <xxhash.h>
 #include <array>
 #include <atomic>
@@ -292,24 +293,43 @@ auto start_subscriber(const uint8_t subscriber_num, const uint64_t msg_num) noex
 template <size_t L, uint16_t M>
 auto run_subscriber_loop(lshl::demux::DemultiplexerSubscriber<L, M>& sub, const uint64_t msg_num) noexcept(false)
     -> void {
+  // initialize XXH64 hashing
   XXH64_state_t* const state = XXH64_createState();
   if (nullptr == state) {
     throw std::domain_error("XXH64_createState failed");
   }
-  const XXH64_state_remover remover{state};
+  const XXH64_state_remover remover1{state};
   if (XXH64_reset(state, 0) == XXH_ERROR) {
     throw std::domain_error("XXH64_reset failed");
   }
 
+  // initialize hdr_histogram
+  const int64_t lowest_discernible_value = 1L;          // Minimum value that can be tracked
+  const int64_t highest_trackable_value = 3600000000L;  // Maximum value to be tracked (e.g., 1 hour in microseconds)
+  const int significant_figures = 1;                    // Number of significant figures to maintain
+
+  hdr_histogram* histogram = nullptr;
+  if (hdr_init(lowest_discernible_value, highest_trackable_value, significant_figures, &histogram) != 0) {
+    throw std::domain_error("hdr_init failed");
+  }
+  const HDR_histogram_remover remover2{histogram};
+
+  // consume the expected number of messages
   for (uint64_t i = 0; i < msg_num;) {
     const std::optional<const MarketDataUpdate*> read = sub.template next_object<MarketDataUpdate>();
     if (read.has_value()) {
-      const MarketDataUpdate* md = read.value();
       i += 1;
+      const MarketDataUpdate* md = read.value();
+      // track the latency
+      if (!hdr_record_value(histogram, calculate_latency(md->timestamp))) {
+        BOOST_LOG_TRIVIAL(error) << "hdr_record_value failed for: " << md;
+      }
+      // report progress
       BOOST_LOG_TRIVIAL(debug) << *md;
       if (i % REPORT_PROGRESS == 0) {
         BOOST_LOG_TRIVIAL(info) << "number of messages received: " << i;
       }
+      // calculate the hash code
       if (XXH64_update(state, md, sizeof(MarketDataUpdate)) == XXH_ERROR) {
         BOOST_LOG_TRIVIAL(error) << "XXH64_update failed for: " << md;
       }
@@ -317,9 +337,18 @@ auto run_subscriber_loop(lshl::demux::DemultiplexerSubscriber<L, M>& sub, const 
   }
 
   XXH64_hash_t const hash = XXH64_digest(state);
-
   BOOST_LOG_TRIVIAL(info) << "subscriber sequence number: " << sub.message_count() << ", XXH64_hash: " << std::hex
                           << std::setw(INT64_HEX_MAX_CHAR_LEN) << std::setfill('0') << hash << std::dec;
+
+  BOOST_LOG_TRIVIAL(info) << "message latency, ns:";
+  hdr_percentiles_print(histogram, stdout, 2, 1.0, format_type::CLASSIC);
+}
+
+auto calculate_latency(const uint64_t x0) -> int64_t {
+  const std::chrono::time_point<std::chrono::steady_clock, std::chrono::nanoseconds> now =
+      std::chrono::steady_clock::now();
+  const uint64_t x1 = static_cast<uint64_t>(now.time_since_epoch().count());
+  return static_cast<int64_t>(x1 - x0);
 }
 
 }  // namespace lshl::demux::example

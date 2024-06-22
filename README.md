@@ -4,6 +4,28 @@
 
 _Description generated with the assistance of ChatGPT._
 
+## Shared Memory Demultiplexer Queue Latency (ns)
+
+Test conducted on my laptop without CPU isolation or CPU pinning. Refer to the **Run Example** section for more details.
+
+```
+       Value   Percentile   TotalCount 1/(1-Percentile)
+
+       167.0     0.000000            5         1.00
+       215.0     0.250000      3022092         1.33
+       239.0     0.500000      5339846         2.00
+       271.0     0.750000      8128375         4.00
+       271.0     0.812500      8128375         5.33
+       303.0     0.906250      9243185        10.67
+     98303.0     0.999999     10000000   1048576.00
+     98303.0     1.000000     10000000          inf
+#[Mean    =      473.791, StdDeviation   =     2617.481]
+#[Max     =    98303.000, Total count    =     10000000]
+#[Buckets =           28, SubBuckets     =           32]
+```
+
+![Latency By Percentile Distribution](./doc/LatencyHistogram.png)
+
 ## Development Environment
 
 This project was developed and tested exclusively on Linux using Clang version 17.0.6.
