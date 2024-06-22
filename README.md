@@ -24,8 +24,6 @@ Test conducted on my laptop without CPU isolation or CPU pinning. Refer to the *
 #[Buckets =           28, SubBuckets     =           32]
 ```
 
-![Latency By Percentile Distribution](./doc/LatencyHistogram.png)
-
 ## Development Environment
 
 This project was developed and tested exclusively on Linux using Clang version 17.0.6.
