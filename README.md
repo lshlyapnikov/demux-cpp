@@ -4,7 +4,7 @@
 
 _Description generated with the assistance of ChatGPT._
 
-## Shared Memory Demultiplexer Queue Latency (ns)
+## 1. Shared Memory Demultiplexer Queue Latency (ns)
 
 Test conducted on my laptop without CPU isolation or CPU pinning. Refer to the **Run Example** section for more details.
 
@@ -24,7 +24,7 @@ Test conducted on my laptop without CPU isolation or CPU pinning. Refer to the *
 #[Buckets =           28, SubBuckets     =           32]
 ```
 
-## Development Environment
+## 2. Development Environment
 
 This project was developed and tested exclusively on Linux using Clang version 17.0.6.
 
@@ -33,23 +33,24 @@ This project was developed and tested exclusively on Linux using Clang version 1
 - **CMake 3.16.3**
 - **Boost 1.83.0:** Configured in the [CMakeList.txt](./CMakeLists.txt)
 - **Clang 17.0.6:** Configured in the [.envrc](./.envrc)
+- **gperftools** (optional)
 - **direnv** (optional): An environment variable manager for your shell. More information can be found [here](https://direnv.net/)
 
-## Setting Project Environment Variables
+## 3. Setting Project Environment Variables
 
-### Using `direnv`
+### 3.1. Using `direnv`
 
 ```
 $ direnv allow .
 ```
 
-### Without `direnv`
+### 3.2. Without `direnv`
 
 ```
 $ source ./.envrc
 ```
 
-## Generate Project Makefile with CMake
+## 4.Generate Project Makefile with CMake
 
 To generate the Makefile for your project using CMake:
 
@@ -57,7 +58,7 @@ To generate the Makefile for your project using CMake:
 $ ./bin/init-cmake-build.sh
 ```
 
-## Build (Debug)
+## 5. Build (Debug)
 
 To build the project in debug mode:
 
@@ -65,7 +66,7 @@ To build the project in debug mode:
 $ cmake --build ./build
 ```
 
-## Build (Release)
+## 6. Build (Release)
 
 To build the project in release mode:
 
@@ -73,7 +74,7 @@ To build the project in release mode:
 $ cmake -DCMAKE_BUILD_TYPE=Release --build ./build
 ```
 
-## Run Tests
+## 7. Run Tests
 
 Execute tests using the following command:
 
@@ -81,7 +82,7 @@ Execute tests using the following command:
 $ cmake --build ./build --target test
 ```
 
-## Run Example
+## 8. Run Example
 
 Explore a usage example of the Shared Memory Demultiplexer Queue: [./example/shm_demux.cpp](./example/shm_demux.cpp)
 
@@ -91,7 +92,7 @@ To run the example:
 $ ./bin/run-example.sh
 ```
 
-## Clean Build Artifacts
+## 9. Clean Build Artifacts
 
 To clean build artifacts:
 
@@ -99,27 +100,12 @@ To clean build artifacts:
 $ cmake --build ./build --target clean
 ```
 
-## Profiling with Valgrind
+## 9. Memory Profiling with Valgrind
 
-For memory profiling with Valgrind, start a publisher under valgrind:
-
-```
-$ valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --log-file=valgrind.out ./build/shm_demux pub 1 1000
-```
-
-Start a subscriber:
-
-```
-$ ./build/shm_demux sub 1 1000
-```
-
-**Notes:** `--track-origins=yes` can be slow.
-
-You can also uncomment `valgrind_cmd` definition in `./bin/run-example.sh` and place it in front of the publisher or subscriber command:
+### 9.1. modify `run-example.sh`
 
 ```
 valgrind_cmd="valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --log-file=valgrind.out"
-
 ${valgrind_cmd} ./build/shm_demux pub 2 "${msg_num}" > ./example-pub.out 2>&1 &
 ```
 
@@ -127,8 +113,57 @@ or
 
 ```
 valgrind_cmd="valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --log-file=valgrind.out"
-
 ${valgrind_cmd} ./build/shm_demux sub 1 "${msg_num}" &> ./example-sub-1.out &
+```
+
+### 9.2. Run the example script
+
+```
+$ ./bin/run-example.sh
+```
+
+**Notes:** `--track-origins=yes` can be slow. The report will be generated in the `valgrind.out` file.
+
+## 10. Performance Profiling with gperftools (Google Performance Tools)
+
+https://github.com/gperftools/gperftools/tree/master
+
+### 10.1. Update `CMakeLists.txt`
+
+To enable optimization in the Debug build, replace `-O0` with `-O3` in the `CMAKE_CXX_FLAGS_DEBUG` definition. This will allow the Debug build to compile with optimization:
+
+```
+set(CMAKE_CXX_FLAGS_DEBUG "-gdwarf-4 -O3")
+```
+
+Add `profiler` to the `target_link_libraries(shm_demux ...)` section to include `-lprofiler` linking option:
+
+```
+target_link_libraries(
+  shm_demux
+...
+  profiler
+)
+```
+
+### 10.2. Modify `run-example.sh`
+
+Define `CPUPROFILE` to generate a profile file named `shm_demux_pub.prof`:
+
+```
+CPUPROFILE=shm_demux_pub.prof ./build/shm_demux pub 2 "${msg_num}" > ./example-pub.out 2>&1 &
+```
+
+### 10.3. Run the example script
+
+```
+$ ./bin/run-example.sh
+```
+
+### 10.4. Generate the profiling report
+
+```
+$ google-pprof --text ./build/shm_demux ./shm_demux_pub.prof &> pprof-report.out
 ```
 
 ## Links
@@ -149,5 +184,7 @@ ${valgrind_cmd} ./build/shm_demux sub 1 "${msg_num}" &> ./example-sub-1.out &
 - [xxHash - Extremely fast hash algorithm](https://github.com/Cyan4973/xxHash)
 - [HdrHistogram](http://hdrhistogram.org/)
 - [Valgrind](https://valgrind.org/)
+- [gperftools (originally Google Performance Tools)](https://github.com/gperftools/gperftools)
+  - google-perftools package
 - [FlatBuffers](https://flatbuffers.dev/flatbuffers_guide_use_cpp.html)
 - [MoldUDP64 Protocol Specification](https://www.nasdaqtrader.com/content/technicalsupport/specifications/dataproducts/moldudp64.pdf)

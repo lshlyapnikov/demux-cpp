@@ -3,6 +3,7 @@ project(demux-cpp VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_VERBOSE_MAKEFILE ON) # verbose CMake output
 
+# standard CMake build types: Debug, Release, RelWithDebInfo, MinSizeRel
 message("CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
 
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
@@ -14,6 +15,8 @@ ELSE()
   SET(CMAKE_BUILD_TYPE Release)
 ENDIF()
 
+#message("CMAKE_ENABLE_PROFILING=${CMAKE_ENABLE_PROFILING}")
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -23,7 +26,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(MY_CXX_FLAGS -Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wconversion -Wsign-conversion -Werror)
 
 # valgrind needs -gdwarf-4
-set(CMAKE_CXX_FLAGS_DEBUG "-gdwarf-4 -O0")
+set(CMAKE_CXX_FLAGS_DEBUG "-gdwarf-4 -O0") # -03 for gperftools
+# set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+# set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
+# set(CMAKE_CXX_FLAGS_MINSIZEREL "-Os")
 
 #
 # tools
@@ -116,6 +122,7 @@ target_link_libraries(
   hdr_histogram
   rt
   Boost::log
+  profiler
 )
 target_compile_options(
   shm_demux
