@@ -1,7 +1,6 @@
 #ifndef LSHL_DEMUX_EXAMPLE_DEMUX_H
 #define LSHL_DEMUX_EXAMPLE_DEMUX_H
 
-#include <xxhash.h>
 #include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/trivial.hpp>
@@ -14,6 +13,8 @@ namespace lshl::demux::example {
 
 using std::size_t;
 using std::uint16_t;
+
+auto init_logging() noexcept -> void;
 
 auto main_(std::span<char*> args) noexcept(false) -> int;
 
@@ -33,7 +34,7 @@ auto start_subscriber(uint8_t subscriber_num, uint64_t msg_num) noexcept(false) 
 template <size_t L, uint16_t M>
 auto run_subscriber_loop(lshl::demux::DemultiplexerSubscriber<L, M>& sub, uint64_t msg_num) noexcept(false) -> void;
 
-auto init_logging() noexcept -> void;
+auto calculate_latency(uint64_t x0) -> int64_t;
 
 struct ShmRemover {
   explicit ShmRemover(const char* name) : name_(name) {
@@ -66,19 +67,6 @@ struct ShmRemover {
 
  private:
   const char* name_;
-};
-
-struct XXH64_state_remover {
-  explicit XXH64_state_remover(XXH64_state_t* state) : state_(state){};
-  ~XXH64_state_remover() { XXH64_freeState(this->state_); }
-
-  XXH64_state_remover(const XXH64_state_remover&) = delete;                         // copy constructor
-  auto operator=(const XXH64_state_remover&) -> XXH64_state_remover& = delete;      // copy assignment
-  XXH64_state_remover(XXH64_state_remover&&) noexcept = delete;                     // move constructor
-  auto operator=(XXH64_state_remover&&) noexcept -> XXH64_state_remover& = delete;  // move assignment
-
- private:
-  XXH64_state_t* const state_;
 };
 
 }  // namespace lshl::demux::example

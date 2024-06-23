@@ -58,6 +58,7 @@ find_package(Boost 1.83.0 REQUIRED COMPONENTS log)
 include(FetchContent)
 set(FETCHCONTENT_QUIET OFF)
 
+# example uses this to compute hash digest of sent and received messages
 FetchContent_Declare(
   xxhash
   SYSTEM
@@ -65,6 +66,15 @@ FetchContent_Declare(
   GIT_TAG 805c00b68fa754200ada0c207ffeaa7a4409377c
 )
 FetchContent_MakeAvailable(xxhash)
+
+# example uses this to measure and report message latency
+FetchContent_Declare(
+  hdr_histogram
+  SYSTEM
+  GIT_REPOSITORY git@github.com:HdrHistogram/HdrHistogram_c.git
+  GIT_TAG e33c19c911bd259a84dcb2b86c2e4bd5b79258e1
+)
+FetchContent_MakeAvailable(hdr_histogram)
 
 FetchContent_Declare(
   googletest
@@ -86,6 +96,7 @@ FetchContent_MakeAvailable(rapidcheck)
 include_directories(
   SYSTEM ${Boost_INCLUDE_DIR}
   SYSTEM ${xxhash_SOURCE_DIR}
+  SYSTEM ${hdr_histogram_SOURCE_DIR}/include
   SYSTEM ${rapidcheck_SOURCE_DIR}/include
 )
 
@@ -102,6 +113,7 @@ target_link_libraries(
   shm_demux
   domain
   atomic
+  hdr_histogram
   rt
   Boost::log
 )
