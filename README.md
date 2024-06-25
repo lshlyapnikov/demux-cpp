@@ -35,7 +35,7 @@ This project was developed and tested exclusively on Linux using Clang version 1
 - **CMake 3.16.3**
 - **Boost 1.83.0:** Configured in the [CMakeList.txt](./CMakeLists.txt)
 - **Clang 17.0.6:** Configured in the [.envrc](./.envrc)
-- **gperftools** (optional) AKA google-perftools package
+- **gperftools** (optional): google-perftools package
 - **direnv** (optional): An environment variable manager for your shell. More information can be found [here](https://direnv.net/)
 
 ## 3. Setting Project Environment Variables
