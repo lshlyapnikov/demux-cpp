@@ -188,5 +188,6 @@ $ google-pprof --text ./build/shm_demux ./shm_demux_pub.prof &> pprof-report.out
 - [Valgrind](https://valgrind.org/)
 - [gperftools (originally Google Performance Tools)](https://github.com/gperftools/gperftools)
   - google-perftools package
+- [Latency Numbers Every Programmer Should Know](https://gist.github.com/jboner/2841832)
 - [FlatBuffers](https://flatbuffers.dev/flatbuffers_guide_use_cpp.html)
 - [MoldUDP64 Protocol Specification](https://www.nasdaqtrader.com/content/technicalsupport/specifications/dataproducts/moldudp64.pdf)
