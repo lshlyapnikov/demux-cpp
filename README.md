@@ -73,7 +73,9 @@ $ cmake --build ./build
 To build the project in release mode:
 
 ```
+$ cmake --build ./build --target clean
 $ cmake -DCMAKE_BUILD_TYPE=Release --build ./build
+$ cmake --build ./build
 ```
 
 ## 7. Run Tests
