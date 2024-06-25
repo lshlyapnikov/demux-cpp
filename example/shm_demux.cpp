@@ -179,7 +179,9 @@ auto run_publisher_loop(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, c
 
   for (uint64_t i = 1; i <= msg_num; ++i) {
     md_gen.generate_market_data_update(&md);
+#ifndef NDEBUG
     BOOST_LOG_TRIVIAL(debug) << md;
+#endif
     const bool ok = send_(pub, md);
     if (!ok) {
       BOOST_LOG_TRIVIAL(error) << "dropping message, could not send: " << md;
@@ -265,8 +267,10 @@ auto run_subscriber_loop(lshl::demux::DemultiplexerSubscriber<L, M>& sub, const 
       const MarketDataUpdate* md = read.value();
       // track the latency
       histogram.record_value(calculate_latency(md->timestamp));
-      // report progress
+#ifndef NDEBUG
       BOOST_LOG_TRIVIAL(debug) << *md;
+#endif
+      // report progress
       if (i % REPORT_PROGRESS == 0) {
         BOOST_LOG_TRIVIAL(info) << "number of messages received: " << i;
       }

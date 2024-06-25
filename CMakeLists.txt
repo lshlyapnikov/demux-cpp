@@ -26,7 +26,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(MY_CXX_FLAGS -Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wconversion -Wsign-conversion -Werror)
 
 # valgrind needs -gdwarf-4
-set(CMAKE_CXX_FLAGS_DEBUG "-gdwarf-4 -O0") # -03 for gperftools
+set(CMAKE_CXX_FLAGS_DEBUG "-gdwarf-4 -O0")
+#set(CMAKE_CXX_FLAGS_DEBUG "-gdwarf-4 -O3 -DNDEBUG") # -03 for gperftools
 # set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 # set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
 # set(CMAKE_CXX_FLAGS_MINSIZEREL "-Os")
