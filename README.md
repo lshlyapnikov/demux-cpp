@@ -35,7 +35,7 @@ This project was developed and tested exclusively on Linux using Clang version 1
 - **CMake 3.16.3**
 - **Boost 1.83.0:** Configured in the [CMakeList.txt](./CMakeLists.txt)
 - **Clang 17.0.6:** Configured in the [.envrc](./.envrc)
-- **gperftools** (optional)
+- **gperftools** (optional) AKA google-perftools package
 - **direnv** (optional): An environment variable manager for your shell. More information can be found [here](https://direnv.net/)
 
 ## 3. Setting Project Environment Variables
@@ -187,7 +187,6 @@ $ google-pprof --text ./build/shm_demux ./shm_demux_pub.prof &> pprof-report.out
 - [HdrHistogram](http://hdrhistogram.org/)
 - [Valgrind](https://valgrind.org/)
 - [gperftools (originally Google Performance Tools)](https://github.com/gperftools/gperftools)
-  - google-perftools package
 - [Latency Numbers Every Programmer Should Know](https://gist.github.com/jboner/2841832)
 - [FlatBuffers](https://flatbuffers.dev/flatbuffers_guide_use_cpp.html)
 - [MoldUDP64 Protocol Specification](https://www.nasdaqtrader.com/content/technicalsupport/specifications/dataproducts/moldudp64.pdf)
