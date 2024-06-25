@@ -14,9 +14,9 @@ cd "${__root}"
 
 msg_num=${1:-10000000}
 
-valgrind_cmd="valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --track-origins=yes --trace-children=yes --track-fds=yes --log-file=valgrind.out"
+#valgrind_cmd="valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --track-origins=yes --trace-children=yes --track-fds=yes --log-file=valgrind.out"
 
-echo "To enable valgrind profiling place valgrind_cmd infront of the pub or sub: ${valgrind_cmd}"
+#CPUPROFILE=shm_demux_pub.prof
 
 # start publisher expecting 2 subscribers
 ./build/shm_demux pub 2 "${msg_num}" > ./example-pub.out 2>&1 &

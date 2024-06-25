@@ -10,12 +10,9 @@
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/log/attributes/named_scope.hpp>
+#include <boost/log/core.hpp>
 #include <boost/log/expressions.hpp>
-#include <boost/log/support/date_time.hpp>
 #include <boost/log/trivial.hpp>
-#include <boost/log/utility/setup/common_attributes.hpp>
-#include <boost/log/utility/setup/console.hpp>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -111,10 +108,8 @@ auto main_(const span<char*> args) noexcept(false) -> int {
   const auto msg_num = boost::lexical_cast<uint64_t>(args[3]);
 
   if (command == "pub") {
-    BOOST_LOG_NAMED_SCOPE("pub");
     start_publisher<SHARED_MEM_SIZE, BUFFER_SIZE, MAX_MESSAGE_SIZE>(num8, msg_num);
   } else if (command == "sub") {
-    BOOST_LOG_NAMED_SCOPE("sub");
     start_subscriber<BUFFER_SIZE, MAX_MESSAGE_SIZE>(num8, msg_num);
   } else {
     print_usage(args[0]);
@@ -125,28 +120,7 @@ auto main_(const span<char*> args) noexcept(false) -> int {
 }
 
 auto init_logging() noexcept -> void {
-  namespace logging = boost::log;
-  namespace expr = boost::log::expressions;
-  namespace keywords = boost::log::keywords;
-  namespace sinks = boost::log::sinks;
-
-  // Add Scope
-  logging::add_common_attributes();
-  logging::core::get()->add_global_attribute("Scope", logging::attributes::named_scope());
-
-  // Customize output format and enable auto_flush
-  const boost::shared_ptr<sinks::sink> console_sink = logging::add_console_log(
-      std::cout,
-      keywords::auto_flush = true,
-      keywords::format =
-          (expr::stream << expr::format_date_time<boost::posix_time::ptime>("TimeStamp", "%Y-%m-%d %H:%M:%S.%f") << " ["
-                        << logging::trivial::severity << "] ["
-                        << expr::attr<boost::log::attributes::current_thread_id::value_type>("ThreadID") << "] ["
-                        << expr::format_named_scope("Scope", keywords::format = "%n", keywords::depth = 2) << "] "
-                        << expr::smessage));
-
-  // Configure logging severity
-  logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::info);
+  boost::log::core::get()->set_filter(boost::log::trivial::severity >= boost::log::trivial::info);
 }
 
 template <size_t SHM, size_t L, uint16_t M>
@@ -205,7 +179,9 @@ auto run_publisher_loop(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, c
 
   for (uint64_t i = 1; i <= msg_num; ++i) {
     md_gen.generate_market_data_update(&md);
+#ifndef NDEBUG
     BOOST_LOG_TRIVIAL(debug) << md;
+#endif
     const bool ok = send_(pub, md);
     if (!ok) {
       BOOST_LOG_TRIVIAL(error) << "dropping message, could not send: " << md;
@@ -291,8 +267,10 @@ auto run_subscriber_loop(lshl::demux::DemultiplexerSubscriber<L, M>& sub, const 
       const MarketDataUpdate* md = read.value();
       // track the latency
       histogram.record_value(calculate_latency(md->timestamp));
-      // report progress
+#ifndef NDEBUG
       BOOST_LOG_TRIVIAL(debug) << *md;
+#endif
+      // report progress
       if (i % REPORT_PROGRESS == 0) {
         BOOST_LOG_TRIVIAL(info) << "number of messages received: " << i;
       }

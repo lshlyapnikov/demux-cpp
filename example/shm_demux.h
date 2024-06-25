@@ -2,7 +2,6 @@
 #define LSHL_DEMUX_EXAMPLE_DEMUX_H
 
 #include <boost/interprocess/shared_memory_object.hpp>
-#include <boost/log/attributes/named_scope.hpp>
 #include <boost/log/trivial.hpp>
 #include <cstddef>
 #include <cstdint>
@@ -39,24 +38,22 @@ auto calculate_latency(uint64_t x0) -> int64_t;
 struct ShmRemover {
   explicit ShmRemover(const char* name) : name_(name) {
     namespace bipc = boost::interprocess;
-    BOOST_LOG_NAMED_SCOPE("startup");
     const bool ok = bipc::shared_memory_object::remove(this->name_);
     if (ok) {
-      BOOST_LOG_TRIVIAL(warning) << "removed shared_memory_object: " << this->name_;
+      BOOST_LOG_TRIVIAL(warning) << "startup: removed shared_memory_object: " << this->name_;
     } else {
-      BOOST_LOG_TRIVIAL(info) << "could not remove shared_memory_object: " << this->name_
+      BOOST_LOG_TRIVIAL(info) << "startup: could not remove shared_memory_object: " << this->name_
                               << ", possible it did not exist.";
     }
   }
 
   ~ShmRemover() {
     namespace bipc = boost::interprocess;
-    BOOST_LOG_NAMED_SCOPE("shutdown");
     const bool ok = bipc::shared_memory_object::remove(this->name_);
     if (ok) {
-      BOOST_LOG_TRIVIAL(info) << "removed shared_memory_object: " << this->name_;
+      BOOST_LOG_TRIVIAL(info) << "shutdown: removed shared_memory_object: " << this->name_;
     } else {
-      BOOST_LOG_TRIVIAL(error) << "could not remove shared_memory_object: " << this->name_;
+      BOOST_LOG_TRIVIAL(error) << "shutdown: could not remove shared_memory_object: " << this->name_;
     }
   }
 
