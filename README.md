@@ -166,7 +166,7 @@ $ ./bin/run-example.sh
 $ google-pprof --text ./build/shm_demux ./shm_demux_pub.prof &> pprof-report.out
 ```
 
-## Links
+## 11. Links
 
 - [C++ Best Practices](https://github.com/cpp-best-practices/cppbestpractices/blob/master/00-Table_of_Contents.md)
 - [C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines)

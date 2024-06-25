@@ -10,12 +10,9 @@
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/log/attributes/named_scope.hpp>
+#include <boost/log/core.hpp>
 #include <boost/log/expressions.hpp>
-#include <boost/log/support/date_time.hpp>
 #include <boost/log/trivial.hpp>
-#include <boost/log/utility/setup/common_attributes.hpp>
-#include <boost/log/utility/setup/console.hpp>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -111,10 +108,8 @@ auto main_(const span<char*> args) noexcept(false) -> int {
   const auto msg_num = boost::lexical_cast<uint64_t>(args[3]);
 
   if (command == "pub") {
-    BOOST_LOG_NAMED_SCOPE("pub");
     start_publisher<SHARED_MEM_SIZE, BUFFER_SIZE, MAX_MESSAGE_SIZE>(num8, msg_num);
   } else if (command == "sub") {
-    BOOST_LOG_NAMED_SCOPE("sub");
     start_subscriber<BUFFER_SIZE, MAX_MESSAGE_SIZE>(num8, msg_num);
   } else {
     print_usage(args[0]);
@@ -125,28 +120,7 @@ auto main_(const span<char*> args) noexcept(false) -> int {
 }
 
 auto init_logging() noexcept -> void {
-  namespace logging = boost::log;
-  namespace expr = boost::log::expressions;
-  namespace keywords = boost::log::keywords;
-  namespace sinks = boost::log::sinks;
-
-  // Add Scope
-  logging::add_common_attributes();
-  logging::core::get()->add_global_attribute("Scope", logging::attributes::named_scope());
-
-  // Customize output format and enable auto_flush
-  const boost::shared_ptr<sinks::sink> console_sink = logging::add_console_log(
-      std::cout,
-      keywords::auto_flush = true,
-      keywords::format =
-          (expr::stream << expr::format_date_time<boost::posix_time::ptime>("TimeStamp", "%Y-%m-%d %H:%M:%S.%f") << " ["
-                        << logging::trivial::severity << "] ["
-                        << expr::attr<boost::log::attributes::current_thread_id::value_type>("ThreadID") << "] ["
-                        << expr::format_named_scope("Scope", keywords::format = "%n", keywords::depth = 2) << "] "
-                        << expr::smessage));
-
-  // Configure logging severity
-  logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::info);
+  boost::log::core::get()->set_filter(boost::log::trivial::severity >= boost::log::trivial::info);
 }
 
 template <size_t SHM, size_t L, uint16_t M>
