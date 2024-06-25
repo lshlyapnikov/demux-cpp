@@ -122,7 +122,7 @@ target_link_libraries(
   hdr_histogram
   rt
   Boost::log
-  profiler
+  #profiler
 )
 target_compile_options(
   shm_demux
