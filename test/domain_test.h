@@ -1,3 +1,6 @@
+// Copyright 2024 Leonid Shlyapnikov.
+// SPDX-License-Identifier: Apache-2.0
+
 // NOLINTBEGIN(misc-include-cleaner)
 
 #ifndef DEMUX_CPP_LSHL_DEMUX_DOMAIN_TEST_H

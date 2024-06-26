@@ -1,3 +1,6 @@
+// Copyright 2024 Leonid Shlyapnikov.
+// SPDX-License-Identifier: Apache-2.0
+
 // NOLINTBEGIN(misc-include-cleaner, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
 
 #define XXH_INLINE_ALL  // <xxhash.h>

@@ -1,3 +1,6 @@
+// Copyright 2024 Leonid Shlyapnikov.
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef XXHASH_UTIL_H
 #define XXHASH_UTIL_H
 

@@ -1,3 +1,6 @@
+// Copyright 2024 Leonid Shlyapnikov.
+// SPDX-License-Identifier: Apache-2.0
+
 // NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner)
 
 #define UNIT_TEST

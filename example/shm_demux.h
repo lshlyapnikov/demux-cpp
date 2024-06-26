@@ -1,3 +1,6 @@
+// Copyright 2024 Leonid Shlyapnikov.
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef LSHL_DEMUX_EXAMPLE_DEMUX_H
 #define LSHL_DEMUX_EXAMPLE_DEMUX_H
 

@@ -9,6 +9,7 @@
     "lshl",
     "NOLINTNEXTLINE",
     "Rapidcheck",
+    "Shlyapnikov",
     "STREQ",
     "tparam",
     "Valgrind"

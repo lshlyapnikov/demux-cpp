@@ -1,3 +1,6 @@
+// Copyright 2024 Leonid Shlyapnikov.
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef HDR_HISTROGRAM_UTIL_H
 #define HDR_HISTROGRAM_UTIL_H
 
