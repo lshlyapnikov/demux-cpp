@@ -52,7 +52,7 @@ $ direnv allow .
 $ source ./.envrc
 ```
 
-## 4.Generate Project Makefile with CMake
+## 4. Generate Project Makefile with CMake
 
 To generate the Makefile for your project using CMake:
 
