@@ -69,14 +69,18 @@ To build the project in debug mode:
 $ cmake --build ./build
 ```
 
+To build with the Clang Static Analyzer (recommended):
+
+```
+$ scan-build-17 cmake --build ./build
+```
+
 ## 6. Build (Release)
 
 To build the project in release mode:
 
 ```
-$ cmake --build ./build --target clean
-$ cmake -DCMAKE_BUILD_TYPE=Release --build ./build
-$ cmake --build ./build
+$ ./bin/release.sh
 ```
 
 ## 7. Run Tests
