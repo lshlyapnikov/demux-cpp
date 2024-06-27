@@ -11,18 +11,19 @@ Test conducted on my laptop without CPU isolation or CPU pinning. Refer to the *
 ```
        Value   Percentile   TotalCount 1/(1-Percentile)
 
-        75.0     0.000000            1         1.00
-       103.0     0.250000      2867052         1.33
-       123.0     0.500000      5106433         2.00
-       135.0     0.625000      6392539         2.67
-       143.0     0.750000      7872294         4.00
-       151.0     0.812500      8820403         5.33
-       151.0     0.875000      8820403         8.00
-       159.0     0.906250      9165407        10.67
-     30719.0     0.999999      9999998   1398101.33
-     32767.0     1.000000     10000000  11184810.67
-#[Mean    =      130.984, StdDeviation   =      269.127]
-#[Max     =    32767.000, Total count    =     10000000]
+        79.0     0.000000           50         1.00
+       103.0     0.250000      3394829         1.33
+       119.0     0.500000      5070828         2.00
+       127.0     0.625000      6357200         2.67
+       143.0     0.750000      7827810         4.00
+       151.0     0.812500      8849381         5.33
+       151.0     0.875000      8849381         8.00
+       159.0     0.906250      9257164        10.67
+     32767.0     0.999999      9999993   1398101.33
+     38911.0     1.000000     10000000   2796202.67
+     38911.0     1.000000     10000000          inf
+#[Mean    =      128.848, StdDeviation   =      276.737]
+#[Max     =    38911.000, Total count    =     10000000]
 #[Buckets =           28, SubBuckets     =           32]
 ```
 
@@ -104,9 +105,9 @@ To clean build artifacts:
 $ cmake --build ./build --target clean
 ```
 
-## 9. Memory Profiling with Valgrind
+## 10. Memory Profiling with Valgrind
 
-### 9.1. modify `run-example.sh`
+### 10.1. modify `run-example.sh`
 
 ```
 valgrind_cmd="valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --log-file=valgrind.out"
@@ -120,7 +121,7 @@ valgrind_cmd="valgrind --leak-check=full --show-leak-kinds=all --track-origins=y
 ${valgrind_cmd} ./build/shm_demux sub 1 "${msg_num}" &> ./example-sub-1.out &
 ```
 
-### 9.2. Run the example script
+### 10.2. Run the example script
 
 ```
 $ ./bin/run-example.sh
@@ -128,11 +129,11 @@ $ ./bin/run-example.sh
 
 **Notes:** `--track-origins=yes` can be slow. The report will be generated in the `valgrind.out` file.
 
-## 10. Performance Profiling with gperftools (Google Performance Tools)
+## 11. Performance Profiling with gperftools (Google Performance Tools)
 
 https://github.com/gperftools/gperftools/tree/master
 
-### 10.1. Update `CMakeLists.txt`
+### 11.1. Update `CMakeLists.txt`
 
 To enable optimization in the Debug build, replace `-O0` with `-O3` in the `CMAKE_CXX_FLAGS_DEBUG` definition. This will allow the Debug build to compile with optimization:
 
@@ -150,7 +151,7 @@ target_link_libraries(
 )
 ```
 
-### 10.2. Modify `run-example.sh`
+### 11.2. Modify `run-example.sh`
 
 Define `CPUPROFILE` to generate a profile file named `shm_demux_pub.prof`:
 
@@ -158,19 +159,19 @@ Define `CPUPROFILE` to generate a profile file named `shm_demux_pub.prof`:
 CPUPROFILE=shm_demux_pub.prof ./build/shm_demux pub 2 "${msg_num}" > ./example-pub.out 2>&1 &
 ```
 
-### 10.3. Run the example script
+### 11.3. Run the example script
 
 ```
 $ ./bin/run-example.sh
 ```
 
-### 10.4. Generate the profiling report
+### 11.4. Generate the profiling report
 
 ```
 $ google-pprof --text ./build/shm_demux ./shm_demux_pub.prof &> pprof-report.out
 ```
 
-## 11. Links
+## 12. Links
 
 - [C++ Best Practices](https://github.com/cpp-best-practices/cppbestpractices/blob/master/00-Table_of_Contents.md)
 - [C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines)

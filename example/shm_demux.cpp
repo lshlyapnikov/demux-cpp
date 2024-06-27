@@ -37,17 +37,21 @@
 namespace lshl::demux::example {
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays)
-constexpr char SHARED_MEM_NAME[] = "lshl_demux_example";
+constexpr char BUFFER_SHARED_MEM_NAME[] = "lshl_demux_buf";
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays)
+constexpr char UTIL_SHARED_MEM_NAME[] = "lshl_demux_util";
 
 constexpr int REPORT_PROGRESS = 1000000;
 
 constexpr std::size_t PAGE_SIZE = 4096;
-// total shared memory size, should be  a multiple of the page size (4kB on Linux). Because the operating system
-// performs mapping operations over whole pages. So, you don't waste memory.
-constexpr std::size_t SHARED_MEM_SIZE = 16 * PAGE_SIZE;
-// names take up some space in the managed_shared_memory, 512 was enough
-constexpr std::size_t SHARED_MEM_UTIL_SIZE = 512 + 32;
-constexpr std::size_t BUFFER_SIZE = SHARED_MEM_SIZE - SHARED_MEM_UTIL_SIZE;
+
+// names take up some space in the managed_shared_memory
+constexpr std::size_t BUFFER_PADDING = 512;
+
+// circular buffer size in bytes
+constexpr std::size_t BUFFER_SIZE = 16 * PAGE_SIZE - BUFFER_PADDING;
+
+// max message size that would be allowed
 constexpr std::uint16_t MAX_MESSAGE_SIZE = 256;
 
 }  // namespace lshl::demux::example
@@ -111,7 +115,7 @@ auto main_(const span<char*> args) noexcept(false) -> int {
   const auto msg_num = boost::lexical_cast<uint64_t>(args[3]);
 
   if (command == "pub") {
-    start_publisher<SHARED_MEM_SIZE, BUFFER_SIZE, MAX_MESSAGE_SIZE>(num8, msg_num);
+    start_publisher<BUFFER_SIZE, MAX_MESSAGE_SIZE>(num8, msg_num);
   } else if (command == "sub") {
     start_subscriber<BUFFER_SIZE, MAX_MESSAGE_SIZE>(num8, msg_num);
   } else {
@@ -126,34 +130,58 @@ auto init_logging() noexcept -> void {
   boost::log::core::get()->set_filter(boost::log::trivial::severity >= boost::log::trivial::info);
 }
 
-template <size_t SHM, size_t L, uint16_t M>
+template <size_t L>
+auto calculate_required_buffer_shared_mem_size() noexcept -> size_t {
+  // names take some space in the managed_shared_memory
+  // total shared memory size, should be  a multiple of the page size (4kB on Linux). Because the operating system
+  // performs mapping operations over whole pages. So, you don't waste memory.
+  const size_t quotient = (L + BUFFER_PADDING) / PAGE_SIZE;
+  const size_t reminder = (L + BUFFER_PADDING) % PAGE_SIZE;
+  if (reminder > 0) {
+    return (quotient + 1) * PAGE_SIZE;
+  } else {
+    return quotient * PAGE_SIZE;
+  }
+}
+
+template <size_t L, uint16_t M>
 auto start_publisher(const uint8_t total_subscriber_num, const uint64_t msg_num) noexcept(false) -> void {
-  BOOST_LOG_TRIVIAL(info) << "start_publisher SHARED_MEM_NAME: " << SHARED_MEM_NAME << ", size: " << SHM << ", L: " << L
+  const size_t SHM = calculate_required_buffer_shared_mem_size<L>();
+
+  BOOST_LOG_TRIVIAL(info) << "start_publisher " << BUFFER_SHARED_MEM_NAME << ", size: " << SHM << ", L: " << L
                           << ", M: " << M << ", total_subscriber_num: " << static_cast<int>(total_subscriber_num);
 
-  const ShmRemover remover(SHARED_MEM_NAME);
+  const ShmRemover remover1(BUFFER_SHARED_MEM_NAME);
+  const ShmRemover remover2(UTIL_SHARED_MEM_NAME);
 
   const uint64_t all_subs_mask = SubscriberId::all_subscribers_mask(total_subscriber_num);
 
-  bipc::managed_shared_memory segment(bipc::create_only, SHARED_MEM_NAME, SHM);
-  BOOST_LOG_TRIVIAL(info) << "created shared_memory_object: " << SHARED_MEM_NAME
-                          << ", free_memory: " << segment.get_free_memory();
+  // segment for the circular buffer and message counter, written by publisher, read by subscribers
+  bipc::managed_shared_memory segment1(bipc::create_only, BUFFER_SHARED_MEM_NAME, SHM);
+  BOOST_LOG_TRIVIAL(info) << "created shared_memory_object segment1: " << BUFFER_SHARED_MEM_NAME
+                          << ", segment1.free_memory: " << segment1.get_free_memory();
 
-  atomic<uint64_t>* message_count_sync = segment.construct<atomic<uint64_t>>("message_count_sync")(0);
-  BOOST_LOG_TRIVIAL(info) << "message_count_sync allocated, free_memory: " << segment.get_free_memory();
+  array<uint8_t, L>* buffer = segment1.construct<array<uint8_t, L>>("buffer")();
+  BOOST_LOG_TRIVIAL(info) << "buffer allocated, segment1.free_memory: " << segment1.get_free_memory();
 
-  atomic<uint64_t>* wraparound_sync = segment.construct<atomic<uint64_t>>("wraparound_sync")(0);
-  BOOST_LOG_TRIVIAL(info) << "wraparound_sync allocated, free_memory: " << segment.get_free_memory();
+  atomic<uint64_t>* message_count_sync = segment1.construct<atomic<uint64_t>>("message_count_sync")(0);
+  BOOST_LOG_TRIVIAL(info) << "message_count_sync allocated, segment1.free_memory: " << segment1.get_free_memory();
 
-  array<uint8_t, L>* buffer = segment.construct<array<uint8_t, L>>("buffer")();
-  BOOST_LOG_TRIVIAL(info) << "buffer allocated, free_memory: " << segment.get_free_memory();
+  // segment for synchronization
+  bipc::managed_shared_memory segment2(bipc::create_only, UTIL_SHARED_MEM_NAME, PAGE_SIZE);
+  BOOST_LOG_TRIVIAL(info) << "created shared_memory_object segment2: " << UTIL_SHARED_MEM_NAME
+                          << ", segment2.free_memory: " << segment2.get_free_memory();
 
-  atomic<uint64_t>* startup_sync = segment.construct<atomic<uint64_t>>("startup_sync")(0);
-  BOOST_LOG_TRIVIAL(info) << "startup_sync allocated, free_memory: " << segment.get_free_memory();
+  atomic<uint64_t>* wraparound_sync = segment2.construct<atomic<uint64_t>>("wraparound_sync")(0);
+  BOOST_LOG_TRIVIAL(info) << "wraparound_sync allocated, segment2.free_memory: " << segment2.get_free_memory();
+
+  atomic<uint64_t>* startup_sync = segment2.construct<atomic<uint64_t>>("startup_sync")(0);
+  BOOST_LOG_TRIVIAL(info) << "startup_sync allocated, segment2.free_memory: " << segment2.get_free_memory();
 
   lshl::demux::DemultiplexerPublisher<L, M, false> pub(
       all_subs_mask, span{*buffer}, message_count_sync, wraparound_sync);
-  BOOST_LOG_TRIVIAL(info) << "DemultiplexerPublisher created, free_memory: " << segment.get_free_memory();
+  BOOST_LOG_TRIVIAL(info) << "DemultiplexerPublisher created, segment1.free_memory: " << segment1.get_free_memory()
+                          << ", segment2.free_memory: " << segment2.get_free_memory();
 
   BOOST_LOG_TRIVIAL(info) << "waiting for all subscribers ...";
   while (true) {
@@ -168,7 +196,8 @@ auto start_publisher(const uint8_t total_subscriber_num, const uint64_t msg_num)
   BOOST_LOG_TRIVIAL(info) << "all subscribers connected";
 
   run_publisher_loop(pub, msg_num);
-  BOOST_LOG_TRIVIAL(info) << "DemultiplexerPublisher completed, free_memory: " << segment.get_free_memory();
+  BOOST_LOG_TRIVIAL(info) << "DemultiplexerPublisher completed, segment1.free_memory: " << segment1.get_free_memory()
+                          << ", segment2.free_memory: " << segment2.get_free_memory();
 }
 
 template <size_t L, uint16_t M>
@@ -223,37 +252,45 @@ template <class T, size_t L, uint16_t M>
 
 template <size_t L, uint16_t M>
 auto start_subscriber(const uint8_t subscriber_num, const uint64_t msg_num) noexcept(false) -> void {
-  using lshl::demux::example::SHARED_MEM_NAME;
+  using lshl::demux::example::BUFFER_SHARED_MEM_NAME;
   using std::atomic;
 
-  BOOST_LOG_TRIVIAL(info) << "subscriber SHARED_MEM_NAME: " << SHARED_MEM_NAME << ", L: " << L << ", M: " << M
-                          << ", subscriber_num: " << static_cast<int>(subscriber_num);
+  BOOST_LOG_TRIVIAL(info) << "subscriber BUFFER_SHARED_MEM_NAME: " << BUFFER_SHARED_MEM_NAME << ", L: " << L
+                          << ", M: " << M << ", subscriber_num: " << static_cast<int>(subscriber_num);
 
-  bipc::managed_shared_memory segment(bipc::open_only, SHARED_MEM_NAME);
-  BOOST_LOG_TRIVIAL(info) << "opened shared_memory_object: " << SHARED_MEM_NAME
-                          << ", free_memory: " << segment.get_free_memory();
+  // read-only segment for the circular buffer and message counter
+  bipc::managed_shared_memory segment1(bipc::open_read_only, BUFFER_SHARED_MEM_NAME);
+  BOOST_LOG_TRIVIAL(info) << "opened shared_memory_object segment1: " << BUFFER_SHARED_MEM_NAME
+                          << ", segment1.free_memory: " << segment1.get_free_memory();
 
-  atomic<uint64_t>* message_count_sync = segment.find<atomic<uint64_t>>("message_count_sync").first;
-  BOOST_LOG_TRIVIAL(info) << "message_count_sync found, free_memory: " << segment.get_free_memory();
+  array<uint8_t, L>* buffer = segment1.find<array<uint8_t, L>>("buffer").first;
+  BOOST_LOG_TRIVIAL(info) << "buffer found, segment1.free_memory: " << segment1.get_free_memory();
 
-  atomic<uint64_t>* wraparound_sync = segment.find<atomic<uint64_t>>("wraparound_sync").first;
-  BOOST_LOG_TRIVIAL(info) << "wraparound_sync found, free_memory: " << segment.get_free_memory();
+  atomic<uint64_t>* message_count_sync = segment1.find<atomic<uint64_t>>("message_count_sync").first;
+  BOOST_LOG_TRIVIAL(info) << "message_count_sync found, segment1.free_memory: " << segment1.get_free_memory();
 
-  array<uint8_t, L>* buffer = segment.find<array<uint8_t, L>>("buffer").first;
-  BOOST_LOG_TRIVIAL(info) << "buffer found, free_memory: " << segment.get_free_memory();
+  // read-write segment for atomic variables
+  bipc::managed_shared_memory segment2(bipc::open_only, UTIL_SHARED_MEM_NAME);
+  BOOST_LOG_TRIVIAL(info) << "opened shared_memory_object segment2: " << UTIL_SHARED_MEM_NAME
+                          << ", segment2.free_memory: " << segment2.get_free_memory();
 
-  atomic<uint64_t>* startup_sync = segment.find<atomic<uint64_t>>("startup_sync").first;
-  BOOST_LOG_TRIVIAL(info) << "startup_sync found, free_memory: " << segment.get_free_memory();
+  atomic<uint64_t>* wraparound_sync = segment2.find<atomic<uint64_t>>("wraparound_sync").first;
+  BOOST_LOG_TRIVIAL(info) << "wraparound_sync found, segment2.free_memory: " << segment2.get_free_memory();
+
+  atomic<uint64_t>* startup_sync = segment2.find<atomic<uint64_t>>("startup_sync").first;
+  BOOST_LOG_TRIVIAL(info) << "startup_sync found, segment2.free_memory: " << segment2.get_free_memory();
 
   const SubscriberId id = SubscriberId::create(subscriber_num);
 
   lshl::demux::DemultiplexerSubscriber<L, M> sub(id, span{*buffer}, message_count_sync, wraparound_sync);
-  BOOST_LOG_TRIVIAL(info) << "DemultiplexerSubscriber created, free_memory: " << segment.get_free_memory();
+  BOOST_LOG_TRIVIAL(info) << "DemultiplexerSubscriber created, segment1.free_memory: " << segment2.get_free_memory()
+                          << ", segment2.free_memory: " << segment2.get_free_memory();
 
   startup_sync->fetch_or(id.mask());
 
   run_subscriber_loop(sub, msg_num);
-  BOOST_LOG_TRIVIAL(info) << "DemultiplexerSubscriber completed, free_memory: " << segment.get_free_memory();
+  BOOST_LOG_TRIVIAL(info) << "DemultiplexerSubscriber completed, segment1.free_memory: " << segment2.get_free_memory()
+                          << ", segment2.free_memory: " << segment2.get_free_memory();
 }
 
 template <size_t L, uint16_t M>

@@ -20,7 +20,10 @@ auto init_logging() noexcept -> void;
 
 auto main_(std::span<char*> args) noexcept(false) -> int;
 
-template <size_t SHM, size_t L, uint16_t M>
+template <size_t L>
+auto calculate_required_buffer_shared_mem_size() noexcept -> size_t;
+
+template <size_t L, uint16_t M>
 auto start_publisher(uint8_t total_subscriber_num, uint64_t msg_num) noexcept(false) -> void;
 
 template <size_t L, uint16_t M>
