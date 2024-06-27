@@ -31,7 +31,7 @@ struct MessageBuffer {
   /// @param position -- the zero-based byte offset at which the message should be written.
   /// @param message -- the bytes that should be written.
   /// @return the total number of written bytes (2 + message length) or zero.
-  [[nodiscard]] auto write(const size_t position, const span<uint8_t> message) noexcept -> size_t {
+  [[nodiscard]] auto write(const size_t position, const span<uint8_t>& message) noexcept -> size_t {
     const size_t x = sizeof(message_length_t);
     const size_t n = message.size();
     const size_t total_required = n + x;

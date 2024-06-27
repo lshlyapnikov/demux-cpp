@@ -20,13 +20,13 @@ using lshl::demux::MessageBuffer;
 using std::array;
 using std::span;
 using std::uint8_t;
-using std::unique_ptr;
 using std::vector;
 
-auto create_test_array(const size_t size) -> unique_ptr<uint8_t[]> {
-  unique_ptr<uint8_t[]> result(new uint8_t[size]);
+auto create_test_array(const size_t size) -> vector<uint8_t> {
+  vector<uint8_t> result{};
+  result.resize(size);
   for (uint8_t i = 0; i < size; i++) {
-    result.get()[i] = i;
+    result[i] = i;
   }
   return result;
 }
@@ -84,7 +84,7 @@ TEST(MessageBufferTest, WriteToSharedMemory) {
       ASSERT_EQ(read.size(), message.size());
 
       for (size_t i = 0; i < message.size(); ++i) {
-        ASSERT_EQ(data[i + sizeof(uint16_t)], message[i]);
+        ASSERT_EQ(data.at(i + 2), message[i]);
         ASSERT_EQ(read[i], message[i]);
       }
     } else {
@@ -104,16 +104,16 @@ TEST(MessageBufferTest, MessageBufferWriteRead) {
 
     const size_t remaining = buf.remaining(position);
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays)
-    const unique_ptr<uint8_t[]> src = create_test_array(src_size);
-    const size_t written = buf.write(position, span(src.get(), src_size));
+    vector<uint8_t> src = create_test_array(src_size);
+    const size_t written = buf.write(position, src);
     if (remaining >= src_size + sizeof(uint16_t)) {
       ASSERT_EQ(src_size + sizeof(uint16_t), written);
       const span<uint8_t> read = buf.read(position);
       ASSERT_EQ(read.size(), src_size);
       // compare read bytes with the src bytes
       for (uint8_t i = 0; i < src_size; i++) {
-        std::cout << "\ti:" << static_cast<int>(i) << ", value: " << static_cast<int>(src.get()[i]) << '\n';
-        ASSERT_EQ(read[i], src.get()[i]);
+        std::cout << "\ti:" << static_cast<int>(i) << ", value: " << static_cast<int>(src[i]) << '\n';
+        ASSERT_EQ(read[i], src[i]);
       }
     } else {
       ASSERT_EQ(0, written);
