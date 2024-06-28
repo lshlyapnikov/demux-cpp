@@ -6,7 +6,7 @@
 #define UNIT_TEST
 #undef NDEBUG  // for assert to work in release build
 
-#include "../src/demultiplexer.h"
+#include "../main/demultiplexer.h"
 #include <gtest/gtest.h>
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
 #include <array>
@@ -22,8 +22,8 @@
 #include <future>
 #include <span>
 #include <vector>
-#include "../src/domain.h"
-#include "../src/message_buffer.h"
+#include "../main/domain.h"
+#include "../main/message_buffer.h"
 #include "./domain_test.h"
 
 namespace lshl::demux {

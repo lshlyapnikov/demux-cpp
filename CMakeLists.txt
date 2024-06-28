@@ -113,8 +113,8 @@ include_directories(
 
 add_executable(
   shm_demux
-  example/shm_demux.cpp
-  example/market_data.cpp
+  src/example/shm_demux.cpp
+  src/example/market_data.cpp
 )
 target_link_libraries(
   shm_demux
@@ -132,7 +132,7 @@ target_compile_options(
 
 add_library(
   domain
-  OBJECT src/domain.cpp
+  OBJECT src/main/domain.cpp
 )
 target_compile_options(
   domain
@@ -141,7 +141,7 @@ target_compile_options(
 
 add_library(
   demultiplexer
-  OBJECT src/demultiplexer.cpp
+  OBJECT src/main/demultiplexer.cpp
 )
 target_compile_options(
   demultiplexer
@@ -153,7 +153,7 @@ include(GoogleTest)
 
 add_executable(
   domain_test
-  test/domain_test.cpp
+  src/test/domain_test.cpp
 )
 target_link_libraries(
   domain_test
@@ -169,7 +169,7 @@ gtest_discover_tests(domain_test)
 
 add_executable(
   message_buffer_test
-  test/message_buffer_test.cpp
+  src/test/message_buffer_test.cpp
 )
 target_link_libraries(
   message_buffer_test
@@ -185,7 +185,7 @@ gtest_discover_tests(message_buffer_test)
 
 add_executable(
   demultiplexer_test
-  test/demultiplexer_test.cpp
+  src/test/demultiplexer_test.cpp
 )
 target_link_libraries(
   demultiplexer_test

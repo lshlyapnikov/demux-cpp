@@ -8,7 +8,7 @@
 
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
 #include <cstdint>
-#include "../src/domain.h"
+#include "../main/domain.h"
 
 namespace rc {
 

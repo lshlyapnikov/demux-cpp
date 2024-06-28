@@ -5,7 +5,7 @@
 
 #define UNIT_TEST
 
-#include "../src/domain.h"
+#include "../main/domain.h"
 #include <gtest/gtest.h>
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
 #include <cmath>

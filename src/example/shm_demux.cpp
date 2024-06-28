@@ -28,8 +28,8 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
-#include "../src/demultiplexer.h"
-#include "../src/domain.h"
+#include "../main/demultiplexer.h"
+#include "../main/domain.h"
 #include "./hdr_histogram_util.h"
 #include "./market_data.h"
 #include "./xxhash_util.h"
