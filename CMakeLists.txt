@@ -111,15 +111,15 @@ include_directories(
 # artifacts
 #
 
-# add_library(
-#   ${PROJECT_NAME}
-#   STATIC
-# )
-# target_link_libraries(
-#   ${PROJECT_NAME}
-#   subscriber_id
-#   demultiplexer
-# )
+add_library(
+  ${PROJECT_NAME}
+  STATIC
+)
+target_link_libraries(
+  ${PROJECT_NAME}
+  subscriber_id
+  demultiplexer
+)
 
 add_executable(
   shm_demux
