@@ -1,7 +1,7 @@
 // Copyright 2024 Leonid Shlyapnikov.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "./domain.h"
+#include "./subscriber_id.h"
 #include <iostream>
 
 namespace lshl::demux {

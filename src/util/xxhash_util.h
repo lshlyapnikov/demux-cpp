@@ -1,8 +1,8 @@
 // Copyright 2024 Leonid Shlyapnikov.
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef XXHASH_UTIL_H
-#define XXHASH_UTIL_H
+#ifndef LSHL_UTIL_XXHASH_UTIL_H
+#define LSHL_UTIL_XXHASH_UTIL_H
 
 #include <xxhash.h>
 #include <cstddef>
@@ -11,6 +11,8 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+
+namespace lshl::util {
 
 struct XXH64_util {
   explicit XXH64_util() noexcept(false) : state_(XXH64_createState()) {
@@ -48,4 +50,6 @@ struct XXH64_util {
   XXH64_state_t* state_;
 };
 
-#endif  // XXHASH_UTIL_H
+}  // namespace lshl::util
+
+#endif  // LSHL_UTIL_XXHASH_UTIL_H

@@ -3,12 +3,12 @@
 
 // NOLINTBEGIN(misc-include-cleaner)
 
-#ifndef DEMUX_CPP_LSHL_DEMUX_DOMAIN_TEST_H
-#define DEMUX_CPP_LSHL_DEMUX_DOMAIN_TEST_H
+#ifndef DEMUX_CPP_LSHL_DEMUX_SUBSCRIBER_ID_TEST_H
+#define DEMUX_CPP_LSHL_DEMUX_SUBSCRIBER_ID_TEST_H
 
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
 #include <cstdint>
-#include "../main/domain.h"
+#include "../demux/subscriber_id.h"
 
 namespace rc {
 
@@ -27,6 +27,6 @@ struct Arbitrary<lshl::demux::SubscriberId> {
 
 }  // namespace rc
 
-#endif  // DEMUX_CPP_LSHL_DEMUX_DOMAIN_TEST_H
+#endif  // DEMUX_CPP_LSHL_DEMUX_SUBSCRIBER_ID_TEST_H
 
 // NOLINTEND(misc-include-cleaner)

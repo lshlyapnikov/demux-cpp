@@ -13,8 +13,8 @@
 #include <span>
 #include <tuple>
 #include <utility>
-#include "./domain.h"
 #include "./message_buffer.h"
+#include "./subscriber_id.h"
 
 namespace lshl::demux {
 

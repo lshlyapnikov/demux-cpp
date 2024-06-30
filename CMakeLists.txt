@@ -111,6 +111,16 @@ include_directories(
 # artifacts
 #
 
+# add_library(
+#   ${PROJECT_NAME}
+#   STATIC
+# )
+# target_link_libraries(
+#   ${PROJECT_NAME}
+#   subscriber_id
+#   demultiplexer
+# )
+
 add_executable(
   shm_demux
   src/example/shm_demux.cpp
@@ -118,7 +128,7 @@ add_executable(
 )
 target_link_libraries(
   shm_demux
-  domain
+  subscriber_id
   atomic
   hdr_histogram
   rt
@@ -131,17 +141,17 @@ target_compile_options(
 )
 
 add_library(
-  domain
-  OBJECT src/main/domain.cpp
+  subscriber_id
+  OBJECT src/demux/subscriber_id.cpp
 )
 target_compile_options(
-  domain
+  subscriber_id
   PRIVATE ${MY_CXX_FLAGS}
 )
 
 add_library(
   demultiplexer
-  OBJECT src/main/demultiplexer.cpp
+  OBJECT src/demux/demultiplexer.cpp
 )
 target_compile_options(
   demultiplexer
@@ -152,20 +162,20 @@ enable_testing()
 include(GoogleTest)
 
 add_executable(
-  domain_test
-  src/test/domain_test.cpp
+  subscriber_id_test
+  src/test/subscriber_id_test.cpp
 )
 target_link_libraries(
-  domain_test
-  domain
+  subscriber_id_test
+  subscriber_id
   GTest::gtest_main
   rapidcheck
 )
 target_compile_options(
-  domain_test
+  subscriber_id_test
   PRIVATE ${MY_CXX_FLAGS}
 )
-gtest_discover_tests(domain_test)
+gtest_discover_tests(subscriber_id_test)
 
 add_executable(
   message_buffer_test
@@ -190,7 +200,7 @@ add_executable(
 target_link_libraries(
   demultiplexer_test
   demultiplexer
-  domain
+  subscriber_id
   atomic
   GTest::gtest_main
   rapidcheck

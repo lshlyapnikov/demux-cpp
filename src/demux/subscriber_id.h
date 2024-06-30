@@ -1,8 +1,8 @@
 // Copyright 2024 Leonid Shlyapnikov.
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef DEMUX_CPP_LSHL_DEMUX_DOMAIN_H
-#define DEMUX_CPP_LSHL_DEMUX_DOMAIN_H
+#ifndef DEMUX_CPP_LSHL_DEMUX_SUBSCRIBER_ID_H
+#define DEMUX_CPP_LSHL_DEMUX_SUBSCRIBER_ID_H
 
 #include <cstddef>
 #include <cstdint>
@@ -73,4 +73,4 @@ class SubscriberId {
 
 }  // namespace lshl::demux
 
-#endif  // DEMUX_CPP_LSHL_DEMUX_DOMAIN_H
+#endif  // DEMUX_CPP_LSHL_DEMUX_SUBSCRIBER_ID_H

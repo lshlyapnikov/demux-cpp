@@ -28,11 +28,12 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
-#include "../main/demultiplexer.h"
-#include "../main/domain.h"
-#include "./hdr_histogram_util.h"
+#include "../demux/demultiplexer.h"
+#include "../demux/subscriber_id.h"
+#include "../util/hdr_histogram_util.h"
+#include "../util/shm_remover.h"
+#include "../util/xxhash_util.h"
 #include "./market_data.h"
-#include "./xxhash_util.h"
 
 namespace lshl::demux::example {
 
@@ -89,6 +90,9 @@ namespace bipc = boost::interprocess;
 using lshl::demux::DemultiplexerPublisher;
 using lshl::demux::DemultiplexerSubscriber;
 using lshl::demux::SubscriberId;
+using lshl::util::HDR_histogram_util;
+using lshl::util::ShmRemover;
+using lshl::util::XXH64_util;
 using std::array;
 using std::atomic;
 using std::size_t;

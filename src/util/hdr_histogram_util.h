@@ -1,13 +1,15 @@
 // Copyright 2024 Leonid Shlyapnikov.
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef HDR_HISTROGRAM_UTIL_H
-#define HDR_HISTROGRAM_UTIL_H
+#ifndef LSHL_UTIL_HDR_HISTOGRAM_UTIL_H
+#define LSHL_UTIL_HDR_HISTOGRAM_UTIL_H
 
 #include <hdr/hdr_histogram.h>
 #include <cstdint>
 #include <cstdio>
 #include <stdexcept>
+
+namespace lshl::util {
 
 struct HDR_histogram_util {
   explicit HDR_histogram_util() noexcept(false) {
@@ -41,4 +43,6 @@ struct HDR_histogram_util {
   hdr_histogram* histogram_{nullptr};
 };
 
-#endif  // HDR_HISTROGRAM_UTIL_H
+}  // namespace lshl::util
+
+#endif  // LSHL_UTIL_HDR_HISTOGRAM_UTIL_H

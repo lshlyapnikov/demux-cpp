@@ -5,14 +5,14 @@
 
 #define UNIT_TEST
 
-#include "../main/domain.h"
+#include "../demux/subscriber_id.h"
 #include <gtest/gtest.h>
-#include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
+#include <rapidcheck.h>
 #include <cmath>
 #include <cstdint>
 #include <stdexcept>
 #include <tuple>
-#include "./domain_test.h"
+#include "./subscriber_id_test.h"
 
 using lshl::demux::SubscriberId;
 
