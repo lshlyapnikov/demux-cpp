@@ -60,9 +60,10 @@ constexpr std::uint16_t MAX_MESSAGE_SIZE = 256;
 auto print_usage(const char* prog) -> void {
   std::cerr << "Usage: " << prog << " [pub <total-number-of-subscribers> <number-of-messages-to-send>] "
             << " | [sub <the-subscriber-number> <number-of-messages-to-receive>]\n"
-            << "\twhere <total-number-of-subscribers> and <the-subscriber-number> are within the interval [1, "
-            << static_cast<int>(std::numeric_limits<uint8_t>::max()) << "] (uint8_t)\n"
-            << "\t<number-of-messages-to-send> and <number-of-messages-to-receive> are within the interval [1, "
+            << "  where\n"
+            << "    <total-number-of-subscribers> and <the-subscriber-number> are within the interval [1, "
+            << static_cast<int>(lshl::demux::MAX_SUBSCRIBER_NUM) << "]\n"
+            << "    <number-of-messages-to-send> and <number-of-messages-to-receive> are within the interval [1, "
             << std::numeric_limits<uint64_t>::max() << "] (uint64_t)\n";
 }
 
@@ -111,7 +112,7 @@ auto main_(const span<char*> args) noexcept(false) -> int {
 
   const std::string command(args[1]);
   const auto num16 = boost::lexical_cast<uint16_t>(args[2]);
-  if (num16 < 1 || num16 > std::numeric_limits<uint8_t>::max()) {
+  if (num16 < 1 || num16 > lshl::demux::MAX_SUBSCRIBER_NUM) {
     print_usage(args[0]);
     return ERROR;
   }
