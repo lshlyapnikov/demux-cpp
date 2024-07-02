@@ -25,17 +25,16 @@ template <size_t L, uint16_t M>
 auto start_publisher(uint8_t total_subscriber_num, uint64_t msg_num) noexcept(false) -> void;
 
 template <size_t L, uint16_t M>
-auto run_publisher_loop(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, uint64_t msg_num) noexcept(false)
-    -> void;
+auto run_publisher_loop(lshl::demux::DemuxPublisher<L, M, false>& pub, uint64_t msg_num) noexcept(false) -> void;
 
 template <class T, size_t L, uint16_t M>
-[[nodiscard]] inline auto send_(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, const T& md) noexcept -> bool;
+[[nodiscard]] inline auto send_(lshl::demux::DemuxPublisher<L, M, false>& pub, const T& md) noexcept -> bool;
 
 template <size_t L, uint16_t M>
 auto start_subscriber(uint8_t subscriber_num, uint64_t msg_num) noexcept(false) -> void;
 
 template <size_t L, uint16_t M>
-auto run_subscriber_loop(lshl::demux::DemultiplexerSubscriber<L, M>& sub, uint64_t msg_num) noexcept(false) -> void;
+auto run_subscriber_loop(lshl::demux::DemuxSubscriber<L, M>& sub, uint64_t msg_num) noexcept(false) -> void;
 
 auto calculate_latency(uint64_t x0) -> int64_t;
 

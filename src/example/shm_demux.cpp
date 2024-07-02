@@ -88,8 +88,8 @@ namespace lshl::demux::example {
 
 namespace bipc = boost::interprocess;
 
-using lshl::demux::DemultiplexerPublisher;
-using lshl::demux::DemultiplexerSubscriber;
+using lshl::demux::DemuxPublisher;
+using lshl::demux::DemuxSubscriber;
 using lshl::demux::SubscriberId;
 using lshl::util::HDR_histogram_util;
 using lshl::util::ShmRemover;
@@ -183,9 +183,8 @@ auto start_publisher(const uint8_t total_subscriber_num, const uint64_t msg_num)
   atomic<uint64_t>* startup_sync = segment2.construct<atomic<uint64_t>>("startup_sync")(0);
   BOOST_LOG_TRIVIAL(info) << "startup_sync allocated, segment2.free_memory: " << segment2.get_free_memory();
 
-  lshl::demux::DemultiplexerPublisher<L, M, false> pub(
-      all_subs_mask, span{*buffer}, message_count_sync, wraparound_sync);
-  BOOST_LOG_TRIVIAL(info) << "DemultiplexerPublisher created, segment1.free_memory: " << segment1.get_free_memory()
+  lshl::demux::DemuxPublisher<L, M, false> pub(all_subs_mask, span{*buffer}, message_count_sync, wraparound_sync);
+  BOOST_LOG_TRIVIAL(info) << "DemuxPublisher created, segment1.free_memory: " << segment1.get_free_memory()
                           << ", segment2.free_memory: " << segment2.get_free_memory();
 
   BOOST_LOG_TRIVIAL(info) << "waiting for all subscribers ...";
@@ -201,13 +200,12 @@ auto start_publisher(const uint8_t total_subscriber_num, const uint64_t msg_num)
   BOOST_LOG_TRIVIAL(info) << "all subscribers connected";
 
   run_publisher_loop(pub, msg_num);
-  BOOST_LOG_TRIVIAL(info) << "DemultiplexerPublisher completed, segment1.free_memory: " << segment1.get_free_memory()
+  BOOST_LOG_TRIVIAL(info) << "DemuxPublisher completed, segment1.free_memory: " << segment1.get_free_memory()
                           << ", segment2.free_memory: " << segment2.get_free_memory();
 }
 
 template <size_t L, uint16_t M>
-auto run_publisher_loop(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, const uint64_t msg_num) noexcept(false)
-    -> void {
+auto run_publisher_loop(lshl::demux::DemuxPublisher<L, M, false>& pub, const uint64_t msg_num) noexcept(false) -> void {
   BOOST_LOG_TRIVIAL(info) << "sending " << msg_num << " md updates ...";
 
   MarketDataUpdate md{};
@@ -235,7 +233,7 @@ auto run_publisher_loop(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, c
 }
 
 template <class T, size_t L, uint16_t M>
-[[nodiscard]] inline auto send_(lshl::demux::DemultiplexerPublisher<L, M, false>& pub, const T& md) noexcept -> bool {
+[[nodiscard]] inline auto send_(lshl::demux::DemuxPublisher<L, M, false>& pub, const T& md) noexcept -> bool {
   int attempt = 0;
   while (true) {
     const SendResult result = pub.send_object(md);
@@ -287,20 +285,19 @@ auto start_subscriber(const uint8_t subscriber_num, const uint64_t msg_num) noex
 
   const SubscriberId id = SubscriberId::create(subscriber_num);
 
-  lshl::demux::DemultiplexerSubscriber<L, M> sub(id, span{*buffer}, message_count_sync, wraparound_sync);
-  BOOST_LOG_TRIVIAL(info) << "DemultiplexerSubscriber created, segment1.free_memory: " << segment2.get_free_memory()
+  lshl::demux::DemuxSubscriber<L, M> sub(id, span{*buffer}, message_count_sync, wraparound_sync);
+  BOOST_LOG_TRIVIAL(info) << "DemuxSubscriber created, segment1.free_memory: " << segment2.get_free_memory()
                           << ", segment2.free_memory: " << segment2.get_free_memory();
 
   startup_sync->fetch_or(id.mask());
 
   run_subscriber_loop(sub, msg_num);
-  BOOST_LOG_TRIVIAL(info) << "DemultiplexerSubscriber completed, segment1.free_memory: " << segment2.get_free_memory()
+  BOOST_LOG_TRIVIAL(info) << "DemuxSubscriber completed, segment1.free_memory: " << segment2.get_free_memory()
                           << ", segment2.free_memory: " << segment2.get_free_memory();
 }
 
 template <size_t L, uint16_t M>
-auto run_subscriber_loop(lshl::demux::DemultiplexerSubscriber<L, M>& sub, const uint64_t msg_num) noexcept(false)
-    -> void {
+auto run_subscriber_loop(lshl::demux::DemuxSubscriber<L, M>& sub, const uint64_t msg_num) noexcept(false) -> void {
   XXH64_util hash{};
   HDR_histogram_util histogram{};
 

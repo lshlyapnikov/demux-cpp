@@ -39,17 +39,17 @@ enum SendResult {
 /// wraparound synchronization. If `false`, it will return immediately with `SendResult::Repeat`.
 template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
-class DemultiplexerPublisher {
+class DemuxPublisher {
  public:
-  DemultiplexerPublisher(uint64_t all_subs_mask,
-                         span<uint8_t, L> buffer,
-                         atomic<uint64_t>* message_count_sync,
-                         atomic<uint64_t>* wraparound_sync) noexcept
+  DemuxPublisher(uint64_t all_subs_mask,
+                 span<uint8_t, L> buffer,
+                 atomic<uint64_t>* message_count_sync,
+                 atomic<uint64_t>* wraparound_sync) noexcept
       : all_subs_mask_(all_subs_mask),
         buffer_(buffer),
         message_count_sync_(message_count_sync),
         wraparound_sync_(wraparound_sync) {
-    BOOST_LOG_TRIVIAL(info) << "DemultiplexerPublisher::constructor L: " << L << ", M: " << M << ", B: " << B
+    BOOST_LOG_TRIVIAL(info) << "DemuxPublisher::constructor L: " << L << ", M: " << M << ", B: " << B
                             << ", all_subs_mask_: " << this->all_subs_mask_;
   }
 
@@ -59,7 +59,7 @@ class DemultiplexerPublisher {
   [[nodiscard]] auto send(const span<uint8_t>& source) noexcept -> SendResult {
     const size_t n = source.size();
     if (n == 0 || n > M) {
-      BOOST_LOG_TRIVIAL(error) << "DemultiplexerPublisher::send invalid message length: " << n;
+      BOOST_LOG_TRIVIAL(error) << "DemuxPublisher::send invalid message length: " << n;
       return SendResult::Error;
     }
     if constexpr (B) {
@@ -156,22 +156,22 @@ class DemultiplexerPublisher {
   atomic<uint64_t>* wraparound_sync_;
 };
 
-/// @brief Demultiplexer subscriber. Should be mapped into shared memory allocated by DemultiplexerPublisher.
+/// @brief Demultiplexer subscriber. Should be mapped into shared memory allocated by DemuxPublisher.
 /// @tparam `L` The size of the circular buffer in bytes.
 /// @tparam `M` The max message size in bytes.
 template <size_t L, uint16_t M>
   requires(L >= M + 2 && M > 0)
-class DemultiplexerSubscriber {
+class DemuxSubscriber {
  public:
-  DemultiplexerSubscriber(const SubscriberId& subscriber_id,
-                          span<uint8_t, L> buffer,
-                          atomic<uint64_t>* message_count_sync,
-                          atomic<uint64_t>* wraparound_sync) noexcept
+  DemuxSubscriber(const SubscriberId& subscriber_id,
+                  span<uint8_t, L> buffer,
+                  atomic<uint64_t>* message_count_sync,
+                  atomic<uint64_t>* wraparound_sync) noexcept
       : id_(subscriber_id),
         buffer_(buffer),
         message_count_sync_(message_count_sync),
         wraparound_sync_(wraparound_sync) {
-    BOOST_LOG_TRIVIAL(info) << "DemultiplexerSubscriber::constructor L: " << L << ", M: " << M << ", " << this->id_;
+    BOOST_LOG_TRIVIAL(info) << "DemuxSubscriber::constructor L: " << L << ", M: " << M << ", " << this->id_;
   }
 
   /// @brief Does not block. Calls `has_next`. Returns a `span` pointing to the object in the circular buffer.
@@ -224,7 +224,7 @@ class DemultiplexerSubscriber {
 
 template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
-auto DemultiplexerPublisher<L, M, B>::send_blocking_(const span<uint8_t>& source, uint8_t recursion_level) noexcept
+auto DemuxPublisher<L, M, B>::send_blocking_(const span<uint8_t>& source, uint8_t recursion_level) noexcept
     -> SendResult {
   // it either writes the entire message or nothing
   const size_t written = this->buffer_.write(this->position_, source);
@@ -234,7 +234,7 @@ auto DemultiplexerPublisher<L, M, B>::send_blocking_(const span<uint8_t>& source
     return SendResult::Success;
   } else {
     if (recursion_level > 1) {
-      BOOST_LOG_TRIVIAL(error) << "DemultiplexerPublisher::send_ recursion_level: " << recursion_level;
+      BOOST_LOG_TRIVIAL(error) << "DemuxPublisher::send_ recursion_level: " << recursion_level;
       return SendResult::Error;
     } else {
       this->wait_for_subs_to_catch_up_and_wraparound_();
@@ -245,11 +245,11 @@ auto DemultiplexerPublisher<L, M, B>::send_blocking_(const span<uint8_t>& source
 
 template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
-auto DemultiplexerPublisher<L, M, B>::send_non_blocking_(const span<uint8_t>& source) noexcept -> SendResult {
+auto DemuxPublisher<L, M, B>::send_non_blocking_(const span<uint8_t>& source) noexcept -> SendResult {
   const size_t n = source.size();
 
   if (n == 0 || n > M) {
-    BOOST_LOG_TRIVIAL(error) << "DemultiplexerPublisher::send_ invalid message length: " << n;
+    BOOST_LOG_TRIVIAL(error) << "DemuxPublisher::send_ invalid message length: " << n;
     return SendResult::Error;
   }
 
@@ -275,11 +275,11 @@ auto DemultiplexerPublisher<L, M, B>::send_non_blocking_(const span<uint8_t>& so
 
 template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
-auto DemultiplexerPublisher<L, M, B>::wait_for_subs_to_catch_up_and_wraparound_() noexcept -> void {
+auto DemuxPublisher<L, M, B>::wait_for_subs_to_catch_up_and_wraparound_() noexcept -> void {
   this->initiate_wraparound_();
 
 #ifndef NDEBUG
-  BOOST_LOG_TRIVIAL(debug) << "DemultiplexerPublisher::wait_for_subs_to_catch_up_and_wraparound_, message_count_: "
+  BOOST_LOG_TRIVIAL(debug) << "DemuxPublisher::wait_for_subs_to_catch_up_and_wraparound_, message_count_: "
                            << this->message_count_ << ", position_: " << this->position_ << " ... waiting ...";
 #endif
 
@@ -292,7 +292,7 @@ auto DemultiplexerPublisher<L, M, B>::wait_for_subs_to_catch_up_and_wraparound_(
 
 template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
-inline auto DemultiplexerPublisher<L, M, B>::initiate_wraparound_() noexcept -> void {
+inline auto DemuxPublisher<L, M, B>::initiate_wraparound_() noexcept -> void {
   // see doc/adr/ADR003.md for more details
   this->wraparound_ = true;
   this->wraparound_sync_->store(0);
@@ -302,14 +302,14 @@ inline auto DemultiplexerPublisher<L, M, B>::initiate_wraparound_() noexcept -> 
 
 template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
-inline auto DemultiplexerPublisher<L, M, B>::complete_wraparound_() noexcept -> void {
+inline auto DemuxPublisher<L, M, B>::complete_wraparound_() noexcept -> void {
   this->position_ = 0;
   this->wraparound_ = false;
 }
 
 template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
-inline auto DemultiplexerPublisher<L, M, B>::all_subs_caught_up_() noexcept -> bool {
+inline auto DemuxPublisher<L, M, B>::all_subs_caught_up_() noexcept -> bool {
   const uint64_t x = this->wraparound_sync_->load();
   return x == this->all_subs_mask_;
 }
@@ -317,9 +317,9 @@ inline auto DemultiplexerPublisher<L, M, B>::all_subs_caught_up_() noexcept -> b
 template <size_t L, uint16_t M>
   requires(L >= M + 2 && M > 0)
 // NOLINTNEXTLINE(readability-const-return-type)
-[[nodiscard]] auto DemultiplexerSubscriber<L, M>::next() noexcept -> const span<uint8_t> {
+[[nodiscard]] auto DemuxSubscriber<L, M>::next() noexcept -> const span<uint8_t> {
 #ifndef NDEBUG
-  BOOST_LOG_TRIVIAL(debug) << "DemultiplexerSubscriber::next() " << this->id_
+  BOOST_LOG_TRIVIAL(debug) << "DemuxSubscriber::next() " << this->id_
                            << ", read_message_count_: " << this->read_message_count_
                            << ", position_: " << this->position_;
 #endif
@@ -337,7 +337,7 @@ template <size_t L, uint16_t M>
     this->position_ += msg_size;
     this->position_ += sizeof(uint16_t);
 #ifndef NDEBUG
-    BOOST_LOG_TRIVIAL(debug) << "DemultiplexerSubscriber::next() continue, " << this->id_
+    BOOST_LOG_TRIVIAL(debug) << "DemuxSubscriber::next() continue, " << this->id_
                              << ", read_message_count_: " << this->read_message_count_
                              << ", available_message_count_: " << this->available_message_count_
                              << ", position_: " << this->position_;
@@ -346,7 +346,7 @@ template <size_t L, uint16_t M>
     return result;
   } else {
 #ifndef NDEBUG
-    BOOST_LOG_TRIVIAL(debug) << "DemultiplexerSubscriber::next() wrapping up, " << this->id_
+    BOOST_LOG_TRIVIAL(debug) << "DemuxSubscriber::next() wrapping up, " << this->id_
                              << ", read_message_count_: " << this->read_message_count_
                              << ", available_message_count_: " << this->available_message_count_
                              << ", position_: " << this->position_;
@@ -361,7 +361,7 @@ template <size_t L, uint16_t M>
 
 template <size_t L, uint16_t M>
   requires(L >= M + 2 && M > 0)
-[[nodiscard]] auto DemultiplexerSubscriber<L, M>::has_next() noexcept -> bool {
+[[nodiscard]] auto DemuxSubscriber<L, M>::has_next() noexcept -> bool {
   if (this->read_message_count_ < this->available_message_count_) {
     return true;
   } else {

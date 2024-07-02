@@ -36,8 +36,8 @@ BOOST_STRONG_TYPEDEF(std::vector<uint8_t>, TestMessage);
 }  // namespace lshl::demux
 
 using lshl::demux::DEFAULT_WAIT;
-using lshl::demux::DemultiplexerPublisher;
-using lshl::demux::DemultiplexerSubscriber;
+using lshl::demux::DemuxPublisher;
+using lshl::demux::DemuxSubscriber;
 using lshl::demux::SendResult;
 using lshl::demux::SubscriberId;
 using lshl::demux::TestMessage;
@@ -93,7 +93,7 @@ auto assert_eq(const vector<TestMessage>& left, const vector<TestMessage>& right
 }
 
 template <size_t L, uint16_t M, bool B>
-auto send_all(const vector<TestMessage>& messages, DemultiplexerPublisher<L, M, B>& publisher) -> size_t {
+auto send_all(const vector<TestMessage>& messages, DemuxPublisher<L, M, B>& publisher) -> size_t {
   size_t result = 0;
   for (size_t i = 0; i < messages.size();) {
     TestMessage m = messages[i];
@@ -113,7 +113,7 @@ auto send_all(const vector<TestMessage>& messages, DemultiplexerPublisher<L, M, 
 }
 
 template <size_t L, uint16_t M>
-auto read_n(const size_t message_num, DemultiplexerSubscriber<L, M>& subscriber) -> vector<TestMessage> {
+auto read_n(const size_t message_num, DemuxSubscriber<L, M>& subscriber) -> vector<TestMessage> {
   vector<TestMessage> result;
   while (result.size() < message_num) {
     const span<uint8_t>& m = subscriber.next();
@@ -144,7 +144,7 @@ auto publisher_constructor_does_not_throw(const uint8_t all_subs_mask) -> void {
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
 
-  const DemultiplexerPublisher<32, 4, Blocking> m(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  const DemuxPublisher<32, 4, Blocking> m(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
   ASSERT_EQ(0, m.message_count());
   ASSERT_EQ(0, m.position());
   ASSERT_EQ(all_subs_mask, m.all_subs_mask());
@@ -166,8 +166,8 @@ auto publisher_send_empty_message() {
   const uint8_t all_subs_mask = 0b1;
   const SubscriberId subId = SubscriberId::create(1);
 
-  DemultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
-  DemultiplexerSubscriber<L, M> subscriber(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxPublisher<L, M, Blocking> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxSubscriber<L, M> subscriber(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
   const SendResult result = publisher.send({});
 
@@ -195,8 +195,8 @@ auto publisher_send_invalid_large_message() -> void {
   const uint8_t all_subs_mask = 0b1;
   const SubscriberId subId = SubscriberId::create(1);
 
-  DemultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
-  DemultiplexerSubscriber<L, M> subscriber(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxPublisher<L, M, Blocking> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxSubscriber<L, M> subscriber(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
   array<uint8_t, L> m{1};  // this should not fit into the buffer given M + 2 requirement
   const SendResult result = publisher.send(m);
@@ -223,8 +223,8 @@ TEST(NonBlockingDeDemultiplexerPublisherTest, SendWhenBufferIfFullAndGetSendRepe
   const uint8_t all_subs_mask = 0b1;
   const SubscriberId subId = SubscriberId::create(1);
 
-  DemultiplexerPublisher<L, M, false> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
-  DemultiplexerSubscriber<L, M> subscriber(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxPublisher<L, M, false> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxSubscriber<L, M> subscriber(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
   ASSERT_EQ(L, M * 2);
 
@@ -257,8 +257,8 @@ auto publisher_send_and_receive_1(TestMessage message) {
   const uint8_t all_subs_mask = 0b1;
   const SubscriberId subId = SubscriberId::create(1);
 
-  DemultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
-  DemultiplexerSubscriber<L, M> subscriber(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxPublisher<L, M, Blocking> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxSubscriber<L, M> subscriber(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
   const SendResult result = publisher.send(message.t);
 
@@ -293,8 +293,8 @@ auto publisher_one_sub_receive_x(const vector<TestMessage>& valid_messages) {
   const uint8_t all_subs_mask = 0b1;
   const SubscriberId subId = SubscriberId::create(1);
 
-  DemultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
-  DemultiplexerSubscriber<L, M> subscriber(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxPublisher<L, M, Blocking> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxSubscriber<L, M> subscriber(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
   std::future<size_t> sent_count_future =
       std::async(std::launch::async, [&valid_messages, &publisher] { return send_all(valid_messages, publisher); });
@@ -338,15 +338,15 @@ auto publisher_multiple_subs_receive_x(const vector<TestMessage>& valid_messages
   atomic<uint64_t> wraparound_sync{0};
   const uint64_t all_subs_mask = SubscriberId::all_subscribers_mask(SUB_NUM);
 
-  vector<DemultiplexerSubscriber<L, M>> subscribers{};
+  vector<DemuxSubscriber<L, M>> subscribers{};
   subscribers.reserve(SUB_NUM);
   for (uint8_t i = 1; i <= SUB_NUM; ++i) {
     const SubscriberId id = SubscriberId::create(i);
-    const DemultiplexerSubscriber<L, M> sub{id, span{buffer}, &msg_counter_sync, &wraparound_sync};
+    const DemuxSubscriber<L, M> sub{id, span{buffer}, &msg_counter_sync, &wraparound_sync};
     subscribers.emplace_back(sub);
   }
 
-  DemultiplexerPublisher<L, M, Blocking> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxPublisher<L, M, Blocking> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
   std::future<size_t> future_pub_result =
       std::async(std::launch::async, [&valid_messages, &publisher] { return send_all(valid_messages, publisher); });
@@ -405,7 +405,7 @@ auto publisher_add_remove_subscriber(const vector<SubscriberId>& subs) {
   array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
-  DemultiplexerPublisher<L, M, Blocking> publisher(0, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxPublisher<L, M, Blocking> publisher(0, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
   ASSERT_EQ(0, publisher.all_subs_mask());
 

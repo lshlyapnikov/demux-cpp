@@ -14,4 +14,4 @@ cd "${__root}"
 echo ""
 echo "Running clang-format..."
 
-clang-format-17 --dry-run --Werror ./src/* ./test/* ./example/*
+clang-format-17 --dry-run --Werror ./src/**/*
