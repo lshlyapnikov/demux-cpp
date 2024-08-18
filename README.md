@@ -1,6 +1,6 @@
 # C++ Lock-free Demultiplexer Queue
 
-**A Lock-free, Thread-safe, Shared Memory Friendly Demultiplexer Queue** designed for high-performance concurrent programming. This queue supports a single producer (publisher) and multiple consumers (subscribers), ensuring efficient data distribution without the need for locking mechanisms. The queue features zero-copy on the consumer side and is optimized for shared memory environments, making it ideal for applications requiring fast, non-blocking communication between threads or processes.
+**A Lock-free, Thread-safe, Shared Memory and CPU Cache Optimized Demultiplexer Queue** designed for high-performance concurrent programming. This queue supports a single producer (publisher) and multiple consumers (subscribers), ensuring efficient, contiguous data distribution without locking mechanisms. The queue features zero-copy on the consumer side and is optimized for shared memory environments, making it ideal for applications requiring fast, non-blocking communication between threads or processes.
 
 _Description generated with the assistance of ChatGPT._
 
