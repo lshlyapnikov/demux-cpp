@@ -41,10 +41,12 @@ template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
 class DemuxPublisher {
  public:
-  DemuxPublisher(uint64_t all_subs_mask,
-                 span<uint8_t, L> buffer,
-                 atomic<uint64_t>* message_count_sync,
-                 atomic<uint64_t>* wraparound_sync) noexcept
+  DemuxPublisher(
+      uint64_t all_subs_mask,
+      span<uint8_t, L> buffer,
+      atomic<uint64_t>* message_count_sync,
+      atomic<uint64_t>* wraparound_sync
+  ) noexcept
       : all_subs_mask_(all_subs_mask),
         buffer_(buffer),
         message_count_sync_(message_count_sync),
@@ -163,10 +165,12 @@ template <size_t L, uint16_t M>
   requires(L >= M + 2 && M > 0)
 class DemuxSubscriber {
  public:
-  DemuxSubscriber(const SubscriberId& subscriber_id,
-                  span<uint8_t, L> buffer,
-                  atomic<uint64_t>* message_count_sync,
-                  atomic<uint64_t>* wraparound_sync) noexcept
+  DemuxSubscriber(
+      const SubscriberId& subscriber_id,
+      span<uint8_t, L> buffer,
+      atomic<uint64_t>* message_count_sync,
+      atomic<uint64_t>* wraparound_sync
+  ) noexcept
       : id_(subscriber_id),
         buffer_(buffer),
         message_count_sync_(message_count_sync),

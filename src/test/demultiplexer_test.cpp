@@ -354,8 +354,9 @@ auto publisher_multiple_subs_receive_x(const vector<TestMessage>& valid_messages
   vector<std::future<vector<TestMessage>>> future_sub_results{};
   future_sub_results.reserve(SUB_NUM);
   for (auto& subscriber : subscribers) {
-    future_sub_results.emplace_back(
-        std::async(std::launch::async, [message_num, &subscriber] { return read_n(message_num, subscriber); }));
+    future_sub_results.emplace_back(std::async(std::launch::async, [message_num, &subscriber] {
+      return read_n(message_num, subscriber);
+    }));
   }
 
   future_pub_result.wait_for(DEFAULT_WAIT);

@@ -17,17 +17,21 @@ ENDIF()
 
 #message("CMAKE_ENABLE_PROFILING=${CMAKE_ENABLE_PROFILING}")
 
+set(LLVM_HOME $ENV{LLVM_HOME})
+message("LLVM_HOME=${LLVM_HOME}")
+
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_EXTENSIONS OFF) # Disable GNU extensions
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # generate a compile_commands.json file, needed for clang-tidy
 
 # https://github.com/cpp-best-practices/cppbestpractices/blob/master/02-Use_the_Tools_Available.md#gcc--clang
 #set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wconversion -Wsign-conversion -Werror")
 set(MY_CXX_FLAGS -Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wconversion -Wsign-conversion -Werror)
 
-# valgrind needs -gdwarf-4
-set(CMAKE_CXX_FLAGS_DEBUG "-gdwarf-4 -O0")
-#set(CMAKE_CXX_FLAGS_DEBUG "-gdwarf-4 -O3 -DNDEBUG") # -03 for gperftools
+set(CMAKE_CXX_FLAGS_DEBUG "-gdwarf-4 -O0") # valgrind needs `-gdwarf-4`
+#set(CMAKE_CXX_FLAGS_DEBUG "-gdwarf-4 -O3 -DNDEBUG") # `-03 -DNDEBUG` for gperftools
 # set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 # set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
 # set(CMAKE_CXX_FLAGS_MINSIZEREL "-Os")
@@ -44,7 +48,7 @@ endif()
 
 find_program(
   CLANG_TIDY_EXE 
-  NAMES "clang-tidy-17" REQUIRED
+  NAMES "${LLVM_HOME}/bin/clang-tidy" REQUIRED
 )
 set(
   CLANG_TIDY_COMMAND

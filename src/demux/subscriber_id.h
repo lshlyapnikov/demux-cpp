@@ -38,8 +38,10 @@ constexpr auto validate_subscriber_number(uint8_t num) noexcept(false) -> uint8_
   if (is_valid_subscriber_number(num)) {
     return num;
   }
-  throw std::invalid_argument(std::string("subscriber_number must be within the inclusive interval: [1, ") +
-                              std::to_string(MAX_SUBSCRIBER_NUM) + ']');
+  throw std::invalid_argument(
+      std::string("subscriber_number must be within the inclusive interval: [1, ") +
+      std::to_string(MAX_SUBSCRIBER_NUM) + ']'
+  );
 }
 
 auto my_pow(uint8_t x, uint8_t p) -> uint64_t;

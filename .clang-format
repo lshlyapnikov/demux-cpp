@@ -10,6 +10,7 @@ CommentPragmas: "^NOLINT"
 
 BinPackArguments: false
 BinPackParameters: false
+AlignAfterOpenBracket: BlockIndent
 # AllowAllArgumentsOnNextLine: true
 # AllowAllConstructorInitializersOnNextLine: true
 # AllowAllParametersOfDeclarationOnNextLine: true

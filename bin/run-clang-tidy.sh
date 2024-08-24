@@ -14,11 +14,4 @@ cd "${__root}"
 echo ""
 echo "Running clang-tidy..."
 
-# if [ -d "${HOME}/.cltcache" ]; then
-#     find "${HOME}/.cltcache" -mtime +60 -0 | xargs rm
-# fi
-
-clang-tidy-17 -p=./build "$@"
-# cltcache clang-tidy-17 -p=./build "$@"
-# clang-tidy-17 -p=./build ./src/* ./test/*
-# clang-tidy-17 -p=./build ./src/*.cpp ./test/*.cpp
+"${LLVM_HOME}"/bin/clang-tidy -p=./build "$@"

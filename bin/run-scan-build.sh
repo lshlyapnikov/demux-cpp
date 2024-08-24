@@ -14,4 +14,4 @@ cd "${__root}"
 echo ""
 echo "Running scan-build (AKA clang analyzer, subset of clang-tidy)..."
 
-scan-build-17 cmake --build ./build
+"${LLVM_HOME}"/bin/scan-build cmake --build ./build
