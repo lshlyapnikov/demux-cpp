@@ -46,15 +46,6 @@ if(CCACHE_PROGRAM)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
 endif()
 
-find_program(
-  CLANG_TIDY_EXE 
-  NAMES "${LLVM_HOME}/bin/clang-tidy" REQUIRED
-)
-set(
-  CLANG_TIDY_COMMAND
-  "${CLANG_TIDY_EXE}"
-)
-
 #
 # dependencies
 #
