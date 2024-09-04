@@ -1,0 +1,55 @@
+[requires]
+boost/1.83.0
+xxhash/0.8.2
+hdrhistogram-c/0.11.8
+gtest/1.15.0
+rapidcheck/cci.20230815
+
+[options]
+boost/*:header_only=False  # Boost.Log is not header-only, so ensure this is set to False
+boost/*:shared=False       # Static libs
+boost/*:without_log=False  # Ensure Boost.Log is included
+
+# Boost Components defaults
+#
+#    - atomic                   : building
+#    - chrono                   : building
+#    - container                : building
+#    - context                  : building
+#    - contract                 : building
+#    - coroutine                : building
+#    - date_time                : building
+#    - exception                : building
+#    - fiber                    : building
+#    - filesystem               : building
+#    - graph                    : building
+#    - graph_parallel           : not building
+#    - headers                  : not building
+#    - iostreams                : building
+#    - json                     : building
+#    - locale                   : building
+#    - log                      : building
+#    - math                     : building
+#    - mpi                      : not building
+#    - nowide                   : building
+#    - program_options          : building
+#    - python                   : not building
+#    - random                   : building
+#    - regex                    : building
+#    - serialization            : building
+#    - stacktrace               : building
+#    - system                   : building
+#    - test                     : building
+#    - thread                   : building
+#    - timer                    : building
+#    - type_erasure             : building
+#    - url                      : building
+#    - wave                     : building
+
+[generators]
+CMakeDeps
+CMakeToolchain
+
+[layout]
+# this is to separate Release and Debug builds. Keeping 1 build at-a-time for simplicity
+#cmake_layout

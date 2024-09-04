@@ -90,7 +90,14 @@
     "bitset": "cpp",
     "codecvt": "cpp",
     "regex": "cpp",
-    "cassert": "cpp"
+    "cassert": "cpp",
+    "charconv": "cpp",
+    "numbers": "cpp",
+    "semaphore": "cpp",
+    "__threading_support": "cpp",
+    "__verbose_abort": "cpp",
+    "ios": "cpp",
+    "__locale": "cpp"
   },
   "C_Cpp.default.cppStandard": "c++20",
   "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"
