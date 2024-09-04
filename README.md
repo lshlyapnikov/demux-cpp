@@ -33,11 +33,12 @@ This project was developed and tested exclusively on Linux using Clang version 1
 
 **Prerequisites:**
 
-- **CMake 3.16.3**
-- **Boost 1.83.0:** Configured in the [CMakeList.txt](./CMakeLists.txt)
-- **Clang 17.0.6:** Configured in the [.envrc](./.envrc)
-- **gperftools** (optional): google-perftools package
-- **direnv** (optional): An environment variable manager for your shell. More information can be found [here](https://direnv.net/)
+- **Conan 2.7.0** `pip install conan`
+- **CMake**
+- **Clang 18** Configured in the [.envrc](./.envrc).
+- **gperftools** (optional): google-perftools packag.
+- **direnv** (optional): An environment variable manager for your shell. More information can be found [here](https://direnv.net/).
+- **ccache** (optional): Compiler cache.
 
 ## 3. Setting Project Environment Variables
 
@@ -178,6 +179,9 @@ $ google-pprof --text ./build/shm_demux ./shm_demux_pub.prof &> pprof-report.out
 ## 12. Links
 
 - [LLVM Debian/Ubuntu nightly packages](https://apt.llvm.org/)
+- Conan C/C++ Package Manager
+  - [Conan Central Repository](https://conan.io/center)
+  - [Consuming Conan Packages Tutorial](https://docs.conan.io/2/tutorial/consuming_packages.html)
 - [C++ Best Practices](https://github.com/cpp-best-practices/cppbestpractices/blob/master/00-Table_of_Contents.md)
 - [C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines)
 - [Clang-Tidy](https://clang.llvm.org/extra/clang-tidy/)

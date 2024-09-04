@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.15)
 project(demux-cpp VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_VERBOSE_MAKEFILE ON) # verbose CMake output
@@ -15,8 +15,6 @@ ELSE()
   SET(CMAKE_BUILD_TYPE Release)
 ENDIF()
 
-#message("CMAKE_ENABLE_PROFILING=${CMAKE_ENABLE_PROFILING}")
-
 set(LLVM_HOME $ENV{LLVM_HOME})
 message("LLVM_HOME=${LLVM_HOME}")
 
@@ -32,6 +30,8 @@ set(MY_CXX_FLAGS -Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wconversio
 
 set(CMAKE_CXX_FLAGS_DEBUG "-gdwarf-4 -O0") # valgrind needs `-gdwarf-4`
 #set(CMAKE_CXX_FLAGS_DEBUG "-gdwarf-4 -O3 -DNDEBUG") # `-03 -DNDEBUG` for gperftools
+
+# default settins for other build types:
 # set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 # set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
 # set(CMAKE_CXX_FLAGS_MINSIZEREL "-Os")
@@ -53,53 +53,26 @@ endif()
 set(CMAKE_THREAD_PREFER_PTHREAD ON)
 find_package(Threads REQUIRED)
 
-set(BOOST_ROOT $ENV{HOME}/local/boost-installed)
 set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.83.0 REQUIRED COMPONENTS log)
-
-include(FetchContent)
-set(FETCHCONTENT_QUIET OFF)
+find_package(Boost REQUIRED COMPONENTS log)
 
 # example uses this to compute hash digest of sent and received messages
-FetchContent_Declare(
-  xxhash
-  SYSTEM
-  GIT_REPOSITORY git@github.com:Cyan4973/xxHash.git
-  GIT_TAG 805c00b68fa754200ada0c207ffeaa7a4409377c
-)
-FetchContent_MakeAvailable(xxhash)
+find_package(xxHash REQUIRED)
 
 # example uses this to measure and report message latency
-FetchContent_Declare(
-  hdr_histogram
-  SYSTEM
-  GIT_REPOSITORY git@github.com:HdrHistogram/HdrHistogram_c.git
-  GIT_TAG e33c19c911bd259a84dcb2b86c2e4bd5b79258e1
-)
-FetchContent_MakeAvailable(hdr_histogram)
+find_package(hdr_histogram REQUIRED)
 
-FetchContent_Declare(
-  googletest
-  SYSTEM
-  URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
-)
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
+find_package(GTest REQUIRED)
 
-FetchContent_Declare(
-  rapidcheck
-  SYSTEM
-  GIT_REPOSITORY git@github.com:emil-e/rapidcheck.git
-  GIT_TAG ff6af6fc683159deb51c543b065eba14dfcf329b
-)
-FetchContent_MakeAvailable(rapidcheck)
+find_package(rapidcheck REQUIRED)
+
 
 # system include directories do not raise compiler warnings
 include_directories(
   SYSTEM ${Boost_INCLUDE_DIR}
-  SYSTEM ${xxhash_SOURCE_DIR}
-  SYSTEM ${hdr_histogram_SOURCE_DIR}/include
-  SYSTEM ${rapidcheck_SOURCE_DIR}/include
+  SYSTEM ${xxHash_INCLUDE_DIR}
+  # SYSTEM ${hdr_histogram_INCLUDE_DIR}
+  # SYSTEM ${rapidcheck_INCLUDE_DIR}
 )
 
 #
@@ -125,7 +98,7 @@ target_link_libraries(
   shm_demux
   subscriber_id
   atomic
-  hdr_histogram
+  hdr_histogram::hdr_histogram_static
   rt
   Boost::log
   #profiler
@@ -163,8 +136,8 @@ add_executable(
 target_link_libraries(
   subscriber_id_test
   subscriber_id
-  GTest::gtest_main
-  rapidcheck
+  gtest::gtest
+  rapidcheck::rapidcheck
 )
 target_compile_options(
   subscriber_id_test
@@ -178,8 +151,8 @@ add_executable(
 )
 target_link_libraries(
   message_buffer_test
-  GTest::gtest_main
-  rapidcheck
+  gtest::gtest
+  rapidcheck::rapidcheck
   Boost::log
 )
 target_compile_options(
@@ -197,8 +170,8 @@ target_link_libraries(
   demultiplexer
   subscriber_id
   atomic
-  GTest::gtest_main
-  rapidcheck
+  gtest::gtest
+  rapidcheck::rapidcheck
   Boost::log
 )
 target_compile_options(
