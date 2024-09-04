@@ -136,7 +136,7 @@ $ ./bin/run-example.sh
 
 ## 11. Performance Profiling with gperftools (Google Performance Tools)
 
-https://github.com/gperftools/gperftools/tree/master
+<https://github.com/gperftools/gperftools/tree/master>
 
 ### 11.1. Update `CMakeLists.txt`
 
