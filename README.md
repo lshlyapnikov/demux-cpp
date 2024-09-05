@@ -29,7 +29,7 @@ Test conducted on my laptop without CPU isolation or CPU pinning. Refer to the *
 
 ## 2. Development Environment
 
-This project was developed and tested exclusively on Linux using Clang version 17.0.6.
+This project was developed and tested exclusively on Linux using Clang version 17.0.6 and 18.
 
 **Prerequisites:**
 

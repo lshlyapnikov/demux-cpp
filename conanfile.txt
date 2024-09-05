@@ -7,10 +7,10 @@ rapidcheck/cci.20230815
 
 [options]
 boost/*:header_only=False  # Boost.Log is not header-only, so ensure this is set to False
-boost/*:shared=False       # Static libs
 boost/*:without_log=False  # Ensure Boost.Log is included
+boost/*:shared=False       # Static libs
 
-# Boost Components defaults
+# Boost Components:
 #
 #    - atomic                   : building
 #    - chrono                   : building
@@ -51,5 +51,5 @@ CMakeDeps
 CMakeToolchain
 
 [layout]
-# this is to separate Release and Debug builds. Keeping 1 build at-a-time for simplicity
+# Uncomment next line to separate Release and Debug builds. Keeping 1 build at-a-time for simplicity.
 #cmake_layout
