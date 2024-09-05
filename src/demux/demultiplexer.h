@@ -24,7 +24,7 @@ using std::span;
 using std::uint64_t;
 using std::uint8_t;
 
-enum SendResult {
+enum SendResult : std::uint8_t {
   Success,  // message sent
   Repeat,   // wraparound required, resend the last message
   Error,    // message cannot be sent, log error and drop it

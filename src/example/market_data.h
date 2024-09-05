@@ -14,7 +14,7 @@ using std::uint16_t;
 using std::uint32_t;
 using std::uint64_t;
 
-enum class Side { Bid, Ask };
+enum class Side : std::uint8_t { Bid, Ask };
 
 auto operator<<(std::ostream& os, const Side& side) -> std::ostream&;
 
