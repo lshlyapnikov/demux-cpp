@@ -15,10 +15,8 @@ cd "${__root}"
 [ -d ./build ] && rm -rf ./build
 mkdir ./build
 
-cd ./build
-cmake -DCMAKE_BUILD_TYPE=Release ../
-cd ../
+./bin/init-cmake-build.sh "Release"
 
 cmake --build ./build
 
-ls -l ./build
+ls -l ./build/shm_demux
