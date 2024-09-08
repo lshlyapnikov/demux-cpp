@@ -50,6 +50,7 @@ endif()
 # dependencies
 #
 
+# OS-level dependency, needed for boost: -lpthread
 set(CMAKE_THREAD_PREFER_PTHREAD ON)
 find_package(Threads REQUIRED)
 
@@ -65,7 +66,6 @@ find_package(hdr_histogram REQUIRED)
 find_package(GTest REQUIRED)
 
 find_package(rapidcheck REQUIRED)
-
 
 # system include directories do not raise compiler warnings
 include_directories(
@@ -97,9 +97,8 @@ add_executable(
 target_link_libraries(
   shm_demux
   subscriber_id
-  atomic
   hdr_histogram::hdr_histogram_static
-  rt
+  # atomic
   Boost::log
   #profiler
 )
@@ -169,10 +168,10 @@ target_link_libraries(
   demultiplexer_test
   demultiplexer
   subscriber_id
-  atomic
   gtest::gtest
   rapidcheck::rapidcheck
   Boost::log
+  atomic
 )
 target_compile_options(
   demultiplexer_test
