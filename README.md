@@ -35,8 +35,9 @@ This project was developed and tested exclusively on Linux using Clang version 1
 
 - **Conan 2.7.0** `pip install conan`
 - **CMake**
-- **Clang 18** Configured in the [.envrc](./.envrc).
-- **gperftools** (optional): google-perftools packag.
+- **Clang 18** Configured in the [.envrc](./.envrc). See <https://apt.llvm.org/>.
+- **libstdc++** with C++20 support, `sudo add-apt-repository ppa:ubuntu-toolchain-r/test`
+- **gperftools** (optional): google-perftools package.
 - **direnv** (optional): An environment variable manager for your shell. More information can be found [here](https://direnv.net/).
 - **ccache** (optional): Compiler cache.
 
