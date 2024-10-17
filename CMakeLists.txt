@@ -51,8 +51,9 @@ endif()
 #
 
 # OS-level dependency, needed for boost: -lpthread
-set(CMAKE_THREAD_PREFER_PTHREAD ON)
-find_package(Threads REQUIRED)
+# TODO(Leo): is it still needed???
+# set(CMAKE_THREAD_PREFER_PTHREAD ON)
+# find_package(Threads REQUIRED)
 
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost REQUIRED COMPONENTS log)
