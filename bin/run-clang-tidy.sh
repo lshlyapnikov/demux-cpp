@@ -11,7 +11,18 @@ __root="$(cd "$(dirname "${__dir}")" && pwd)"
 ###
 
 cd "${__root}"
-echo ""
-echo "Running clang-tidy..."
 
-"${LLVM_HOME}"/bin/clang-tidy -p=./build "$@"
+mode=${1:-all}
+
+echo ""
+echo "Running clang-tidy, mode: ${mode} ..."
+
+all_src_folders=(./src/demux/* ./src/example/* ./src/test/*)
+
+if [ "${mode}" = "all" ]; then
+    "${LLVM_HOME}"/bin/clang-tidy -p=./build "${all_src_folders[@]}"
+else
+    "${LLVM_HOME}"/bin/clang-tidy -p=./build "$@"
+fi
+
+
