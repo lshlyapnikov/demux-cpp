@@ -24,5 +24,3 @@ if [ "${mode}" = "all" ]; then
 else
     "${LLVM_HOME}"/bin/clang-tidy -p=./build "$@"
 fi
-
-
