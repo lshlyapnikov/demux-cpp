@@ -23,11 +23,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Setup Conan
-        uses: actions/setup-conan@v1
-        with:
-          conan-home: "~/.conan2"
-          cache-dependencies: true
-          cache-tool: true
+        uses: jwidauer/setup-conan@v1
 
       - name: Configure CMake
         # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
