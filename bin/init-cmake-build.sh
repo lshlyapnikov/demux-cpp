@@ -27,7 +27,7 @@ mkdir ./build
 echo "build_type: ${build_type}"
 
 # resolve package dependencies
-conan install . --profile ./conan2/profiles/clang --output-folder=./build/ \
+conan install . --profile:build=./conan2/profiles/clang --output-folder=./build/ \
     --build=missing --settings=build_type="${build_type}"
 
 # generate build files
