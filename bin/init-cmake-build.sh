@@ -26,11 +26,15 @@ mkdir ./build
 
 echo "build_type: ${build_type}"
 
-# resolve package dependencies
+# import environment variables
+# shellcheck source=/dev/null
+source ./.envrc
+
+# Conan: resolve package dependencies
 conan install . --profile:all=./conan2/profiles/clang --output-folder=./build/ \
     --build=missing --settings=build_type="${build_type}"
 
-# generate build files
+# CMake: generate build files
 cd ./build
 cmake ../ -DCMAKE_TOOLCHAIN_FILE=./conan_toolchain.cmake -DCMAKE_BUILD_TYPE="${build_type}"
 cd ../
