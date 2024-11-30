@@ -22,7 +22,7 @@ jobs:
       - name: Setup Conan
         uses: jwidauer/setup-conan@v1
 
-      - name: Set up Clang
+      - name: Set up Clang v18
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
@@ -32,8 +32,8 @@ jobs:
         run: |
           echo ${{github.workspace}}
           echo ${{env.BUILD_TYPE}}
-          clang --version
-          clang++ --version
+          which clang-18
+          which clang++-18
           conan --version
           cmake --version
 
