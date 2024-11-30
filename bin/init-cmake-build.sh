@@ -30,9 +30,11 @@ echo "build_type: ${build_type}"
 # shellcheck source=/dev/null
 source ./.envrc
 
-# Conan: resolve package dependencies
-conan install . --profile:all=./conan2/profiles/clang --output-folder=./build/ \
-    --build=missing --settings=build_type="${build_type}"
+# Conan: configure profile and resolve package dependencies
+conan install . --profile:all=./etc/conan2/profiles/clang.profile \
+    --output-folder=./build/ \
+    --build=missing \
+    --settings=build_type="${build_type}"
 
 # CMake: generate build files
 cd ./build
