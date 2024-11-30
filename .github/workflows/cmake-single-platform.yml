@@ -22,6 +22,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Print Details
+        run: |
+          echo ${{github.workspace}} \
+          echo ${{env.BUILD_TYPE}}
+
       - name: Setup Conan
         uses: jwidauer/setup-conan@v1
 
@@ -41,13 +46,13 @@ jobs:
       #   run: ctest -C ${{env.BUILD_TYPE}}
 
       - name: Configure Conan and CMake
-        working-directory: ${{github.workspace}}/build
+        working-directory: ${{github.workspace}}
         run: ./bin/init-cmake-build.sh ${{env.BUILD_TYPE}}
 
       - name: Build
-        working-directory: ${{github.workspace}}/build
+        working-directory: ${{github.workspace}}
         run: ./bin/run-scan-build.sh
 
       - name: Test
-        working-directory: ${{github.workspace}}/build
+        working-directory: ${{github.workspace}}
         run: cmake --build ./build --target test
