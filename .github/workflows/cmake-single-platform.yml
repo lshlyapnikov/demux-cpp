@@ -23,15 +23,16 @@ jobs:
         uses: jwidauer/setup-conan@v1
 
       - name: Set up Clang
-        uses: egor-tensin/setup-clang@v1
-        with:
-          version: latest
-          platform: x64
+        run: |
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo apt-get install -y libllvm-18-ocaml-dev libllvm18 llvm-18 llvm-18-dev llvm-18-doc llvm-18-runtime
 
       - name: Print Details
         run: |
           echo ${{github.workspace}}
           echo ${{env.BUILD_TYPE}}
+          clang --version
+          clang++ --version
           conan --version
           cmake --version
 
