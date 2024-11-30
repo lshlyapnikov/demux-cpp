@@ -31,7 +31,7 @@ Test conducted on my laptop without CPU isolation or CPU pinning. Refer to the *
 
 This project was developed and tested exclusively on Linux using Clang version 17.0.6 and 18.
 
-**Prerequisites:**
+### 2.1. Prerequisites
 
 - **Conan 2.7.0** `pip install conan`
 - **CMake**
@@ -40,6 +40,10 @@ This project was developed and tested exclusively on Linux using Clang version 1
 - **gperftools** (optional): google-perftools package.
 - **direnv** (optional): An environment variable manager for your shell. More information can be found [here](https://direnv.net/).
 - **ccache** (optional): Compiler cache.
+
+### 2.2. Additional Information
+
+For detailed configuration and build workflows, see the project's CI pipeline: [.github/workflows/cmake-single-platform.yml](.github/workflows/cmake-single-platform.yml).
 
 ## 3. Setting Project Environment Variables
 
