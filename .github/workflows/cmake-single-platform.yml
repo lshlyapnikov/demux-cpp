@@ -25,6 +25,7 @@ jobs:
       - name: Set up Clang
         run: |
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo apt-get install -y clang-18 lldb-18 lld-18
           sudo apt-get install -y libllvm-18-ocaml-dev libllvm18 llvm-18 llvm-18-dev llvm-18-doc llvm-18-runtime
 
       - name: Print Details
