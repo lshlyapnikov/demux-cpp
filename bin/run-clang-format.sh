@@ -29,4 +29,7 @@ fi
 cd "${__root}"
 echo "Running clang-format..."
 
+# shellcheck source=/dev/null
+source ./.envrc
+
 "${LLVM_HOME}"/bin/clang-format "${options}" --Werror ./src/**/*
