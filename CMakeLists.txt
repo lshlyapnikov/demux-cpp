@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(demux-cpp VERSION 0.1.0 LANGUAGES CXX)
+project(${CONAN_PACKAGE_NAME} VERSION ${CONAN_PACKAGE_VERSION} LANGUAGES CXX)
 
 set(CMAKE_VERBOSE_MAKEFILE ON) # verbose CMake output
 
