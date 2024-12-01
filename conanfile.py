@@ -7,7 +7,9 @@ class DemuxCppRecipe(ConanFile):
     name = "demux-cpp"
     version = "0.5.0"
     license = "Apache-2.0"
-    url = "https://github.com/lshlyapnikov/demux-cpp"
+    homepage = "https://github.com/lshlyapnikov/demux-cpp"
+    description = "C++ Lock-free Demultiplexer Queue"
+    topics = ("libraries", "cpp")
     # settings
     settings = "os", "compiler", "build_type", "arch"
     generators = "CMakeDeps", "CMakeToolchain"
