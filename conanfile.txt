@@ -7,8 +7,8 @@ rapidcheck/cci.20230815
 
 [options]
 boost/*:headers_only=True
-boost/*:without_log=False   # Ensure Boost.Log is included
 boost/log:header_only=False # Boost.Log is not header-only, so ensure this is set to False
+boost/*:without_log=False   # Ensure Boost.Log is included
 boost/*:shared=False        # Static libs
 
 # Boost Components:
