@@ -21,7 +21,6 @@ jobs:
       - name: Cache Conan Dependencies
         uses: actions/cache@v4
         with:
-          working-directory: ${{github.workspace}}
           path: ~/.conan2
           key: ${{ runner.os }}-conan-${{ hashFiles('conanfile.txt') }}
           restore-keys: |
@@ -46,6 +45,10 @@ jobs:
           which clang-tidy-18
           conan --version
           cmake --version
+
+      - name: Run clang-format Check
+        working-directory: ${{github.workspace}}
+        run: ./bin/run-clang-format.sh check
 
       - name: Resolve Conan Dependencies and Configure CMake
         working-directory: ${{github.workspace}}
