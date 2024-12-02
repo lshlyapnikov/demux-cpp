@@ -181,7 +181,21 @@ $ ./bin/run-example.sh
 $ google-pprof --text ./build/shm_demux ./shm_demux_pub.prof &> pprof-report.out
 ```
 
-## 12. Links
+## 12. Conan Commands
+
+### 12.1. Deploy this package to the local conan repository
+
+```
+$ conan create .
+```
+
+### 12.2. Remove this package from the local conan repository
+
+```
+$ conan remove demux-cpp/*
+```
+
+## 13. Links
 
 - [LLVM Debian/Ubuntu nightly packages](https://apt.llvm.org/)
 - Conan C/C++ Package Manager
