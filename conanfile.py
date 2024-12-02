@@ -37,26 +37,6 @@ class DemuxCppRecipe(ConanFile):
         #cmake_layout(self)
         pass
 
-    # def generate(self):
-    #     deps = CMakeDeps(self)
-    #     deps.generate()
-    #     tc = CMakeToolchain(self)
-    #     tc.generate()
-
-    # def build(self):
-    #     cmake = CMake(self)
-    #     cmake.configure()
-    #     cmake.build()
-
-    # def package(self):
-    #     cmake = CMake(self)
-    #     cmake.install()
-
-    # def source(self):
-    #     # this copy does not work, try to copy demux, example and util folders
-    #     copy(self, "*.h", "src/demux", "include/demux")
-    #     copy(self, "*.h", "src/util", "include/util")
-
     def package(self):
         # Create the include directory in the package folder
         for package_dir in ["demux", "example", "util"]:
