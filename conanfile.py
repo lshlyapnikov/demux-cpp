@@ -1,6 +1,7 @@
 # pylint: disable=missing-module-docstring,missing-class-docstring,missing-function-docstring,line-too-long
 import os
 from conan import ConanFile
+from conan.tools.cmake import CMake, CMakeToolchain
 from conan.tools.files import copy
 
 class DemuxCppRecipe(ConanFile):
@@ -16,11 +17,12 @@ class DemuxCppRecipe(ConanFile):
 
     # Binary configuration
     settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeDeps", "CMakeToolchain"
+    #generators = "CMakeDeps", "CMakeToolchain"
+    generators = "CMakeDeps"
     package_type = "static-library"
 
     # Sources are located in the same place as this recipe, copy them to the recipe
-    exports_sources = "CMakeLists.txt", "src/*"
+    exports_sources = "CMakeLists.txt", "conanfile.py", "src/*"
 
     def requirements(self):
         self.requires("boost/1.83.0")
@@ -37,6 +39,15 @@ class DemuxCppRecipe(ConanFile):
         #cmake_layout(self)
         pass
 
+    def generate(self):
+        tc = CMakeToolchain(self)
+        tc.generate()
+
+    def build(self):
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
+
     def package(self):
         # Create the include directory in the package folder
         for package_dir in ["demux", "example", "util"]:
@@ -44,6 +55,8 @@ class DemuxCppRecipe(ConanFile):
                 src=os.path.join(self.source_folder, f"src/{package_dir}"),
                 dst=os.path.join(self.package_folder, f"include/{package_dir}")
             )
+        cmake = CMake(self)
+        cmake.install()
 
     def package_info(self):
         self.cpp_info.includedirs = ["include"]

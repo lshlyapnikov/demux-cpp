@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(${CONAN_PACKAGE_NAME} VERSION ${CONAN_PACKAGE_VERSION} LANGUAGES CXX)
+project(demux-cpp VERSION 0.5.1 LANGUAGES CXX)
 
 set(CMAKE_VERBOSE_MAKEFILE ON) # verbose CMake output
 
@@ -99,7 +99,6 @@ target_link_libraries(
   shm_demux
   subscriber_id
   hdr_histogram::hdr_histogram_static
-  # atomic
   Boost::log
   #profiler
 )

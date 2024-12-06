@@ -192,7 +192,7 @@ $ conan create .
 ### 12.2. Remove this package from the local conan repository
 
 ```
-$ conan remove demux-cpp/*
+conan remove --confirm demux-cpp/*
 ```
 
 ## 13. Links
