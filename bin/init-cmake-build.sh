@@ -37,7 +37,9 @@ conan install . --profile:all=./etc/conan2/profiles/clang.profile \
 
 # CMake: generate build files
 cd ./build
-cmake ../ -DCMAKE_TOOLCHAIN_FILE=./"${build_type}"/generators/conan_toolchain.cmake -DCMAKE_BUILD_TYPE="${build_type}"
+cmake ../ \
+    -DCMAKE_TOOLCHAIN_FILE=./"${build_type}"/generators/conan_toolchain.cmake \
+    -DCMAKE_BUILD_TYPE="${build_type}"
 cd ../
 
 echo ""
