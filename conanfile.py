@@ -7,7 +7,7 @@ from conan.tools.files import copy
 class DemuxCppRecipe(ConanFile):
     # Project details
     name = "demux-cpp"
-    version = "0.5.1"
+    version = "0.5.2"
 
     # Optional metadata
     license = "Apache-2.0"
