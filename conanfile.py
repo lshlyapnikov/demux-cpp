@@ -1,13 +1,13 @@
 # pylint: disable=missing-module-docstring,missing-class-docstring,missing-function-docstring,line-too-long
 import os
 from conan import ConanFile
-from conan.tools.cmake import CMakeToolchain, CMake, CMakeDeps
+from conan.tools.cmake import CMakeToolchain, CMake, CMakeDeps, cmake_layout
 from conan.tools.files import copy
 
 
 class DemuxCppRecipe(ConanFile):
     name = "demux-cpp"
-    version = "0.5.2"
+    version = "0.5.3"
     package_type = "library"
 
     # Optional metadata
@@ -42,8 +42,8 @@ class DemuxCppRecipe(ConanFile):
             self.options.rm_safe("fPIC")
         self.options["boost"].shared = False
 
-    # def layout(self):
-    #     cmake_layout(self)
+    def layout(self):
+        cmake_layout(self)
 
     def generate(self):
         deps = CMakeDeps(self)
