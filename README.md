@@ -186,7 +186,7 @@ $ google-pprof --text ./build/shm_demux ./shm_demux_pub.prof &> pprof-report.out
 ### 12.1. Deploy this package to the local conan repository
 
 ```
-$ conan create .
+$ conan create . -s build_type=Debug
 ```
 
 ### 12.2. Remove this package from the local conan repository
