@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(demux-cpp VERSION 0.5.1 LANGUAGES CXX)
+project(demux-cpp LANGUAGES CXX)
 
 set(CMAKE_VERBOSE_MAKEFILE ON) # verbose CMake output
 
@@ -49,11 +49,6 @@ endif()
 #
 # dependencies
 #
-
-# OS-level dependency, needed for boost: -lpthread
-# TODO(Leo): is it still needed???
-# set(CMAKE_THREAD_PREFER_PTHREAD ON)
-# find_package(Threads REQUIRED)
 
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost REQUIRED COMPONENTS log)

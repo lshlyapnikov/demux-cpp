@@ -1,7 +1,7 @@
 # pylint: disable=missing-module-docstring,missing-class-docstring,missing-function-docstring,line-too-long
 import os
 from conan import ConanFile
-from conan.tools.cmake import CMake, CMakeToolchain
+from conan.tools.cmake import CMake
 from conan.tools.files import copy
 
 class DemuxCppRecipe(ConanFile):
@@ -17,8 +17,7 @@ class DemuxCppRecipe(ConanFile):
 
     # Binary configuration
     settings = "os", "compiler", "build_type", "arch"
-    #generators = "CMakeDeps", "CMakeToolchain"
-    generators = "CMakeDeps"
+    generators = "CMakeDeps", "CMakeToolchain"
     package_type = "static-library"
 
     # Sources are located in the same place as this recipe, copy them to the recipe
@@ -33,15 +32,6 @@ class DemuxCppRecipe(ConanFile):
 
     def configure(self):
         self.options["boost"].shared = False
-
-    def layout(self):
-        # Uncomment next line to separate Release and Debug builds. Keeping 1 build at-a-time for simplicity.
-        #cmake_layout(self)
-        pass
-
-    def generate(self):
-        tc = CMakeToolchain(self)
-        tc.generate()
 
     def build(self):
         cmake = CMake(self)
