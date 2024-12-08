@@ -7,7 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
-#include "../demux/demultiplexer.h"
+#include "../core/demultiplexer.h"
 
 namespace lshl::demux::example {
 

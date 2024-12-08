@@ -87,8 +87,8 @@ target_link_libraries(
 
 add_executable(
   shm_demux
-  src/example/shm_demux.cpp
-  src/example/market_data.cpp
+  src/demux/example/shm_demux.cpp
+  src/demux/example/market_data.cpp
 )
 target_link_libraries(
   shm_demux
@@ -104,7 +104,7 @@ target_compile_options(
 
 add_library(
   subscriber_id
-  OBJECT src/demux/subscriber_id.cpp
+  OBJECT src/demux/core/subscriber_id.cpp
 )
 target_compile_options(
   subscriber_id
@@ -113,7 +113,7 @@ target_compile_options(
 
 add_library(
   demultiplexer
-  OBJECT src/demux/demultiplexer.cpp
+  OBJECT src/demux/core/demultiplexer.cpp
 )
 target_compile_options(
   demultiplexer
