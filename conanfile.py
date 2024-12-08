@@ -7,7 +7,7 @@ from conan.tools.files import copy
 
 class DemuxCppRecipe(ConanFile):
     name = "demux-cpp"
-    version = "0.6.1-dev"
+    version = "0.6.1"
     package_type = "library"
 
     # Optional metadata

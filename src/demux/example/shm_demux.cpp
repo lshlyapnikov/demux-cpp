@@ -36,13 +36,13 @@
 #include "./market_data.h"
 
 auto print_usage(const char* prog) -> void {
-  std::cerr << "Usage: " << prog << " [pub <total-number-of-subscribers> <number-of-messages-to-write>] "
-            << " | [sub <the-subscriber-number> <number-of-messages-to-receive>]\n"
+  std::cerr << "Usage: " << prog << " [writer <number-of-readers> <number-of-messages>] "
+            << " | [reader <unique-reader-number> <number-of-messages>]\n"
             << "  where\n"
-            << "    <total-number-of-subscribers> and <the-subscriber-number> are within the interval [1, "
+            << "    <number-of-readers> and <unique-reader-number> are within the interval [1, "
             << static_cast<int>(lshl::demux::core::MAX_READER_NUM) << "]\n"
-            << "    <number-of-messages-to-write> and <number-of-messages-to-receive> are within the interval [1, "
-            << std::numeric_limits<uint64_t>::max() << "] (uint64_t)\n";
+            << "    <number-of-messages> is within the interval [1, " << std::numeric_limits<uint64_t>::max()
+            << "] (uint64_t)\n";
 }
 
 auto main(int argc, char* argv[]) noexcept -> int {
@@ -116,10 +116,10 @@ auto main_(const span<char*> args) noexcept(false) -> int {
   const auto num8 = static_cast<uint8_t>(num16);
   const auto msg_num = boost::lexical_cast<uint64_t>(args[3]);
 
-  if (command == "pub") {
-    start_publisher<BUFFER_SIZE, MAX_MESSAGE_SIZE>(num8, msg_num);
-  } else if (command == "sub") {
-    start_subscriber<BUFFER_SIZE, MAX_MESSAGE_SIZE>(num8, msg_num);
+  if (command == "writer") {
+    start_writer<BUFFER_SIZE, MAX_MESSAGE_SIZE>(num8, msg_num);
+  } else if (command == "reader") {
+    start_reader<BUFFER_SIZE, MAX_MESSAGE_SIZE>(num8, msg_num);
   } else {
     print_usage(args[0]);
     return ERROR;
@@ -147,18 +147,18 @@ auto calculate_required_buffer_shared_mem_size() noexcept -> size_t {
 }
 
 template <size_t L, uint16_t M>
-auto start_publisher(const uint8_t total_subscriber_num, const uint64_t msg_num) noexcept(false) -> void {
+auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num) noexcept(false) -> void {
   const size_t SHM = calculate_required_buffer_shared_mem_size<L>();
 
-  BOOST_LOG_TRIVIAL(info) << "start_publisher " << BUFFER_SHARED_MEM_NAME << ", size: " << SHM << ", L: " << L
-                          << ", M: " << M << ", total_subscriber_num: " << static_cast<int>(total_subscriber_num);
+  BOOST_LOG_TRIVIAL(info) << "start_writer " << BUFFER_SHARED_MEM_NAME << ", size: " << SHM << ", L: " << L
+                          << ", M: " << M << ", total_reader_num: " << static_cast<int>(total_reader_num);
 
   const ShmRemover remover1(BUFFER_SHARED_MEM_NAME);
   const ShmRemover remover2(UTIL_SHARED_MEM_NAME);
 
-  const uint64_t all_subs_mask = ReaderId::all_readers_mask(total_subscriber_num);
+  const uint64_t all_subs_mask = ReaderId::all_readers_mask(total_reader_num);
 
-  // segment for the circular buffer and message counter, written by publisher, read by subscribers
+  // segment for the circular buffer and message counter, written by writer, read by readers
   bipc::managed_shared_memory segment1(bipc::create_only, BUFFER_SHARED_MEM_NAME, SHM);
   BOOST_LOG_TRIVIAL(info) << "created shared_memory_object segment1: " << BUFFER_SHARED_MEM_NAME
                           << ", segment1.free_memory: " << segment1.get_free_memory();
@@ -184,7 +184,7 @@ auto start_publisher(const uint8_t total_subscriber_num, const uint64_t msg_num)
   BOOST_LOG_TRIVIAL(info) << "DemuxWriter created, segment1.free_memory: " << segment1.get_free_memory()
                           << ", segment2.free_memory: " << segment2.get_free_memory();
 
-  BOOST_LOG_TRIVIAL(info) << "waiting for all subscribers ...";
+  BOOST_LOG_TRIVIAL(info) << "waiting for all readers ...";
   while (true) {
     const uint64_t x = startup_sync->load();
     if (x == all_subs_mask) {
@@ -194,16 +194,15 @@ auto start_publisher(const uint8_t total_subscriber_num, const uint64_t msg_num)
       std::this_thread::sleep_for(1s);
     }
   }
-  BOOST_LOG_TRIVIAL(info) << "all subscribers connected";
+  BOOST_LOG_TRIVIAL(info) << "all readers connected";
 
-  run_publisher_loop(pub, msg_num);
+  run_writer_loop(pub, msg_num);
   BOOST_LOG_TRIVIAL(info) << "DemuxWriter completed, segment1.free_memory: " << segment1.get_free_memory()
                           << ", segment2.free_memory: " << segment2.get_free_memory();
 }
 
 template <size_t L, uint16_t M>
-auto run_publisher_loop(lshl::demux::core::DemuxWriter<L, M, false>& pub, const uint64_t msg_num) noexcept(false
-) -> void {
+auto run_writer_loop(lshl::demux::core::DemuxWriter<L, M, false>& pub, const uint64_t msg_num) noexcept(false) -> void {
   BOOST_LOG_TRIVIAL(info) << "sending " << msg_num << " md updates ...";
 
   MarketDataUpdate md{};
@@ -226,7 +225,7 @@ auto run_publisher_loop(lshl::demux::core::DemuxWriter<L, M, false>& pub, const 
     hash.update(&md, sizeof(MarketDataUpdate));
   }
 
-  BOOST_LOG_TRIVIAL(info) << "publisher sequence number: " << pub.message_count()
+  BOOST_LOG_TRIVIAL(info) << "writer sequence number: " << pub.message_count()
                           << ", XXH64_hash: " << XXH64_util::format(hash.digest());
 }
 
@@ -243,8 +242,8 @@ template <class T, size_t L, uint16_t M>
       case WriteResult::Repeat:
         attempt += 1;
         if (attempt % REPORT_PROGRESS == 0) {
-          BOOST_LOG_TRIVIAL(warning) << "one or more subscribers are lagging, wraparound is blocked, write attempt: "
-                                     << attempt << ", publisher sequence: " << pub.message_count();
+          BOOST_LOG_TRIVIAL(warning) << "one or more readers are lagging, wraparound is blocked, write attempt: "
+                                     << attempt << ", writer sequence: " << pub.message_count();
         }
         continue;
     }
@@ -252,12 +251,12 @@ template <class T, size_t L, uint16_t M>
 }
 
 template <size_t L, uint16_t M>
-auto start_subscriber(const uint8_t subscriber_num, const uint64_t msg_num) noexcept(false) -> void {
+auto start_reader(const uint8_t reader_num, const uint64_t msg_num) noexcept(false) -> void {
   using lshl::demux::example::BUFFER_SHARED_MEM_NAME;
   using std::atomic;
 
-  BOOST_LOG_TRIVIAL(info) << "subscriber BUFFER_SHARED_MEM_NAME: " << BUFFER_SHARED_MEM_NAME << ", L: " << L
-                          << ", M: " << M << ", subscriber_num: " << static_cast<int>(subscriber_num);
+  BOOST_LOG_TRIVIAL(info) << "reader BUFFER_SHARED_MEM_NAME: " << BUFFER_SHARED_MEM_NAME << ", L: " << L << ", M: " << M
+                          << ", reader_num: " << static_cast<int>(reader_num);
 
   // read-only segment for the circular buffer and message counter
   bipc::managed_shared_memory segment1(bipc::open_read_only, BUFFER_SHARED_MEM_NAME);
@@ -281,7 +280,7 @@ auto start_subscriber(const uint8_t subscriber_num, const uint64_t msg_num) noex
   atomic<uint64_t>* startup_sync = segment2.find<atomic<uint64_t>>("startup_sync").first;
   BOOST_LOG_TRIVIAL(info) << "startup_sync found, segment2.free_memory: " << segment2.get_free_memory();
 
-  const ReaderId id = ReaderId::create(subscriber_num);
+  const ReaderId id = ReaderId::create(reader_num);
 
   lshl::demux::core::DemuxReader<L, M> sub(id, span{*buffer}, message_count_sync, wraparound_sync);
   BOOST_LOG_TRIVIAL(info) << "DemuxReader created, segment1.free_memory: " << segment2.get_free_memory()
@@ -289,13 +288,13 @@ auto start_subscriber(const uint8_t subscriber_num, const uint64_t msg_num) noex
 
   startup_sync->fetch_or(id.mask());
 
-  run_subscriber_loop(sub, msg_num);
+  run_reader_loop(sub, msg_num);
   BOOST_LOG_TRIVIAL(info) << "DemuxReader completed, segment1.free_memory: " << segment2.get_free_memory()
                           << ", segment2.free_memory: " << segment2.get_free_memory();
 }
 
 template <size_t L, uint16_t M>
-auto run_subscriber_loop(lshl::demux::core::DemuxReader<L, M>& sub, const uint64_t msg_num) noexcept(false) -> void {
+auto run_reader_loop(lshl::demux::core::DemuxReader<L, M>& sub, const uint64_t msg_num) noexcept(false) -> void {
   XXH64_util hash{};
   HDR_histogram_util histogram{};
 
@@ -319,7 +318,7 @@ auto run_subscriber_loop(lshl::demux::core::DemuxReader<L, M>& sub, const uint64
     }
   }
 
-  BOOST_LOG_TRIVIAL(info) << "subscriber sequence number: " << sub.message_count()
+  BOOST_LOG_TRIVIAL(info) << "reader sequence number: " << sub.message_count()
                           << ", XXH64_hash: " << XXH64_util::format(hash.digest());
 
   BOOST_LOG_TRIVIAL(info) << "message latency, ns:";

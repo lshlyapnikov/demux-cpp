@@ -35,7 +35,7 @@ enum WriteResult : std::uint8_t {
 /// ensure that `L` is a multiple of the OS page size. This is because the Linux operating system
 /// maps memory in whole pages, preventing memory waste.
 /// @tparam `M` The maximum message size in bytes.
-/// @tparam `B` If `true`, `write` will block/busy-spin while waiting for all subscribers to catch up during a
+/// @tparam `B` If `true`, `write` will block/busy-spin while waiting for all readers to catch up during a
 /// wraparound synchronization. If `false`, it will return immediately with `WriteResult::Repeat`.
 template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
@@ -124,7 +124,7 @@ class DemuxWriter {
 #endif  // UNIT_TEST
 
  private:
-  /// @brief Blocks/busy-spins while waiting for subscribers to catch up during a wraparound.
+  /// @brief Blocks/busy-spins while waiting for readers to catch up during a wraparound.
   /// @param `source` message to write.
   /// @param recursion_level.
   /// @return WriteResult.
@@ -158,7 +158,7 @@ class DemuxWriter {
   atomic<uint64_t>* wraparound_sync_;
 };
 
-/// @brief Demultiplexer subscriber. Should be mapped into shared memory allocated by DemuxWriter.
+/// @brief Demultiplexer reader. Should be mapped into shared memory allocated by DemuxWriter.
 /// @tparam `L` The size of the circular buffer in bytes.
 /// @tparam `M` The max message size in bytes.
 template <size_t L, uint16_t M>

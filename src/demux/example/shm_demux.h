@@ -22,19 +22,19 @@ template <size_t L>
 auto calculate_required_buffer_shared_mem_size() noexcept -> size_t;
 
 template <size_t L, uint16_t M>
-auto start_publisher(uint8_t total_subscriber_num, uint64_t msg_num) noexcept(false) -> void;
+auto start_writer(uint8_t total_reader_num, uint64_t msg_num) noexcept(false) -> void;
 
 template <size_t L, uint16_t M>
-auto run_publisher_loop(lshl::demux::core::DemuxWriter<L, M, false>& pub, uint64_t msg_num) noexcept(false) -> void;
+auto run_writer_loop(lshl::demux::core::DemuxWriter<L, M, false>& pub, uint64_t msg_num) noexcept(false) -> void;
 
 template <class T, size_t L, uint16_t M>
 [[nodiscard]] inline auto send_(lshl::demux::core::DemuxWriter<L, M, false>& pub, const T& md) noexcept -> bool;
 
 template <size_t L, uint16_t M>
-auto start_subscriber(uint8_t subscriber_num, uint64_t msg_num) noexcept(false) -> void;
+auto start_reader(uint8_t reader_num, uint64_t msg_num) noexcept(false) -> void;
 
 template <size_t L, uint16_t M>
-auto run_subscriber_loop(lshl::demux::core::DemuxReader<L, M>& sub, uint64_t msg_num) noexcept(false) -> void;
+auto run_reader_loop(lshl::demux::core::DemuxReader<L, M>& sub, uint64_t msg_num) noexcept(false) -> void;
 
 auto calculate_latency(uint64_t x0) -> int64_t;
 
