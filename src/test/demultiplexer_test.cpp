@@ -23,24 +23,24 @@
 #include <span>
 #include <vector>
 #include "../demux/core/message_buffer.h"
-#include "../demux/core/subscriber_id.h"
-#include "./subscriber_id_test.h"
+#include "../demux/core/reader_id.h"
+#include "./reader_id_test.h"
 
-namespace lshl::demux {
+namespace lshl::demux::core {
 
 const std::chrono::seconds DEFAULT_WAIT(5);  // NOLINT(cert-err58-cpp)
 
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
 BOOST_STRONG_TYPEDEF(std::vector<uint8_t>, TestMessage);
 
-}  // namespace lshl::demux
+}  // namespace lshl::demux::core
 
-using lshl::demux::DEFAULT_WAIT;
-using lshl::demux::DemuxPublisher;
-using lshl::demux::DemuxSubscriber;
-using lshl::demux::SendResult;
-using lshl::demux::SubscriberId;
-using lshl::demux::TestMessage;
+using lshl::demux::core::DEFAULT_WAIT;
+using lshl::demux::core::DemuxReader;
+using lshl::demux::core::DemuxWriter;
+using lshl::demux::core::ReaderId;
+using lshl::demux::core::TestMessage;
+using lshl::demux::core::WriteResult;
 using std::array;
 using std::atomic;
 using std::span;
@@ -93,18 +93,18 @@ auto assert_eq(const vector<TestMessage>& left, const vector<TestMessage>& right
 }
 
 template <size_t L, uint16_t M, bool B>
-auto send_all(const vector<TestMessage>& messages, DemuxPublisher<L, M, B>& publisher) -> size_t {
+auto write_all(const vector<TestMessage>& messages, DemuxWriter<L, M, B>& writer) -> size_t {
   size_t result = 0;
   for (size_t i = 0; i < messages.size();) {
     TestMessage m = messages[i];
-    switch (publisher.send(m.t)) {
-      case SendResult::Success:
+    switch (writer.write(m.t)) {
+      case WriteResult::Success:
         i += 1;
         result += 1;
         break;
-      case SendResult::Repeat:
+      case WriteResult::Repeat:
         break;
-      case SendResult::Error:
+      case WriteResult::Error:
         return result;
     }
   }
@@ -113,17 +113,17 @@ auto send_all(const vector<TestMessage>& messages, DemuxPublisher<L, M, B>& publ
 }
 
 template <size_t L, uint16_t M>
-auto read_n(const size_t message_num, DemuxSubscriber<L, M>& subscriber) -> vector<TestMessage> {
+auto read_n(const size_t message_num, DemuxReader<L, M>& reader) -> vector<TestMessage> {
   vector<TestMessage> result;
   while (result.size() < message_num) {
-    const span<uint8_t>& m = subscriber.next();
+    const span<uint8_t>& m = reader.next();
     if (!m.empty()) {
       result.emplace_back(TestMessage(vector<uint8_t>{m.begin(), m.end()}));
     }
   }
 
-  // read one more to unblock the subscriber, which might be waiting for the wraparound unblock
-  const span<uint8_t>& m = subscriber.next();
+  // read one more to unblock the reader, which might be waiting for the wraparound unblock
+  const span<uint8_t>& m = reader.next();
   assert(m.empty());
 
   return result;
@@ -139,148 +139,149 @@ TEST(MultiplexerTest, Atomic) {
 }
 
 template <bool Blocking>
-auto publisher_constructor_does_not_throw(const uint8_t all_subs_mask) -> void {
+auto writer_constructor_does_not_throw(const uint8_t all_readers_mask) -> void {
   array<uint8_t, 32> buffer{};  // NOLINT(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
 
-  const DemuxPublisher<32, 4, Blocking> m(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  const DemuxWriter<32, 4, Blocking> m(all_readers_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
   ASSERT_EQ(0, m.message_count());
   ASSERT_EQ(0, m.position());
-  ASSERT_EQ(all_subs_mask, m.all_subs_mask());
+  ASSERT_EQ(all_readers_mask, m.all_readers_mask());
 }
 
-TEST(BlockingDemultiplexerPublisherTest, ConstructorDoesNotThrow) {
-  rc::check(publisher_constructor_does_not_throw<true>);
+TEST(BlockingDemuxWriterTest, ConstructorDoesNotThrow) {
+  rc::check(writer_constructor_does_not_throw<true>);
 }
 
-TEST(NonBlockingDemultiplexerPublisherTest, ConstructorDoesNotThrow) {
-  rc::check(publisher_constructor_does_not_throw<false>);
+TEST(NonBlockingDemuxWriterTest, ConstructorDoesNotThrow) {
+  rc::check(writer_constructor_does_not_throw<false>);
 }
 
 template <bool Blocking>
-auto publisher_send_empty_message() {
+auto write_empty_message() {
   array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
-  const uint8_t all_subs_mask = 0b1;
-  const SubscriberId subId = SubscriberId::create(1);
+  const uint8_t all_readers_mask = 0b1;
+  const ReaderId subId = ReaderId::create(1);
 
-  DemuxPublisher<L, M, Blocking> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
-  DemuxSubscriber<L, M> subscriber(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxWriter<L, M, Blocking> writer(all_readers_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxReader<L, M> reader(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
-  const SendResult result = publisher.send({});
+  // write an empty message
+  const WriteResult result = writer.write({});
 
-  ASSERT_EQ(SendResult::Error, result);
-  ASSERT_EQ(0, publisher.message_count());
+  ASSERT_EQ(WriteResult::Error, result);
+  ASSERT_EQ(0, writer.message_count());
 
-  const span<uint8_t> read = subscriber.next();
+  const span<uint8_t> read = reader.next();
   ASSERT_EQ(0, read.size());
-  ASSERT_EQ(0, subscriber.message_count());
+  ASSERT_EQ(0, reader.message_count());
 }
 
-TEST(BlockingDemultiplexerPublisherTest, SendEmptyMessage) {
-  publisher_send_empty_message<true>();
+TEST(BlockingDemuxWriterTest, WriteEmptyMessage) {
+  write_empty_message<true>();
 }
 
-TEST(NonBlockingDemultiplexerPublisherTest, SendEmptyMessage) {
-  publisher_send_empty_message<false>();
+TEST(NonBlockingDemuxWriterTest, WriteEmptyMessage) {
+  write_empty_message<false>();
 }
 
 template <bool Blocking>
-auto publisher_send_invalid_large_message() -> void {
+auto write_invalid_large_message() -> void {
   array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
-  const uint8_t all_subs_mask = 0b1;
-  const SubscriberId subId = SubscriberId::create(1);
+  const uint8_t all_readers_mask = 0b1;
+  const ReaderId subId = ReaderId::create(1);
 
-  DemuxPublisher<L, M, Blocking> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
-  DemuxSubscriber<L, M> subscriber(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxWriter<L, M, Blocking> writer(all_readers_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxReader<L, M> reader(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
   array<uint8_t, L> m{1};  // this should not fit into the buffer given M + 2 requirement
-  const SendResult result = publisher.send(m);
-  ASSERT_EQ(SendResult::Error, result);
-  ASSERT_EQ(0, publisher.message_count());
+  const WriteResult result = writer.write(m);
+  ASSERT_EQ(WriteResult::Error, result);
+  ASSERT_EQ(0, writer.message_count());
 
-  const span<uint8_t> read = subscriber.next();
+  const span<uint8_t> read = reader.next();
   ASSERT_EQ(0, read.size());
-  ASSERT_EQ(0, subscriber.message_count());
+  ASSERT_EQ(0, reader.message_count());
 }
 
-TEST(BlockingDemultiplexerPublisherTest, SendInvalidLargeMessage) {
-  publisher_send_invalid_large_message<true>();
+TEST(BlockingDemuxWriterTest, WriteInvalidLargeMessage) {
+  write_invalid_large_message<true>();
 }
 
-TEST(NonBlockingDemultiplexerPublisherTest, SendInvalidLargeMessage) {
-  publisher_send_invalid_large_message<false>();
+TEST(NonBlockingDemuxWriterTest, WriteInvalidLargeMessage) {
+  write_invalid_large_message<false>();
 }
 
-TEST(NonBlockingDeDemultiplexerPublisherTest, SendWhenBufferIfFullAndGetSendRepeatResult) {
+TEST(NonBlockingDemuxWriterTest, WriteWhenBufferIfFullAndGetWriteRepeatResult) {
   array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
-  const uint8_t all_subs_mask = 0b1;
-  const SubscriberId subId = SubscriberId::create(1);
+  const uint8_t all_readers_mask = 0b1;
+  const ReaderId subId = ReaderId::create(1);
 
-  DemuxPublisher<L, M, false> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
-  DemuxSubscriber<L, M> subscriber(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxWriter<L, M, false> writer(all_readers_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxReader<L, M> reader(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
   ASSERT_EQ(L, M * 2);
 
   array<uint8_t, M> m1{1};
-  const SendResult result1 = publisher.send(m1);
-  ASSERT_EQ(SendResult::Success, result1);
-  ASSERT_EQ(1, publisher.message_count());
+  const WriteResult result1 = writer.write(m1);
+  ASSERT_EQ(WriteResult::Success, result1);
+  ASSERT_EQ(1, writer.message_count());
 
   array<uint8_t, M> m2{2};
-  const SendResult result2 = publisher.send(m2);
-  ASSERT_EQ(SendResult::Repeat, result2);
-  ASSERT_EQ(2, publisher.message_count());  // empty message written during the wraparound counts
+  const WriteResult result2 = writer.write(m2);
+  ASSERT_EQ(WriteResult::Repeat, result2);
+  ASSERT_EQ(2, writer.message_count());  // empty message written during the wraparound counts
 
-  const span<uint8_t> read1 = subscriber.next();
-  ASSERT_EQ(1, subscriber.message_count());
+  const span<uint8_t> read1 = reader.next();
+  ASSERT_EQ(1, reader.message_count());
   assert_eq(m1, read1);
 
-  const span<uint8_t> read2 = subscriber.next();
+  const span<uint8_t> read2 = reader.next();
   ASSERT_EQ(0, read2.size());
 }
 
 template <bool Blocking>
-auto publisher_send_and_receive_1(TestMessage message) {
+auto write_and_read_1(TestMessage message) {
   if (message.t.size() > M) {
     return;
   }
   array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
-  const uint8_t all_subs_mask = 0b1;
-  const SubscriberId subId = SubscriberId::create(1);
+  const uint8_t all_readers_mask = 0b1;
+  const ReaderId subId = ReaderId::create(1);
 
-  DemuxPublisher<L, M, Blocking> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
-  DemuxSubscriber<L, M> subscriber(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxWriter<L, M, Blocking> writer(all_readers_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxReader<L, M> reader(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
-  const SendResult result = publisher.send(message.t);
+  const WriteResult result = writer.write(message.t);
 
-  ASSERT_EQ(SendResult::Success, result);
-  ASSERT_EQ(1, publisher.message_count());
+  ASSERT_EQ(WriteResult::Success, result);
+  ASSERT_EQ(1, writer.message_count());
 
-  const span<uint8_t> read = subscriber.next();
+  const span<uint8_t> read = reader.next();
 
-  ASSERT_EQ(1, subscriber.message_count());
+  ASSERT_EQ(1, reader.message_count());
   assert_eq(read, message.t);
 }
 
-TEST(BlockingDemultiplexerPublisherTest, SendReceive1) {
-  rc::check(publisher_send_and_receive_1<true>);
+TEST(BlockingDemuxWriterTest, WriteRead1) {
+  rc::check(write_and_read_1<true>);
 }
 
-TEST(NonBlockingDemultiplexerPublisherTest, SendReceive1) {
-  rc::check(publisher_send_and_receive_1<false>);
+TEST(NonBlockingDemuxWriterTest, WriteRead1) {
+  rc::check(write_and_read_1<false>);
 }
 
 template <bool Blocking>
-auto publisher_one_sub_receive_x(const vector<TestMessage>& valid_messages) {
+auto one_reader_read_x(const vector<TestMessage>& valid_messages) {
   if (valid_messages.empty()) {
     return;
   }
@@ -290,17 +291,17 @@ auto publisher_one_sub_receive_x(const vector<TestMessage>& valid_messages) {
   array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
-  const uint8_t all_subs_mask = 0b1;
-  const SubscriberId subId = SubscriberId::create(1);
+  const uint8_t all_readers_mask = 0b1;
+  const ReaderId subId = ReaderId::create(1);
 
-  DemuxPublisher<L, M, Blocking> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
-  DemuxSubscriber<L, M> subscriber(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxWriter<L, M, Blocking> writer(all_readers_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxReader<L, M> reader(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
   std::future<size_t> sent_count_future =
-      std::async(std::launch::async, [&valid_messages, &publisher] { return send_all(valid_messages, publisher); });
+      std::async(std::launch::async, [&valid_messages, &writer] { return write_all(valid_messages, writer); });
 
   std::future<vector<TestMessage>> received_messages_future =
-      std::async(std::launch::async, [message_num, &subscriber] { return read_n(message_num, subscriber); });
+      std::async(std::launch::async, [message_num, &reader] { return read_n(message_num, reader); });
 
   sent_count_future.wait_for(DEFAULT_WAIT);
   ASSERT_TRUE(sent_count_future.valid());
@@ -315,16 +316,16 @@ auto publisher_one_sub_receive_x(const vector<TestMessage>& valid_messages) {
   assert_eq(valid_messages, received_messages);
 }
 
-TEST(BlockingDemultiplexerPublisherTest, OneSubReceiveX) {
-  rc::check(publisher_one_sub_receive_x<true>);
+TEST(BlockingDemuxWriterTest, OneReaderReadX) {
+  rc::check(one_reader_read_x<true>);
 }
 
-TEST(NonBlockingDemultiplexerPublisherTest, OneSubReceiveX) {
-  rc::check(publisher_one_sub_receive_x<false>);
+TEST(NonBlockingDemuxWriterTest, OneReaderReadX) {
+  rc::check(one_reader_read_x<false>);
 }
 
 template <bool Blocking>
-auto publisher_multiple_subs_receive_x(const vector<TestMessage>& valid_messages) {
+auto multiple_readers_read_x(const vector<TestMessage>& valid_messages) {
   if (valid_messages.empty()) {
     return;
   }
@@ -336,26 +337,26 @@ auto publisher_multiple_subs_receive_x(const vector<TestMessage>& valid_messages
   array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
-  const uint64_t all_subs_mask = SubscriberId::all_subscribers_mask(SUB_NUM);
+  const uint64_t all_readers_mask = ReaderId::all_readers_mask(SUB_NUM);
 
-  vector<DemuxSubscriber<L, M>> subscribers{};
-  subscribers.reserve(SUB_NUM);
+  vector<DemuxReader<L, M>> readers{};
+  readers.reserve(SUB_NUM);
   for (uint8_t i = 1; i <= SUB_NUM; ++i) {
-    const SubscriberId id = SubscriberId::create(i);
-    const DemuxSubscriber<L, M> sub{id, span{buffer}, &msg_counter_sync, &wraparound_sync};
-    subscribers.emplace_back(sub);
+    const ReaderId id = ReaderId::create(i);
+    const DemuxReader<L, M> sub{id, span{buffer}, &msg_counter_sync, &wraparound_sync};
+    readers.emplace_back(sub);
   }
 
-  DemuxPublisher<L, M, Blocking> publisher(all_subs_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxWriter<L, M, Blocking> writer(all_readers_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
   std::future<size_t> future_pub_result =
-      std::async(std::launch::async, [&valid_messages, &publisher] { return send_all(valid_messages, publisher); });
+      std::async(std::launch::async, [&valid_messages, &writer] { return write_all(valid_messages, writer); });
 
   vector<std::future<vector<TestMessage>>> future_sub_results{};
   future_sub_results.reserve(SUB_NUM);
-  for (auto& subscriber : subscribers) {
-    future_sub_results.emplace_back(std::async(std::launch::async, [message_num, &subscriber] {
-      return read_n(message_num, subscriber);
+  for (auto& reader : readers) {
+    future_sub_results.emplace_back(std::async(std::launch::async, [message_num, &reader] {
+      return read_n(message_num, reader);
     }));
   }
 
@@ -370,12 +371,12 @@ auto publisher_multiple_subs_receive_x(const vector<TestMessage>& valid_messages
   }
 }
 
-TEST(BlockingDemultiplexerPublisherTest, MultipleSubsReceiveX) {
-  rc::check(publisher_multiple_subs_receive_x<true>);
+TEST(BlockingDemuxWriterTest, MultipleReadersReadX) {
+  rc::check(multiple_readers_read_x<true>);
 }
 
-TEST(NonBlockingDemultiplexerPublisherTest, MultipleSubsReceiveX) {
-  rc::check(publisher_multiple_subs_receive_x<false>);
+TEST(NonBlockingDemuxWriterTest, MultipleReadersReadX) {
+  rc::check(multiple_readers_read_x<false>);
 }
 
 TEST(TestMessageGenerator, CheckLengthDistribution) {
@@ -402,42 +403,42 @@ TEST(TestMessageGenerator, CheckByteDistribution) {
 }
 
 template <bool Blocking>
-auto publisher_add_remove_subscriber(const vector<SubscriberId>& subs) {
+auto writer_add_remove_reader(const vector<ReaderId>& subs) {
   array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
-  DemuxPublisher<L, M, Blocking> publisher(0, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxWriter<L, M, Blocking> writer(0, span{buffer}, &msg_counter_sync, &wraparound_sync);
 
-  ASSERT_EQ(0, publisher.all_subs_mask());
+  ASSERT_EQ(0, writer.all_readers_mask());
 
   for (auto sub : subs) {
-    ASSERT_FALSE(publisher.is_subscriber(sub));
+    ASSERT_FALSE(writer.is_reader(sub));
   }
 
   for (auto sub : subs) {
-    publisher.add_subscriber(sub);
-    ASSERT_TRUE(publisher.is_subscriber(sub));
-    ASSERT_NE(0, publisher.all_subs_mask());
+    writer.add_reader(sub);
+    ASSERT_TRUE(writer.is_reader(sub));
+    ASSERT_NE(0, writer.all_readers_mask());
   }
 
   for (auto sub : subs) {
-    publisher.remove_subscriber(sub);
-    ASSERT_FALSE(publisher.is_subscriber(sub));
+    writer.remove_reader(sub);
+    ASSERT_FALSE(writer.is_reader(sub));
   }
 
   for (auto sub : subs) {
-    ASSERT_FALSE(publisher.is_subscriber(sub));
+    ASSERT_FALSE(writer.is_reader(sub));
   }
 
-  ASSERT_EQ(0, publisher.all_subs_mask());
+  ASSERT_EQ(0, writer.all_readers_mask());
 }
 
-TEST(BlockingDemultiplexerPublisherTest, AddRemoveSubscriber) {
-  rc::check(publisher_add_remove_subscriber<true>);
+TEST(BlockingDemuxWriterTest, AddRemoveReader) {
+  rc::check(writer_add_remove_reader<true>);
 }
 
-TEST(NonBlockingDemultiplexerPublisherTest, AddRemoveSubscriber) {
-  rc::check(publisher_add_remove_subscriber<false>);
+TEST(NonBlockingDemuxWriterTest, AddRemoveReader) {
+  rc::check(writer_add_remove_reader<false>);
 }
 
 auto main(int argc, char** argv) -> int {

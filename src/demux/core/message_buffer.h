@@ -9,7 +9,7 @@
 #include <cstdint>
 #include <span>
 
-namespace lshl::demux {
+namespace lshl::demux::core {
 
 using std::span;
 using std::uint16_t;
@@ -81,6 +81,6 @@ struct MessageBuffer {
   uint8_t* data_;
 };
 
-}  // namespace lshl::demux
+}  // namespace lshl::demux::core
 
 #endif  // DEMUX_CPP_LSHL_DEMUX_MESSAGE_BUFFER_H

@@ -16,7 +16,7 @@
 #include <span>
 #include <vector>
 
-using lshl::demux::MessageBuffer;
+using lshl::demux::core::MessageBuffer;
 using std::array;
 using std::span;
 using std::uint8_t;

@@ -12,7 +12,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace lshl::util {
+namespace lshl::demux::util {
 
 struct XXH64_util {
   explicit XXH64_util() noexcept(false) : state_(XXH64_createState()) {
@@ -50,6 +50,6 @@ struct XXH64_util {
   XXH64_state_t* state_;
 };
 
-}  // namespace lshl::util
+}  // namespace lshl::demux::util
 
 #endif  // LSHL_UTIL_XXHASH_UTIL_H

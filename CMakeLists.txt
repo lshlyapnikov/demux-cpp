@@ -67,7 +67,7 @@ find_package(rapidcheck REQUIRED)
 include_directories(
   SYSTEM ${Boost_INCLUDE_DIR}
   SYSTEM ${xxHash_INCLUDE_DIR}
-  # SYSTEM ${hdr_histogram_INCLUDE_DIR}
+  SYSTEM ${hdr_histogram_INCLUDE_DIR}
   # SYSTEM ${rapidcheck_INCLUDE_DIR}
 )
 
@@ -81,7 +81,7 @@ add_library(
 )
 target_link_libraries(
   ${PROJECT_NAME}
-  subscriber_id
+  reader_id
   demultiplexer
 )
 
@@ -92,7 +92,7 @@ add_executable(
 )
 target_link_libraries(
   shm_demux
-  subscriber_id
+  reader_id
   hdr_histogram::hdr_histogram_static
   Boost::log
   #profiler
@@ -103,11 +103,11 @@ target_compile_options(
 )
 
 add_library(
-  subscriber_id
-  OBJECT src/demux/core/subscriber_id.cpp
+  reader_id
+  OBJECT src/demux/core/reader_id.cpp
 )
 target_compile_options(
-  subscriber_id
+  reader_id
   PRIVATE ${MY_CXX_FLAGS}
 )
 
@@ -124,20 +124,20 @@ enable_testing()
 include(GoogleTest)
 
 add_executable(
-  subscriber_id_test
-  src/test/subscriber_id_test.cpp
+  reader_id_test
+  src/test/reader_id_test.cpp
 )
 target_link_libraries(
-  subscriber_id_test
-  subscriber_id
+  reader_id_test
+  reader_id
   gtest::gtest
   rapidcheck::rapidcheck
 )
 target_compile_options(
-  subscriber_id_test
+  reader_id_test
   PRIVATE ${MY_CXX_FLAGS}
 )
-gtest_discover_tests(subscriber_id_test)
+gtest_discover_tests(reader_id_test)
 
 add_executable(
   message_buffer_test
@@ -162,7 +162,7 @@ add_executable(
 target_link_libraries(
   demultiplexer_test
   demultiplexer
-  subscriber_id
+  reader_id
   gtest::gtest
   rapidcheck::rapidcheck
   Boost::log

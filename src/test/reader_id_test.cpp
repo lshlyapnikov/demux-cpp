@@ -5,110 +5,110 @@
 
 #define UNIT_TEST
 
-#include "../demux/core/subscriber_id.h"
+#include "../demux/core/reader_id.h"
 #include <gtest/gtest.h>
 #include <rapidcheck.h>
 #include <cmath>
 #include <cstdint>
 #include <stdexcept>
 #include <tuple>
-#include "./subscriber_id_test.h"
+#include "./reader_id_test.h"
 
-using lshl::demux::SubscriberId;
+using lshl::demux::core::ReaderId;
 
-TEST(DomainTest, Constants) {
-  EXPECT_EQ(lshl::demux::MAX_SUBSCRIBER_NUM, 64);
+TEST(ReaderIdTest, Constants) {
+  EXPECT_EQ(lshl::demux::core::MAX_READER_NUM, 64);
 }
 
-TEST(DomainTest, SubscriberIdManualCheck) {
+TEST(ReaderIdTest, ReaderIdManualCheck) {
   for (const uint8_t num :
        {static_cast<uint8_t>(0), static_cast<uint8_t>(65), static_cast<uint8_t>(128), static_cast<uint8_t>(255)}) {
-    ASSERT_THROW({ std::ignore = SubscriberId::create(num); }, std::invalid_argument);
-    ASSERT_THROW({ std::ignore = SubscriberId::all_subscribers_mask(num); }, std::invalid_argument);
+    ASSERT_THROW({ std::ignore = ReaderId::create(num); }, std::invalid_argument);
+    ASSERT_THROW({ std::ignore = ReaderId::all_readers_mask(num); }, std::invalid_argument);
   }
   {
-    const SubscriberId sub_id = SubscriberId::create(1);
-    ASSERT_EQ(0, sub_id.index());
-    ASSERT_EQ(0b1, sub_id.mask());
+    const ReaderId reader_id = ReaderId::create(1);
+    ASSERT_EQ(0, reader_id.index());
+    ASSERT_EQ(0b1, reader_id.mask());
 
-    const uint64_t mask = SubscriberId::all_subscribers_mask(1);
+    const uint64_t mask = ReaderId::all_readers_mask(1);
     ASSERT_EQ(0b1, mask);
   }
   {
-    const SubscriberId sub_id = SubscriberId::create(2);
-    ASSERT_EQ(1, sub_id.index());
-    ASSERT_EQ(0b10, sub_id.mask());
+    const ReaderId reader_id = ReaderId::create(2);
+    ASSERT_EQ(1, reader_id.index());
+    ASSERT_EQ(0b10, reader_id.mask());
 
-    const uint64_t mask = SubscriberId::all_subscribers_mask(2);
+    const uint64_t mask = ReaderId::all_readers_mask(2);
     ASSERT_EQ(0b11, mask);
   }
   {
-    const SubscriberId sub_id = SubscriberId::create(3);
-    ASSERT_EQ(2, sub_id.index());
-    ASSERT_EQ(0b100, sub_id.mask());
+    const ReaderId reader_id = ReaderId::create(3);
+    ASSERT_EQ(2, reader_id.index());
+    ASSERT_EQ(0b100, reader_id.mask());
 
-    const uint64_t mask = SubscriberId::all_subscribers_mask(3);
+    const uint64_t mask = ReaderId::all_readers_mask(3);
     ASSERT_EQ(0b111, mask);
   }
   {
-    const SubscriberId sub_id = SubscriberId::create(4);
-    ASSERT_EQ(3, sub_id.index());
-    ASSERT_EQ(0b1000, sub_id.mask());
+    const ReaderId reader_id = ReaderId::create(4);
+    ASSERT_EQ(3, reader_id.index());
+    ASSERT_EQ(0b1000, reader_id.mask());
 
-    const uint64_t mask = SubscriberId::all_subscribers_mask(4);
+    const uint64_t mask = ReaderId::all_readers_mask(4);
     ASSERT_EQ(0b1111, mask);
   }
   {
-    const SubscriberId sub_id = SubscriberId::create(31);
-    ASSERT_EQ(30, sub_id.index());
-    ASSERT_EQ(0b1000000000000000000000000000000, sub_id.mask());
+    const ReaderId reader_id = ReaderId::create(31);
+    ASSERT_EQ(30, reader_id.index());
+    ASSERT_EQ(0b1000000000000000000000000000000, reader_id.mask());
 
-    const uint64_t mask = SubscriberId::all_subscribers_mask(31);
+    const uint64_t mask = ReaderId::all_readers_mask(31);
     ASSERT_EQ(0b1111111111111111111111111111111, mask);
   }
   {
-    const SubscriberId sub_id = SubscriberId::create(32);
-    ASSERT_EQ(31, sub_id.index());
-    ASSERT_EQ(0b10000000000000000000000000000000, sub_id.mask());
+    const ReaderId reader_id = ReaderId::create(32);
+    ASSERT_EQ(31, reader_id.index());
+    ASSERT_EQ(0b10000000000000000000000000000000, reader_id.mask());
 
-    const uint64_t mask = SubscriberId::all_subscribers_mask(32);
+    const uint64_t mask = ReaderId::all_readers_mask(32);
     ASSERT_EQ(0b11111111111111111111111111111111, mask);
   }
   {
-    const SubscriberId sub_id = SubscriberId::create(64);
-    ASSERT_EQ(63, sub_id.index());
-    ASSERT_EQ(0b1000000000000000000000000000000000000000000000000000000000000000, sub_id.mask());
+    const ReaderId reader_id = ReaderId::create(64);
+    ASSERT_EQ(63, reader_id.index());
+    ASSERT_EQ(0b1000000000000000000000000000000000000000000000000000000000000000, reader_id.mask());
 
-    const uint64_t mask = SubscriberId::all_subscribers_mask(64);
+    const uint64_t mask = ReaderId::all_readers_mask(64);
     ASSERT_EQ(0b1111111111111111111111111111111111111111111111111111111111111111, mask);
   }
 }
 
-TEST(DomainTest, SubscriberId) {
+TEST(ReaderIdTest, ReaderId) {
   rc::check([](const uint8_t num) {
-    if (num > lshl::demux::MAX_SUBSCRIBER_NUM || num == 0) {
-      ASSERT_THROW({ std::ignore = SubscriberId::create(num); }, std::invalid_argument);
+    if (num > lshl::demux::core::MAX_READER_NUM || num == 0) {
+      ASSERT_THROW({ std::ignore = ReaderId::create(num); }, std::invalid_argument);
     } else {
-      const SubscriberId sub_id = SubscriberId::create(num);
-      ASSERT_EQ(num - 1, sub_id.index());
-      ASSERT_EQ(pow(2, (num - 1)), sub_id.mask());
+      const ReaderId reader_id = ReaderId::create(num);
+      ASSERT_EQ(num - 1, reader_id.index());
+      ASSERT_EQ(pow(2, (num - 1)), reader_id.mask());
     }
   });
 }
 
-TEST(DomainTest, AllSubscribersMask) {
+TEST(ReaderIdTest, AllReadersMask) {
   rc::check([](const uint8_t num) {
-    if (num > lshl::demux::MAX_SUBSCRIBER_NUM || num == 0) {
-      ASSERT_THROW({ std::ignore = SubscriberId::all_subscribers_mask(num); }, std::invalid_argument);
+    if (num > lshl::demux::core::MAX_READER_NUM || num == 0) {
+      ASSERT_THROW({ std::ignore = ReaderId::all_readers_mask(num); }, std::invalid_argument);
     } else {
-      const uint64_t all_mask = SubscriberId::all_subscribers_mask(num);
+      const uint64_t all_mask = ReaderId::all_readers_mask(num);
       ASSERT_EQ(pow(2, num) - 1, all_mask);
     }
   });
 }
 
-TEST(DomainTest, SubscriberIdGenerator) {
-  rc::check([](const SubscriberId& sub) { RC_TAG(sub.index()); });
+TEST(ReaderIdTest, ReaderIdGenerator) {
+  rc::check([](const ReaderId& sub) { RC_TAG(sub.index()); });
 }
 
 // NOLINTEND(readability-function-cognitive-complexity, misc-include-cleaner)
