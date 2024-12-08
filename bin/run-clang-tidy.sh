@@ -19,6 +19,9 @@ echo "Running clang-tidy, mode: ${mode} ..."
 
 all_src_folders=(./src/demux/core/* ./src/demux/util/* ./src/demux/example/* ./src/test/*)
 
+# shellcheck source=/dev/null
+source ./.envrc
+
 if [ "${mode}" = "all" ]; then
     "${LLVM_HOME}"/bin/clang-tidy -p=./build "${all_src_folders[@]}"
 else
