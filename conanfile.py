@@ -7,7 +7,7 @@ from conan.tools.files import copy
 
 class DemuxCppRecipe(ConanFile):
     name = "demux-cpp"
-    version = "0.5.3"
+    version = "0.6.0"
     package_type = "library"
 
     # Optional metadata
@@ -58,7 +58,7 @@ class DemuxCppRecipe(ConanFile):
 
     def package(self):
         # Create the include directory in the package folder
-        for package_dir in ["demux", "example", "util"]:
+        for package_dir in ["demux/core", "demux/example", "demux/util"]:
             copy(self, "*.h",
                 src=os.path.join(self.source_folder, f"src/{package_dir}"),
                 dst=os.path.join(self.package_folder, f"include/{package_dir}")

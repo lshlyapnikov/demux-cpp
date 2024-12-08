@@ -28,8 +28,8 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
-#include "../demux/demultiplexer.h"
-#include "../demux/subscriber_id.h"
+#include "../core/demultiplexer.h"
+#include "../core/subscriber_id.h"
 #include "../util/hdr_histogram_util.h"
 #include "../util/shm_remover.h"
 #include "../util/xxhash_util.h"

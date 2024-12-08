@@ -5,7 +5,7 @@
 
 #define UNIT_TEST
 
-#include "../demux/subscriber_id.h"
+#include "../demux/core/subscriber_id.h"
 #include <gtest/gtest.h>
 #include <rapidcheck.h>
 #include <cmath>
