@@ -61,3 +61,7 @@ jobs:
       - name: Test
         working-directory: ${{github.workspace}}
         run: cmake --build ./build --target test
+
+      - name: Test
+        working-directory: ${{github.workspace}}
+        run: ./bin/run-clang-tidy.sh

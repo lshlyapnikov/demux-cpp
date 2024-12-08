@@ -7,7 +7,7 @@
 #include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/log/trivial.hpp>
 
-namespace lshl::util {
+namespace lshl::demux::util {
 
 struct ShmRemover {
   explicit ShmRemover(const char* name) : name_(name) {
@@ -40,6 +40,6 @@ struct ShmRemover {
   const char* name_;
 };
 
-}  // namespace lshl::util
+}  // namespace lshl::demux::util
 
 #endif  // LSHL_UTIL_SHM_REMOVER_H

@@ -18,14 +18,14 @@ msg_num=${1:-10000000}
 
 #CPUPROFILE=shm_demux_pub.prof
 
-# start publisher expecting 2 subscribers
+# start writer expecting 2 readers
 ./build/shm_demux pub 2 "${msg_num}" > ./example-pub.out 2>&1 &
 pub_pid="$!"
 
-# let the publisher start and initialize all shared memory objects, it will wait for both subscribers
+# let the writer start and initialize all shared memory objects, it will wait for both readers
 sleep 2s
 
-# start 2 subscribers
+# start 2 readers
 
 ./build/shm_demux sub 1 "${msg_num}" &> ./example-sub-1.out &
 ./build/shm_demux sub 2 "${msg_num}" &> ./example-sub-2.out &

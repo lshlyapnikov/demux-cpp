@@ -9,7 +9,7 @@
 #include <cstdio>
 #include <stdexcept>
 
-namespace lshl::util {
+namespace lshl::demux::util {
 
 struct HDR_histogram_util {
   explicit HDR_histogram_util() noexcept(false) {
@@ -43,6 +43,6 @@ struct HDR_histogram_util {
   hdr_histogram* histogram_{nullptr};
 };
 
-}  // namespace lshl::util
+}  // namespace lshl::demux::util
 
 #endif  // LSHL_UTIL_HDR_HISTOGRAM_UTIL_H

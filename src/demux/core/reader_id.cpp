@@ -1,10 +1,10 @@
 // Copyright 2024 Leonid Shlyapnikov.
 // SPDX-License-Identifier: Apache-2.0
 
-#include "./subscriber_id.h"
+#include "./reader_id.h"
 #include <iostream>
 
-namespace lshl::demux {
+namespace lshl::demux::core {
 
 auto my_pow(uint8_t x, uint8_t p) -> uint64_t {
   if (p == 0) {
@@ -17,9 +17,9 @@ auto my_pow(uint8_t x, uint8_t p) -> uint64_t {
   return result;
 }
 
-auto operator<<(std::ostream& os, const SubscriberId& sub) -> std::ostream& {
-  os << "SubscriberId{index_: " << sub.index_ << ", mask_: " << sub.mask_ << "}";
+auto operator<<(std::ostream& os, const ReaderId& sub) -> std::ostream& {
+  os << "ReaderId{index_: " << sub.index_ << ", mask_: " << sub.mask_ << "}";
   return os;
 }
 
-}  // namespace lshl::demux
+}  // namespace lshl::demux::core

@@ -8,20 +8,20 @@
 
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
 #include <cstdint>
-#include "../demux/core/subscriber_id.h"
+#include "../demux/core/reader_id.h"
 
 namespace rc {
 
 template <>
-struct Arbitrary<lshl::demux::SubscriberId> {
-  static auto arbitrary() -> Gen<lshl::demux::SubscriberId> {
-    using lshl::demux::is_valid_subscriber_number;
-    using lshl::demux::MAX_SUBSCRIBER_NUM;
-    using lshl::demux::SubscriberId;
+struct Arbitrary<lshl::demux::core::ReaderId> {
+  static auto arbitrary() -> Gen<lshl::demux::core::ReaderId> {
+    using lshl::demux::core::is_valid_reader_number;
+    using lshl::demux::core::MAX_READER_NUM;
+    using lshl::demux::core::ReaderId;
 
-    const Gen<uint8_t> range = gen::inRange(static_cast<uint8_t>(1), MAX_SUBSCRIBER_NUM);
-    const Gen<uint8_t> filtered = gen::suchThat(range, is_valid_subscriber_number);
-    return gen::map(filtered, SubscriberId::create);
+    const Gen<uint8_t> range = gen::inRange(static_cast<uint8_t>(1), MAX_READER_NUM);
+    const Gen<uint8_t> filtered = gen::suchThat(range, is_valid_reader_number);
+    return gen::map(filtered, ReaderId::create);
   }
 };
 
