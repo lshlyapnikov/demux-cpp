@@ -7,7 +7,7 @@ from conan.tools.files import copy
 
 class DemuxCppRecipe(ConanFile):
     name = "demux-cpp"
-    version = "0.6.1"
+    version = "0.6.2-dev"
     package_type = "library"
 
     # Optional metadata
@@ -24,7 +24,7 @@ class DemuxCppRecipe(ConanFile):
     default_options = {"shared": False, "fPIC": True}
 
     # Sources are located in the same place as this recipe, copy them to the recipe
-    exports_sources = "CMakeLists.txt", "src/*", "include/*"
+    exports_sources = "CMakeLists.txt", "src/*", "include/*", "test/*"
 
     def requirements(self):
         self.requires("boost/1.83.0")
@@ -63,6 +63,10 @@ class DemuxCppRecipe(ConanFile):
                 src=os.path.join(self.source_folder, f"src/{package_dir}"),
                 dst=os.path.join(self.package_folder, f"include/{package_dir}")
             )
+        copy(self, "*.h",
+            src=os.path.join(self.source_folder, "src/test"),
+            dst=os.path.join(self.package_folder, "include/demux/test")
+        )
         cmake = CMake(self)
         cmake.install()
 
