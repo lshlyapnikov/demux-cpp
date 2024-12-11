@@ -24,7 +24,7 @@
 #include <vector>
 #include "../core/message_buffer.h"
 #include "../core/reader_id.h"
-#include "./reader_id_test.h"
+#include "./reader_id_gen.h"
 
 namespace lshl::demux::core {
 

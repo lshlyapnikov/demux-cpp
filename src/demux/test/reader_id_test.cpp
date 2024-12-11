@@ -12,7 +12,7 @@
 #include <cstdint>
 #include <stdexcept>
 #include <tuple>
-#include "./reader_id_test.h"
+#include "./reader_id_gen.h"
 
 using lshl::demux::core::ReaderId;
 
