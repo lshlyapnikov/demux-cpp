@@ -5,7 +5,7 @@
 
 #define UNIT_TEST
 
-#include "../demux/core/message_buffer.h"
+#include "../core/message_buffer.h"
 #include <gtest/gtest.h>
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
 #include <array>

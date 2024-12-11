@@ -5,7 +5,7 @@
 
 #define UNIT_TEST
 
-#include "../demux/core/reader_id.h"
+#include "../core/reader_id.h"
 #include <gtest/gtest.h>
 #include <rapidcheck.h>
 #include <cmath>

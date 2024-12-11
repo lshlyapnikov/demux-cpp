@@ -125,7 +125,7 @@ include(GoogleTest)
 
 add_executable(
   reader_id_test
-  src/test/reader_id_test.cpp
+  src/demux/test/reader_id_test.cpp
 )
 target_link_libraries(
   reader_id_test
@@ -141,7 +141,7 @@ gtest_discover_tests(reader_id_test)
 
 add_executable(
   message_buffer_test
-  src/test/message_buffer_test.cpp
+  src/demux/test/message_buffer_test.cpp
 )
 target_link_libraries(
   message_buffer_test
@@ -157,7 +157,7 @@ gtest_discover_tests(message_buffer_test)
 
 add_executable(
   demultiplexer_test
-  src/test/demultiplexer_test.cpp
+  src/demux/test/demultiplexer_test.cpp
 )
 target_link_libraries(
   demultiplexer_test

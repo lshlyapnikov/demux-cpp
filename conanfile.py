@@ -57,18 +57,22 @@ class DemuxCppRecipe(ConanFile):
         cmake.build()
 
     def package(self):
+        cmake = CMake(self)
+        cmake.install()
         # Create the include directory in the package folder
-        for package_dir in ["demux/core", "demux/example", "demux/util"]:
+        for package_dir in ["demux/core", "demux/example", "demux/util", "demux/test"]:
             copy(self, "*.h",
                 src=os.path.join(self.source_folder, f"src/{package_dir}"),
                 dst=os.path.join(self.package_folder, f"include/{package_dir}")
             )
-        copy(self, "*.h",
-            src=os.path.join(self.source_folder, "src/test"),
-            dst=os.path.join(self.package_folder, "include/demux/test")
+        # Create the lib directory in the package folder
+        copy(self, pattern="*.a",
+             src=self.build_folder,
+             dst=os.path.join(self.package_folder, "lib"),
+             keep_path=False
         )
-        cmake = CMake(self)
-        cmake.install()
 
     def package_info(self):
+        self.cpp_info.libs = ["demux-cpp"]
+        self.cpp_info.libdirs = ["lib"]
         self.cpp_info.includedirs = ["include"]

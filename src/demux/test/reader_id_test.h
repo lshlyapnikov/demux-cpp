@@ -8,7 +8,7 @@
 
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
 #include <cstdint>
-#include "../demux/core/reader_id.h"
+#include "../core/reader_id.h"
 
 namespace rc {
 
