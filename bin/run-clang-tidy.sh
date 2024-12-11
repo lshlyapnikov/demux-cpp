@@ -17,7 +17,7 @@ mode=${1:-all}
 echo ""
 echo "Running clang-tidy, mode: ${mode} ..."
 
-all_src_folders=(./src/demux/core/* ./src/demux/util/* ./src/demux/example/* ./src/test/*)
+all_src_folders=(./src/demux/core/* ./src/demux/util/* ./src/demux/example/* ./src/demux/test/*)
 
 # shellcheck source=/dev/null
 source ./.envrc
