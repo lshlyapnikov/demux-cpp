@@ -54,6 +54,8 @@ class ReaderId {
     return ReaderId{mask, index};
   }
 
+  ReaderId() : mask_{0}, index_{0} {}
+
   [[nodiscard]] static auto all_readers_mask(uint8_t total_reader_num) noexcept(false) -> uint64_t {
     validate_reader_number(total_reader_num);
     const uint64_t mask = my_pow(2, total_reader_num) - 1L;
