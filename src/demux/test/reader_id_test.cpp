@@ -11,6 +11,7 @@
 #include <boost/lexical_cast.hpp>
 #include <cmath>
 #include <cstdint>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -87,9 +88,11 @@ TEST(ReaderIdTest, ReaderId) {
       const ReaderId reader_id = ReaderId::create(num);
       ASSERT_EQ(pow(2, (num - 1)), reader_id.mask());
       ASSERT_EQ(num, reader_id.number());
-      const std::string expected = "ReaderId{number: " + boost::lexical_cast<std::string>(reader_id.number()) +
-                                   ",  mask : " + boost::lexical_cast<std::string>(reader_id.mask()) + "}";
-      const std::string actual = boost::lexical_cast<std::string>(reader_id);
+      std::ostringstream oss;
+      oss << "ReaderId{number: " << static_cast<uint64_t>(reader_id.number()) << ",  mask : " << reader_id.mask()
+          << "}";
+      const std::string expected = oss.str();
+      const auto actual = boost::lexical_cast<std::string>(reader_id);
       ASSERT_EQ(expected, actual);
     }
   });
