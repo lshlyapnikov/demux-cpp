@@ -32,11 +32,13 @@ constexpr auto validate_reader_number(const uint8_t num) noexcept(false) -> uint
   );
 }
 
-constexpr uint64_t power_of_two(uint8_t exponent) {
-  return (exponent == 0L) ? 1L : 2L * power_of_two(exponent - 1);
+[[nodiscard]] constexpr auto power_of_two(uint8_t exponent) -> uint64_t {
+  uint64_t result = 1;
+  for (size_t i = 0; i < exponent; ++i) {
+    result *= 2;
+  }
+  return result;
 }
-
-auto my_pow(uint8_t x, uint8_t p) -> uint64_t;
 
 class ReaderId {
  public:
