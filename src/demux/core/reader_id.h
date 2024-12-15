@@ -9,6 +9,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 
 namespace lshl::demux::core {
 
@@ -40,16 +41,26 @@ constexpr auto validate_reader_number(const uint8_t num) noexcept(false) -> uint
   return result;
 }
 
+[[nodiscard]] constexpr auto log_base_two(uint64_t value) -> uint8_t {
+  uint8_t result = 0;
+  uint64_t n = value;
+  while (n > 1) {
+    n /= 2;
+    result += 1;
+  }
+  return result;
+}
+
 class ReaderId {
  public:
   [[nodiscard]] static auto create(uint8_t num) noexcept(false) -> ReaderId {
     validate_reader_number(num);
     const uint8_t index = num - 1;
     const uint64_t mask = power_of_two(index);
-    return ReaderId{num, mask};
+    return ReaderId{mask};
   }
 
-  ReaderId() : number_{0}, mask_{0} {}
+  ReaderId() : mask_{0} {}
 
   [[nodiscard]] static auto all_readers_mask(uint8_t total_reader_num) noexcept(false) -> uint64_t {
     validate_reader_number(total_reader_num);
@@ -57,15 +68,26 @@ class ReaderId {
     return mask;
   }
 
-  [[nodiscard]] auto number() const noexcept -> uint64_t { return this->number_; }
+  [[nodiscard]] auto number() const noexcept -> uint8_t {
+    // return log_base_two(this->mask_) + 1;
+    static std::unordered_map<uint64_t, uint8_t> memo;
+    const auto it = memo.find(this->mask_);
+    if (it != memo.end()) {
+      return it->second;
+    } else {
+      const uint8_t num = log_base_two(this->mask_) + 1;
+      memo[this->mask_] = num;
+      return num;
+    }
+  }
+
   [[nodiscard]] auto mask() const noexcept -> uint64_t { return this->mask_; }
 
   friend auto operator<<(std::ostream& os, const ReaderId& x) -> std::ostream&;
 
  private:
-  ReaderId(uint8_t number, uint64_t mask) noexcept : number_{number}, mask_{mask} {}
+  explicit ReaderId(uint64_t mask) noexcept : mask_{mask} {}
 
-  uint8_t number_;
   uint64_t mask_;
 };
 
