@@ -8,9 +8,11 @@
 #include "../core/reader_id.h"
 #include <gtest/gtest.h>
 #include <rapidcheck.h>
+#include <boost/lexical_cast.hpp>
 #include <cmath>
 #include <cstdint>
 #include <stdexcept>
+#include <string>
 #include <tuple>
 #include "./reader_id_gen.h"
 
@@ -85,6 +87,10 @@ TEST(ReaderIdTest, ReaderId) {
       const ReaderId reader_id = ReaderId::create(num);
       ASSERT_EQ(pow(2, (num - 1)), reader_id.mask());
       ASSERT_EQ(num, reader_id.number());
+      const std::string expected = "ReaderId{number: " + boost::lexical_cast<std::string>(reader_id.number()) +
+                                   ",  mask : " + boost::lexical_cast<std::string>(reader_id.mask()) + "}";
+      const std::string actual = boost::lexical_cast<std::string>(reader_id);
+      ASSERT_EQ(expected, actual);
     }
   });
 }
