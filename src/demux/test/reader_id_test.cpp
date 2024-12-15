@@ -28,7 +28,6 @@ TEST(ReaderIdTest, ReaderIdManualCheck) {
   }
   {
     const ReaderId reader_id = ReaderId::create(1);
-    ASSERT_EQ(0, reader_id.index());
     ASSERT_EQ(0b1, reader_id.mask());
 
     const uint64_t mask = ReaderId::all_readers_mask(1);
@@ -36,7 +35,6 @@ TEST(ReaderIdTest, ReaderIdManualCheck) {
   }
   {
     const ReaderId reader_id = ReaderId::create(2);
-    ASSERT_EQ(1, reader_id.index());
     ASSERT_EQ(0b10, reader_id.mask());
 
     const uint64_t mask = ReaderId::all_readers_mask(2);
@@ -44,7 +42,6 @@ TEST(ReaderIdTest, ReaderIdManualCheck) {
   }
   {
     const ReaderId reader_id = ReaderId::create(3);
-    ASSERT_EQ(2, reader_id.index());
     ASSERT_EQ(0b100, reader_id.mask());
 
     const uint64_t mask = ReaderId::all_readers_mask(3);
@@ -52,7 +49,6 @@ TEST(ReaderIdTest, ReaderIdManualCheck) {
   }
   {
     const ReaderId reader_id = ReaderId::create(4);
-    ASSERT_EQ(3, reader_id.index());
     ASSERT_EQ(0b1000, reader_id.mask());
 
     const uint64_t mask = ReaderId::all_readers_mask(4);
@@ -60,7 +56,6 @@ TEST(ReaderIdTest, ReaderIdManualCheck) {
   }
   {
     const ReaderId reader_id = ReaderId::create(31);
-    ASSERT_EQ(30, reader_id.index());
     ASSERT_EQ(0b1000000000000000000000000000000, reader_id.mask());
 
     const uint64_t mask = ReaderId::all_readers_mask(31);
@@ -68,7 +63,6 @@ TEST(ReaderIdTest, ReaderIdManualCheck) {
   }
   {
     const ReaderId reader_id = ReaderId::create(32);
-    ASSERT_EQ(31, reader_id.index());
     ASSERT_EQ(0b10000000000000000000000000000000, reader_id.mask());
 
     const uint64_t mask = ReaderId::all_readers_mask(32);
@@ -76,7 +70,6 @@ TEST(ReaderIdTest, ReaderIdManualCheck) {
   }
   {
     const ReaderId reader_id = ReaderId::create(64);
-    ASSERT_EQ(63, reader_id.index());
     ASSERT_EQ(0b1000000000000000000000000000000000000000000000000000000000000000, reader_id.mask());
 
     const uint64_t mask = ReaderId::all_readers_mask(64);
@@ -90,8 +83,8 @@ TEST(ReaderIdTest, ReaderId) {
       ASSERT_THROW({ std::ignore = ReaderId::create(num); }, std::invalid_argument);
     } else {
       const ReaderId reader_id = ReaderId::create(num);
-      ASSERT_EQ(num - 1, reader_id.index());
       ASSERT_EQ(pow(2, (num - 1)), reader_id.mask());
+      ASSERT_EQ(num, reader_id.number());
     }
   });
 }
@@ -108,7 +101,7 @@ TEST(ReaderIdTest, AllReadersMask) {
 }
 
 TEST(ReaderIdTest, ReaderIdGenerator) {
-  rc::check([](const ReaderId& sub) { RC_TAG(sub.index()); });
+  rc::check([](const ReaderId& sub) { RC_TAG(sub.mask()); });
 }
 
 // NOLINTEND(readability-function-cognitive-complexity, misc-include-cleaner)

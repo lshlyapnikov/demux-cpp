@@ -6,19 +6,8 @@
 
 namespace lshl::demux::core {
 
-auto my_pow(uint8_t x, uint8_t p) -> uint64_t {
-  if (p == 0) {
-    return 1;
-  }
-  uint64_t result = x;
-  for (size_t i = 2; i <= p; ++i) {
-    result *= x;
-  }
-  return result;
-}
-
-auto operator<<(std::ostream& os, const ReaderId& sub) -> std::ostream& {
-  os << "ReaderId{index_: " << sub.index_ << ", mask_: " << sub.mask_ << "}";
+auto operator<<(std::ostream& os, const ReaderId& x) -> std::ostream& {
+  os << "ReaderId{number: " << x.number() << ",  mask : " << x.mask() << "}";
   return os;
 }
 

@@ -1,6 +1,8 @@
 {
   "my.terminal.run.cmd1": "clear; ${LLVM_HOME}/bin/scan-build cmake --build ./build",
-  "my.terminal.run.cmd2": "clear; cmake --build ./build && cmake --build ./build --target test",
+  // "my.terminal.run.cmd2": "clear; cmake --build ./build && cmake --build ./build --target test",
+  "my.terminal.run.cmd2": "clear; cmake --build ./build && ctest --test-dir ./build/",
+  // "my.terminal.run.cmd2": "clear; cmake --build ./build && ctest --test-dir ./build/ --verbose",
   // "my.terminal.run.cmd3": "clear; ./bin/run-clang-tidy.sh",
   "cSpell.words": [
     "bipc",
@@ -102,7 +104,9 @@
     "__bit_reference": "cpp",
     "__split_buffer": "cpp",
     "locale": "cpp",
-    "print": "cpp"
+    "print": "cpp",
+    "*.def": "cpp",
+    "__config": "cpp"
   },
   "C_Cpp.default.cppStandard": "c++20",
   "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"
