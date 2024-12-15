@@ -164,10 +164,13 @@ auto write_empty_message() {
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
   const uint8_t all_readers_mask = 0b1;
-  const ReaderId subId = ReaderId::create(1);
+  const ReaderId reader_id = ReaderId::create(1);
 
   DemuxWriter<L, M, Blocking> writer(all_readers_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
-  DemuxReader<L, M> reader(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxReader<L, M> reader{reader_id, span{buffer}, &msg_counter_sync, &wraparound_sync};
+
+  ASSERT_TRUE(reader.is_id(reader_id));
+  ASSERT_FALSE(reader.is_id(ReaderId::create(2)));
 
   // write an empty message
   const WriteResult result = writer.write({});
@@ -412,22 +415,22 @@ auto writer_add_remove_reader(const vector<ReaderId>& subs) {
   ASSERT_EQ(0, writer.all_readers_mask());
 
   for (auto sub : subs) {
-    ASSERT_FALSE(writer.is_reader(sub));
+    ASSERT_FALSE(writer.is_registered_reader(sub));
   }
 
   for (auto sub : subs) {
     writer.add_reader(sub);
-    ASSERT_TRUE(writer.is_reader(sub));
+    ASSERT_TRUE(writer.is_registered_reader(sub));
     ASSERT_NE(0, writer.all_readers_mask());
   }
 
   for (auto sub : subs) {
     writer.remove_reader(sub);
-    ASSERT_FALSE(writer.is_reader(sub));
+    ASSERT_FALSE(writer.is_registered_reader(sub));
   }
 
   for (auto sub : subs) {
-    ASSERT_FALSE(writer.is_reader(sub));
+    ASSERT_FALSE(writer.is_registered_reader(sub));
   }
 
   ASSERT_EQ(0, writer.all_readers_mask());

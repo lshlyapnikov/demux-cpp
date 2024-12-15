@@ -105,7 +105,7 @@ class DemuxWriter {
 
   [[nodiscard]] auto message_count() const noexcept -> uint64_t { return this->message_count_; }
 
-  [[nodiscard]] auto is_reader(const ReaderId& id) const noexcept -> bool {
+  [[nodiscard]] auto is_registered_reader(const ReaderId& id) const noexcept -> bool {
     return this->all_readers_mask_ & id.mask();
   }
 
@@ -199,6 +199,8 @@ class DemuxReader {
       return std::make_optional(std::move(x));
     }
   }
+
+  [[nodiscard]] auto is_id(const ReaderId id) -> bool { return this->id_.mask() == id.mask(); }
 
   [[nodiscard]] auto has_next() noexcept -> bool;
 
