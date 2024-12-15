@@ -200,7 +200,7 @@ class DemuxReader {
     }
   }
 
-  [[nodiscard]] auto is_id(const ReaderId id) -> bool { return this->id_.mask() == id.mask(); }
+  [[nodiscard]] auto is_id(const ReaderId& id) -> bool { return this->id_.mask() == id.mask(); }
 
   [[nodiscard]] auto has_next() noexcept -> bool;
 
