@@ -87,9 +87,9 @@ TEST(ReaderIdTest, ReaderId) {
     } else {
       const ReaderId reader_id = ReaderId::create(num);
       ASSERT_EQ(pow(2, (num - 1)), reader_id.mask());
-      ASSERT_EQ(num, reader_id.number());
+      ASSERT_EQ(num, reader_id.value());
       std::ostringstream oss;
-      oss << "ReaderId{number: " << static_cast<uint64_t>(reader_id.number()) << ", mask: " << reader_id.mask() << "}";
+      oss << "ReaderId{value: " << static_cast<uint64_t>(reader_id.value()) << ", mask: " << reader_id.mask() << "}";
       const std::string expected = oss.str();
       const auto actual = boost::lexical_cast<std::string>(reader_id);
       ASSERT_EQ(expected, actual);

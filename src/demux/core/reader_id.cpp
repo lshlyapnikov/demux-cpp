@@ -7,7 +7,7 @@
 namespace lshl::demux::core {
 
 auto operator<<(std::ostream& os, const ReaderId& x) -> std::ostream& {
-  os << "ReaderId{number: " << static_cast<uint64_t>(x.number()) << ", mask: " << x.mask() << "}";
+  os << "ReaderId{value: " << static_cast<uint64_t>(x.value()) << ", mask: " << x.mask() << "}";
   return os;
 }
 

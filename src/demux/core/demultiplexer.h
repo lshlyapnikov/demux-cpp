@@ -171,7 +171,11 @@ class DemuxReader {
       atomic<uint64_t>* message_count_sync,
       atomic<uint64_t>* wraparound_sync
   ) noexcept
-      : id_(reader_id), buffer_(buffer), message_count_sync_(message_count_sync), wraparound_sync_(wraparound_sync) {
+      : id_(reader_id),
+        mask_(reader_id.mask()),
+        buffer_(buffer),
+        message_count_sync_(message_count_sync),
+        wraparound_sync_(wraparound_sync) {
     BOOST_LOG_TRIVIAL(info) << "DemuxReader::constructor L: " << L << ", M: " << M << ", " << this->id_;
   }
 
@@ -200,7 +204,7 @@ class DemuxReader {
     }
   }
 
-  [[nodiscard]] auto is_id(const ReaderId& id) -> bool { return this->id_.mask() == id.mask(); }
+  [[nodiscard]] auto is_id(const ReaderId& id) -> bool { return this->mask_ == id.mask(); }
 
   [[nodiscard]] auto has_next() noexcept -> bool;
 
@@ -216,6 +220,7 @@ class DemuxReader {
 
  private:
   ReaderId id_;
+  uint64_t mask_;  // micro-optimization
 
   size_t position_{0};
   uint64_t available_message_count_{0};
@@ -357,7 +362,7 @@ template <size_t L, uint16_t M>
     // signal that it is ready to wraparound, see doc/adr/ADR003.md for more details
     assert(this->read_message_count_ == this->available_message_count_);
     this->position_ = 0;
-    this->wraparound_sync_->fetch_or(this->id_.mask());
+    this->wraparound_sync_->fetch_or(this->mask_);
     return {};
   }
 }

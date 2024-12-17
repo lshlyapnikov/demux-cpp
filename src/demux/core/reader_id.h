@@ -4,12 +4,12 @@
 #ifndef DEMUX_CPP_LSHL_DEMUX_READER_ID_H
 #define DEMUX_CPP_LSHL_DEMUX_READER_ID_H
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
 #include <stdexcept>
 #include <string>
-#include <unordered_map>
 
 namespace lshl::demux::core {
 
@@ -51,16 +51,27 @@ constexpr auto validate_reader_number(const uint8_t num) noexcept(false) -> uint
   return result;
 }
 
+// index: 0 corresponds to Reader: 1.
+[[nodiscard]] constexpr auto create_binary_masks() -> std::array<uint64_t, MAX_READER_NUM> {
+  std::array<uint64_t, MAX_READER_NUM> result{};
+  uint8_t index = 0;
+  for (auto& x : result) {
+    x = power_of_two(index);
+    index += 1;
+  }
+  return result;
+}
+
+constexpr std::array<uint64_t, MAX_READER_NUM> BINARY_MASKS = create_binary_masks();
+
 class ReaderId {
  public:
   [[nodiscard]] static auto create(uint8_t num) noexcept(false) -> ReaderId {
     validate_reader_number(num);
-    const uint8_t index = num - 1;
-    const uint64_t mask = power_of_two(index);
-    return ReaderId{mask};
+    return ReaderId{num};
   }
 
-  ReaderId() : mask_{0} {}
+  ReaderId() : value_{0} {}
 
   [[nodiscard]] static auto all_readers_mask(uint8_t total_reader_num) noexcept(false) -> uint64_t {
     validate_reader_number(total_reader_num);
@@ -68,27 +79,20 @@ class ReaderId {
     return mask;
   }
 
-  [[nodiscard]] auto number() const noexcept -> uint8_t {
-    // return log_base_two(this->mask_) + 1;
-    static std::unordered_map<uint64_t, uint8_t> memo;
-    const auto it = memo.find(this->mask_);
-    if (it != memo.end()) {
-      return it->second;
-    } else {
-      const uint8_t num = log_base_two(this->mask_) + 1;
-      memo[this->mask_] = num;
-      return num;
-    }
-  }
+  [[nodiscard]] auto value() const noexcept -> uint8_t { return this->value_; }
 
-  [[nodiscard]] auto mask() const noexcept -> uint64_t { return this->mask_; }
+  [[nodiscard]] auto mask() const noexcept -> uint64_t {
+    // see validate_reader_number, it guarantees that value_ is always within the bounds
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
+    return BINARY_MASKS[this->value_ - 1];
+  }
 
   friend auto operator<<(std::ostream& os, const ReaderId& x) -> std::ostream&;
 
  private:
-  explicit ReaderId(uint64_t mask) noexcept : mask_{mask} {}
+  explicit ReaderId(uint8_t value) noexcept : value_{value} {}
 
-  uint64_t mask_;
+  uint8_t value_;
 };
 
 }  // namespace lshl::demux::core
