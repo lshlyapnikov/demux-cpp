@@ -32,6 +32,7 @@
 #include "../core/reader_id.h"
 #include "../util/hdr_histogram_util.h"
 #include "../util/shm_remover.h"
+#include "../util/shm_util.h"
 #include "../util/xxhash_util.h"
 #include "./market_data.h"
 
@@ -71,13 +72,9 @@ constexpr char UTIL_SHARED_MEM_NAME[] = "lshl_demux_util";
 
 constexpr int REPORT_PROGRESS = 1000000;
 
-constexpr std::size_t PAGE_SIZE = 4096;
-
-// names take up some space in the managed_shared_memory
-constexpr std::size_t BUFFER_PADDING = 512;
-
 // circular buffer size in bytes
-constexpr std::size_t BUFFER_SIZE = 16 * PAGE_SIZE - BUFFER_PADDING;
+constexpr std::size_t BUFFER_SIZE =
+    16 * lshl::demux::util::LINUX_PAGE_SIZE - lshl::demux::util::BOOST_IPC_INTERNAL_METADATA_SIZE;
 
 // max message size that would be allowed
 constexpr std::uint16_t MAX_MESSAGE_SIZE = 256;
@@ -132,25 +129,13 @@ auto init_logging() noexcept -> void {
   boost::log::core::get()->set_filter(boost::log::trivial::severity >= boost::log::trivial::info);
 }
 
-template <size_t L>
-auto calculate_required_buffer_shared_mem_size() noexcept -> size_t {
-  // names take some space in the managed_shared_memory
-  // total shared memory size, should be  a multiple of the page size (4kB on Linux). Because the operating system
-  // performs mapping operations over whole pages. So, you don't waste memory.
-  const size_t quotient = (L + BUFFER_PADDING) / PAGE_SIZE;
-  const size_t reminder = (L + BUFFER_PADDING) % PAGE_SIZE;
-  if (reminder > 0) {
-    return (quotient + 1) * PAGE_SIZE;
-  } else {
-    return quotient * PAGE_SIZE;
-  }
-}
-
 template <size_t L, uint16_t M>
 auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num) noexcept(false) -> void {
-  const size_t SHM = calculate_required_buffer_shared_mem_size<L>();
+  const size_t SHM_SIZE = lshl::demux::util::calculate_required_shared_mem_size(
+      BUFFER_SIZE, lshl::demux::util::BOOST_IPC_INTERNAL_METADATA_SIZE, lshl::demux::util::LINUX_PAGE_SIZE
+  );
 
-  BOOST_LOG_TRIVIAL(info) << "start_writer " << BUFFER_SHARED_MEM_NAME << ", size: " << SHM << ", L: " << L
+  BOOST_LOG_TRIVIAL(info) << "start_writer " << BUFFER_SHARED_MEM_NAME << ", size: " << SHM_SIZE << ", L: " << L
                           << ", M: " << M << ", total_reader_num: " << static_cast<int>(total_reader_num);
 
   const ShmRemover remover1(BUFFER_SHARED_MEM_NAME);
@@ -159,7 +144,7 @@ auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num) noexce
   const uint64_t all_subs_mask = ReaderId::all_readers_mask(total_reader_num);
 
   // segment for the circular buffer and message counter, written by writer, read by readers
-  bipc::managed_shared_memory segment1(bipc::create_only, BUFFER_SHARED_MEM_NAME, SHM);
+  bipc::managed_shared_memory segment1(bipc::create_only, BUFFER_SHARED_MEM_NAME, SHM_SIZE);
   BOOST_LOG_TRIVIAL(info) << "created shared_memory_object segment1: " << BUFFER_SHARED_MEM_NAME
                           << ", segment1.free_memory: " << segment1.get_free_memory();
 
@@ -170,7 +155,7 @@ auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num) noexce
   BOOST_LOG_TRIVIAL(info) << "message_count_sync allocated, segment1.free_memory: " << segment1.get_free_memory();
 
   // segment for synchronization
-  bipc::managed_shared_memory segment2(bipc::create_only, UTIL_SHARED_MEM_NAME, PAGE_SIZE);
+  bipc::managed_shared_memory segment2(bipc::create_only, UTIL_SHARED_MEM_NAME, lshl::demux::util::LINUX_PAGE_SIZE);
   BOOST_LOG_TRIVIAL(info) << "created shared_memory_object segment2: " << UTIL_SHARED_MEM_NAME
                           << ", segment2.free_memory: " << segment2.get_free_memory();
 
