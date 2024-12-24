@@ -132,7 +132,7 @@ auto init_logging() noexcept -> void {
 template <size_t L, uint16_t M>
 auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num) noexcept(false) -> void {
   const size_t SHM_SIZE = lshl::demux::util::calculate_required_shared_mem_size(
-      BUFFER_SIZE, lshl::demux::util::BOOST_IPC_INTERNAL_METADATA_SIZE, lshl::demux::util::LINUX_PAGE_SIZE
+      L, lshl::demux::util::BOOST_IPC_INTERNAL_METADATA_SIZE, lshl::demux::util::LINUX_PAGE_SIZE
   );
 
   BOOST_LOG_TRIVIAL(info) << "start_writer " << BUFFER_SHARED_MEM_NAME << ", size: " << SHM_SIZE << ", L: " << L
