@@ -346,8 +346,8 @@ auto multiple_readers_read_x(const vector<TestMessage>& valid_messages) {
   readers.reserve(SUB_NUM);
   for (uint8_t i = 1; i <= SUB_NUM; ++i) {
     const ReaderId id = ReaderId::create(i);
-    const DemuxReader<L, M> sub{id, span{buffer}, &msg_counter_sync, &wraparound_sync};
-    readers.emplace_back(sub);
+    // readers.emplace_back(DemuxReader<L, M>{id, span{buffer}, &msg_counter_sync, &wraparound_sync});
+    readers.emplace_back(id, span{buffer}, &msg_counter_sync, &wraparound_sync);
   }
 
   DemuxWriter<L, M, Blocking> writer(all_readers_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);

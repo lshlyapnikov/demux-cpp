@@ -55,6 +55,12 @@ class DemuxWriter {
                             << ", all_readers_mask_: " << this->all_readers_mask_;
   }
 
+  ~DemuxWriter() = default;
+  DemuxWriter(const DemuxWriter&) = delete;
+  auto operator=(const DemuxWriter&) -> DemuxWriter& = delete;
+  DemuxWriter(DemuxWriter&&) = default;
+  auto operator=(DemuxWriter&&) -> DemuxWriter& = delete;
+
   /// @brief Writes/copies the `source` into the buffer.
   /// @param `source` message that will be copied into the circular buffer.
   /// @return
@@ -167,7 +173,7 @@ class DemuxReader {
  public:
   DemuxReader(
       const ReaderId& reader_id,
-      span<uint8_t, L> buffer,
+      const span<uint8_t, L> buffer,
       atomic<uint64_t>* message_count_sync,
       atomic<uint64_t>* wraparound_sync
   ) noexcept
@@ -178,6 +184,12 @@ class DemuxReader {
         wraparound_sync_(wraparound_sync) {
     BOOST_LOG_TRIVIAL(info) << "DemuxReader::constructor L: " << L << ", M: " << M << ", " << this->id_;
   }
+
+  ~DemuxReader() = default;
+  DemuxReader(const DemuxReader&) = delete;                     // no copy constructor, no reason to copy it
+  auto operator=(const DemuxReader&) -> DemuxReader& = delete;  // no copy assignment
+  DemuxReader(DemuxReader&&) = default;                         // movable, can be used with vector.emplace_back
+  auto operator=(DemuxReader&&) -> DemuxReader& = delete;       // no move assignment
 
   /// @brief Does not block. Calls `has_next`. Returns a `span` pointing to the object in the circular buffer.
   ///   Do not keep the reference to the returned `span` between `next` calls, the underlying bytes can be overriden
@@ -219,13 +231,17 @@ class DemuxReader {
 #endif  // UNIT_TEST
 
  private:
-  ReaderId id_;
-  uint64_t mask_;  // micro-optimization
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
+  const ReaderId id_;
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
+  const uint64_t mask_;  // micro-optimization
 
   size_t position_{0};
   uint64_t available_message_count_{0};
   uint64_t read_message_count_{0};
-  MessageBuffer<L> buffer_;
+
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
+  const MessageBuffer<L> buffer_;  // read only buffer
   atomic<uint64_t>* message_count_sync_;
   atomic<uint64_t>* wraparound_sync_;
 };
