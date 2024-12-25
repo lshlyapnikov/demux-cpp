@@ -174,7 +174,7 @@ class DemuxReader {
   DemuxReader(
       const ReaderId& reader_id,
       const span<uint8_t, L> buffer,
-      atomic<uint64_t>* message_count_sync,
+      const atomic<uint64_t>* message_count_sync,
       atomic<uint64_t>* wraparound_sync
   ) noexcept
       : id_(reader_id),
@@ -242,7 +242,7 @@ class DemuxReader {
 
   // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
   const MessageBuffer<L> buffer_;  // read only buffer
-  atomic<uint64_t>* message_count_sync_;
+  const atomic<uint64_t>* message_count_sync_;
   atomic<uint64_t>* wraparound_sync_;
 };
 
