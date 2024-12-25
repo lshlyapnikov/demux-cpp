@@ -231,19 +231,18 @@ class DemuxReader {
 #endif  // UNIT_TEST
 
  private:
-  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
+  // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
   const ReaderId id_;
-  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
   const uint64_t mask_;  // micro-optimization
 
   size_t position_{0};
   uint64_t available_message_count_{0};
   uint64_t read_message_count_{0};
 
-  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
   const MessageBuffer<L> buffer_;  // read only buffer
   const atomic<uint64_t>* message_count_sync_;
   atomic<uint64_t>* wraparound_sync_;
+  // NOLINTEND(cppcoreguidelines-avoid-const-or-ref-data-members)
 };
 
 template <size_t L, uint16_t M, bool B>
