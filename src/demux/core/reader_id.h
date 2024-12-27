@@ -65,16 +65,18 @@ constexpr auto validate_reader_id(const size_t id) noexcept(false) -> uint8_t {
 constexpr std::array<uint64_t, MAX_READER_NUM> BINARY_MASKS = create_binary_masks();
 
 class ReaderId {
- public:
-  [[nodiscard]] static auto create(uint8_t num) noexcept(false) -> ReaderId {
-    return ReaderId{validate_reader_id(num)};
-  }
+ private:
+  uint8_t value_;
 
+ public:
   [[nodiscard]] static auto all_readers_mask(uint8_t total_reader_num) noexcept(false) -> uint64_t {
     validate_reader_id(total_reader_num);
     const uint64_t mask = power_of_two(total_reader_num) - 1L;
     return mask;
   }
+
+  ReaderId() noexcept : value_{1} {}
+  explicit ReaderId(uint8_t id) noexcept(false) : value_{validate_reader_id(id)} {}
 
   [[nodiscard]] auto value() const noexcept -> uint8_t { return this->value_; }
 
@@ -84,12 +86,9 @@ class ReaderId {
     return BINARY_MASKS[this->value_ - 1];
   }
 
+  auto operator==(const ReaderId& x) const noexcept -> bool { return this->value_ == x.value_; }
+
   friend auto operator<<(std::ostream& os, const ReaderId& x) -> std::ostream&;
-
- private:
-  explicit ReaderId(uint8_t value) noexcept : value_{value} {}
-
-  uint8_t value_;
 };
 
 }  // namespace lshl::demux::core

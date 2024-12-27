@@ -37,4 +37,4 @@ build/
 Testing/
 .vscode/numbered-bookmarks.json
 CMakeUserPresets.json
-
+.cache/

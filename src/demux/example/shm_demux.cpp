@@ -265,7 +265,7 @@ auto start_reader(const uint8_t reader_num, const uint64_t msg_num) noexcept(fal
   atomic<uint64_t>* startup_sync = segment2.find<atomic<uint64_t>>("startup_sync").first;
   BOOST_LOG_TRIVIAL(info) << "startup_sync found, segment2.free_memory: " << segment2.get_free_memory();
 
-  const ReaderId id = ReaderId::create(reader_num);
+  const ReaderId id{reader_num};
 
   lshl::demux::core::DemuxReader<L, M> sub(id, span{*buffer}, message_count_sync, wraparound_sync);
   BOOST_LOG_TRIVIAL(info) << "DemuxReader created, segment1.free_memory: " << segment2.get_free_memory()
