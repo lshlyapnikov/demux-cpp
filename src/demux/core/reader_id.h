@@ -88,6 +88,8 @@ class ReaderId {
 
   auto operator==(const ReaderId& x) const noexcept -> bool { return this->value_ == x.value_; }
 
+  auto operator<(const ReaderId& x) const noexcept -> bool { return this->value_ < x.value_; }
+
   friend auto operator<<(std::ostream& os, const ReaderId& x) -> std::ostream&;
 };
 

@@ -27,6 +27,7 @@ TEST(ReaderIdTest, DefaultConstructor) {
   const ReaderId x;
   const ReaderId y{1};
   EXPECT_EQ(x.value(), y.value());
+  ASSERT_TRUE(ReaderId{2} < ReaderId{3});
 }
 
 TEST(ReaderIdTest, OperatorEquals) {
@@ -39,6 +40,18 @@ TEST(ReaderIdTest, OperatorEquals) {
     } else {
       ASSERT_NE(a, b);
       ASSERT_NE(b, a);
+    }
+  });
+}
+
+TEST(ReaderIdTest, OperatorLessThan) {
+  rc::check([](const ReaderId& a, const ReaderId& b) {
+    ASSERT_FALSE(a < a);
+    ASSERT_FALSE(b < b);
+    if (a.value() < b.value()) {
+      ASSERT_TRUE(a < b);
+    } else {
+      ASSERT_FALSE(a < b);
     }
   });
 }
