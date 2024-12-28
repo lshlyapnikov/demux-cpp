@@ -170,7 +170,10 @@ auto write_empty_message() {
   DemuxReader<L, M> reader{reader_id, span{buffer}, &msg_counter_sync, &wraparound_sync};
 
   ASSERT_TRUE(reader.is_id(reader_id));
+  ASSERT_TRUE(reader.id() == reader_id);
+
   ASSERT_FALSE(reader.is_id(ReaderId(2)));
+  ASSERT_FALSE(reader.id() == ReaderId(2));
 
   // write an empty message
   const WriteResult result = writer.write({});
