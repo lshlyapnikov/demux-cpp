@@ -501,11 +501,11 @@ auto writer_lagging_readers(const vector<ReaderId>& readers) {
 }
 
 TEST(BlockingDemuxWriterTest, LaggingReaders) {
-  rc::check(writer_lagging_reader<true>);
+  rc::check(writer_lagging_readers<true>);
 }
 
 TEST(NonBlockingDemuxWriterTest, LaggingReaders) {
-  rc::check(writer_lagging_reader<false>);
+  rc::check(writer_lagging_readers<false>);
 }
 
 auto main(int argc, char** argv) -> int {
