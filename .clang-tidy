@@ -2,7 +2,7 @@
 # https://clang.llvm.org/extra/clang-tidy/#using-clang-tidy
 
 # enable all checks with `*`; disable all checks with xyz prefix using `-xyz-*`
-Checks: "*,-abseil-*,-altera-*,-android-*,-darwin-*,-fuchsia-*,-hicpp-*,,-linuxkernel-*,-llvm-*,-llvmlibc-*,-objc-*,-openmp-*,-zircon-*,-readability-identifier-length,-readability-else-after-return,-bugprone-easily-swappable-parameters"
+Checks: "*,-abseil-*,-altera-*,-android-*,-darwin-*,-fuchsia-*,-hicpp-*,,-linuxkernel-*,-llvm-*,-llvmlibc-*,-objc-*,-openmp-*,-zircon-*,-readability-identifier-length,-readability-else-after-return,-bugprone-easily-swappable-parameters,-readability-avoid-const-params-in-decls"
 
 # upgrade all warnings to errors
 WarningsAsErrors: "*"

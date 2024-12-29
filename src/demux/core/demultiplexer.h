@@ -13,6 +13,7 @@
 #include <span>
 #include <tuple>
 #include <utility>
+#include <vector>
 #include "./message_buffer.h"
 #include "./reader_id.h"
 
@@ -29,6 +30,8 @@ enum WriteResult : std::uint8_t {
   Repeat,   // wraparound required, resend the last message
   Error,    // message cannot be sent, log error and drop it
 };
+
+auto mask_to_reader_ids(const uint64_t value) -> std::vector<ReaderId>;
 
 /// @brief Demultiplexer writer.
 /// @tparam `L` The size of the circular buffer in bytes. When allocating the buffer in shared memory,
@@ -118,6 +121,10 @@ class DemuxWriter {
   auto add_reader(const ReaderId& id) noexcept -> void { this->all_readers_mask_ |= id.mask(); }
 
   auto remove_reader(const ReaderId& id) noexcept -> void { this->all_readers_mask_ &= ~id.mask(); }
+
+  /// @brief Returns lagging readers, based on `wraparound_sync_` and `all_readers_mask_`.
+  /// iterates over 64bits.
+  [[nodiscard]] auto lagging_readers() const noexcept -> std::vector<ReaderId>;
 
 #ifdef UNIT_TEST
 
@@ -337,6 +344,14 @@ template <size_t L, uint16_t M, bool B>
 inline auto DemuxWriter<L, M, B>::all_readers_caught_up_() noexcept -> bool {
   const uint64_t x = this->wraparound_sync_->load();
   return x == this->all_readers_mask_;
+}
+
+template <size_t L, uint16_t M, bool B>
+  requires(L >= M + 2 && M > 0)
+[[nodiscard]] auto DemuxWriter<L, M, B>::lagging_readers() const noexcept -> std::vector<ReaderId> {
+  const uint64_t reader_ids = this->wraparound_sync_->load();
+  const uint64_t lagging_reader_ids = reader_ids ^ this->all_readers_mask_;
+  return mask_to_reader_ids(lagging_reader_ids);
 }
 
 template <size_t L, uint16_t M>

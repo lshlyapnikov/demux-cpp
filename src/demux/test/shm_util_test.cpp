@@ -3,12 +3,11 @@
 
 // NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner)
 
-#define UNIT_TEST
-
 #include "../util/shm_util.h"
 #include <gtest/gtest.h>
 #include <cstddef>
-#include <cstdint>
+
+#define UNIT_TEST
 
 using lshl::demux::util::calculate_required_shared_mem_size;
 using std::size_t;

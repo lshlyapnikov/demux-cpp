@@ -10,6 +10,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace lshl::demux::core {
 
@@ -91,6 +92,8 @@ class ReaderId {
   auto operator<(const ReaderId& x) const noexcept -> bool { return this->value_ < x.value_; }
 
   friend auto operator<<(std::ostream& os, const ReaderId& x) -> std::ostream&;
+
+  friend auto operator<<(std::ostream& os, const std::vector<ReaderId>& xs) -> std::ostream&;
 };
 
 }  // namespace lshl::demux::core

@@ -130,6 +130,14 @@ TEST(ReaderIdTest, ReaderId) {
   });
 }
 
+TEST(ReaderIdTest, ReaderIdVectorStreamOperator) {
+  const std::vector readers{ReaderId(1), ReaderId(2), ReaderId(32)};
+  const auto actual = boost::lexical_cast<std::string>(readers);
+  ASSERT_EQ(
+      "[ReaderId{value: 1, mask: 1}, ReaderId{value: 2, mask: 2}, ReaderId{value: 32, mask: 2147483648}]", actual
+  );
+}
+
 TEST(ReaderIdTest, AllReadersMask) {
   rc::check([](const uint8_t num) {
     if (num > lshl::demux::core::MAX_READER_NUM || num == 0) {

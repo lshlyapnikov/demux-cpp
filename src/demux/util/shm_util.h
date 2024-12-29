@@ -30,6 +30,7 @@ constexpr auto calculate_required_shared_mem_size(
     return quotient * page_size;
   }
 }
+
 }  // namespace lshl::demux::util
 
 #endif  // LSHL_UTIL_SHM_UTIL_H
