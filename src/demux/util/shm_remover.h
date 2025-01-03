@@ -14,9 +14,9 @@ struct ShmRemover {
     namespace bipc = boost::interprocess;
     const bool ok = bipc::shared_memory_object::remove(this->name_);
     if (ok) {
-      BOOST_LOG_TRIVIAL(warning) << "startup: removed shared_memory_object: " << this->name_;
+      BOOST_LOG_TRIVIAL(warning) << "[startup] removed shared_memory_object: " << this->name_;
     } else {
-      BOOST_LOG_TRIVIAL(info) << "startup: could not remove shared_memory_object: " << this->name_
+      BOOST_LOG_TRIVIAL(info) << "[startup] could not remove shared_memory_object: " << this->name_
                               << ", possible it did not exist.";
     }
   }
@@ -25,9 +25,9 @@ struct ShmRemover {
     namespace bipc = boost::interprocess;
     const bool ok = bipc::shared_memory_object::remove(this->name_);
     if (ok) {
-      BOOST_LOG_TRIVIAL(info) << "shutdown: removed shared_memory_object: " << this->name_;
+      BOOST_LOG_TRIVIAL(info) << "[shutdown] removed shared_memory_object: " << this->name_;
     } else {
-      BOOST_LOG_TRIVIAL(error) << "shutdown: could not remove shared_memory_object: " << this->name_;
+      BOOST_LOG_TRIVIAL(error) << "[shutdown] could not remove shared_memory_object: " << this->name_;
     }
   }
 

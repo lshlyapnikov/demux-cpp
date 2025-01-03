@@ -54,7 +54,7 @@ class DemuxWriter {
         buffer_(buffer),
         message_count_sync_(message_count_sync),
         wraparound_sync_(wraparound_sync) {
-    BOOST_LOG_TRIVIAL(info) << "DemuxWriter::constructor L: " << L << ", M: " << M << ", B: " << B
+    BOOST_LOG_TRIVIAL(info) << "[DemuxWriter::constructor] L: " << L << ", M: " << M << ", B: " << B
                             << ", all_readers_mask_: " << this->all_readers_mask_;
   }
 
@@ -70,7 +70,7 @@ class DemuxWriter {
   [[nodiscard]] auto write(const span<uint8_t>& source) noexcept -> WriteResult {
     const size_t n = source.size();
     if (n == 0 || n > M) {
-      BOOST_LOG_TRIVIAL(error) << "DemuxWriter::write invalid message length: " << n;
+      BOOST_LOG_TRIVIAL(error) << "[DemuxWriter::write] invalid message length: " << n;
       return WriteResult::Error;
     }
     if constexpr (B) {
@@ -189,7 +189,7 @@ class DemuxReader {
         buffer_(buffer),
         message_count_sync_(message_count_sync),
         wraparound_sync_(wraparound_sync) {
-    BOOST_LOG_TRIVIAL(info) << "DemuxReader::constructor L: " << L << ", M: " << M << ", " << this->id_;
+    BOOST_LOG_TRIVIAL(info) << "[DemuxReader::constructor] L: " << L << ", M: " << M << ", " << this->id_;
   }
 
   ~DemuxReader() = default;
@@ -266,7 +266,7 @@ auto DemuxWriter<L, M, B>::write_blocking_(const span<uint8_t>& source, uint8_t 
     return WriteResult::Success;
   } else {
     if (recursion_level > 1) {
-      BOOST_LOG_TRIVIAL(error) << "DemuxWriter::send_ recursion_level: " << recursion_level;
+      BOOST_LOG_TRIVIAL(error) << "[DemuxWriter::write_blocking_] recursion_level: " << recursion_level;
       return WriteResult::Error;
     } else {
       this->wait_for_subs_to_catch_up_and_wraparound_();
@@ -281,7 +281,7 @@ auto DemuxWriter<L, M, B>::write_non_blocking_(const span<uint8_t>& source) noex
   const size_t n = source.size();
 
   if (n == 0 || n > M) {
-    BOOST_LOG_TRIVIAL(error) << "DemuxWriter::send_ invalid message length: " << n;
+    BOOST_LOG_TRIVIAL(error) << "[DemuxWriter::write_non_blocking_] invalid message length: " << n;
     return WriteResult::Error;
   }
 
@@ -311,7 +311,7 @@ auto DemuxWriter<L, M, B>::wait_for_subs_to_catch_up_and_wraparound_() noexcept 
   this->initiate_wraparound_();
 
 #ifndef NDEBUG
-  BOOST_LOG_TRIVIAL(debug) << "DemuxWriter::wait_for_subs_to_catch_up_and_wraparound_, message_count_: "
+  BOOST_LOG_TRIVIAL(debug) << "[DemuxWriter::wait_for_subs_to_catch_up_and_wraparound_] message_count_: "
                            << this->message_count_ << ", position_: " << this->position_ << " ... waiting ...";
 #endif
 
@@ -359,7 +359,7 @@ template <size_t L, uint16_t M>
 // NOLINTNEXTLINE(readability-const-return-type)
 [[nodiscard]] auto DemuxReader<L, M>::next() noexcept -> const span<uint8_t> {
 #ifndef NDEBUG
-  BOOST_LOG_TRIVIAL(debug) << "DemuxReader::next() " << this->id_
+  BOOST_LOG_TRIVIAL(debug) << "[DemuxReader::next()] " << this->id_
                            << ", read_message_count_: " << this->read_message_count_
                            << ", position_: " << this->position_;
 #endif
@@ -377,7 +377,7 @@ template <size_t L, uint16_t M>
     this->position_ += msg_size;
     this->position_ += sizeof(uint16_t);
 #ifndef NDEBUG
-    BOOST_LOG_TRIVIAL(debug) << "DemuxReader::next() continue, " << this->id_
+    BOOST_LOG_TRIVIAL(debug) << "[DemuxReader::next()] continue, " << this->id_
                              << ", read_message_count_: " << this->read_message_count_
                              << ", available_message_count_: " << this->available_message_count_
                              << ", position_: " << this->position_;
@@ -386,7 +386,7 @@ template <size_t L, uint16_t M>
     return result;
   } else {
 #ifndef NDEBUG
-    BOOST_LOG_TRIVIAL(debug) << "DemuxReader::next() wrapping up, " << this->id_
+    BOOST_LOG_TRIVIAL(debug) << "[DemuxReader::next()] wrapping up, " << this->id_
                              << ", read_message_count_: " << this->read_message_count_
                              << ", available_message_count_: " << this->available_message_count_
                              << ", position_: " << this->position_;
