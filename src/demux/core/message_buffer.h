@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 
 namespace lshl::demux::core {
@@ -32,7 +33,7 @@ struct MessageBuffer {
   /// @param message -- the bytes that should be written.
   /// @return the total number of written bytes (2 + message length) or zero.
   [[nodiscard]] auto write(const size_t position, const span<uint8_t>& message) noexcept -> size_t {
-    const size_t x = sizeof(message_length_t);
+    constexpr size_t x = sizeof(message_length_t);
     const size_t n = message.size();
     const size_t total_required = n + x;
 
@@ -45,6 +46,29 @@ struct MessageBuffer {
       return total_required;
     } else {
       return 0;
+    }
+  }
+
+  /// @brief Allocates a message directly in the buffer.
+  /// @tparam A -- type of the message.
+  /// @param position -- the zero-based byte offset at which the message should be allocated in the buffer.
+  /// @return std::optional<A*> none when message could not be allocated because there is not enough space.
+  template <class A>
+  [[nodiscard]] auto allocate(const size_t position) -> std::optional<A*> {
+    constexpr size_t x = sizeof(message_length_t);
+    constexpr size_t n = sizeof(A);
+    constexpr size_t total_required = n + x;
+
+    if (this->remaining(position) >= total_required) {
+      // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-type-reinterpret-cast)
+      uint8_t* data = this->data_;
+      std::copy_n(&n, x, data + position);  // write message length
+      uint8_t* obj = data + position + x;   // start of the message bytes
+      A* a = reinterpret_cast<A*>(obj);
+      // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-type-reinterpret-cast)
+      return {a};
+    } else {
+      return std::nullopt;
     }
   }
 

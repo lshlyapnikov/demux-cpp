@@ -98,6 +98,18 @@ class DemuxWriter {
     return this->write_safe<X>(raw);
   }
 
+  template <class A>
+    requires(sizeof(A) <= M)
+  [[nodiscard]] auto allocate_object() -> std::optional<A*> {
+    return this->buffer_.template allocate<A>(this->position_);
+  }
+
+  auto commit() -> WriteResult {
+    // TODO(Leo): increment message_count to notify that new message is allocated and available for the reader to read
+    // TODO(Leo): write a test for allocate + commit
+    return Error;
+  }
+
   /// @brief does not check the size of the `span`, it is checked at compiles time, see the `requires` clause.
   /// @tparam `N` the message size.
   /// @param `source` message that will be copied into the circular buffer.
