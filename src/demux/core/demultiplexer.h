@@ -45,12 +45,12 @@ template <size_t L, uint16_t M, bool B>
 class DemuxWriter {
  public:
   DemuxWriter(
-      uint64_t all_subs_mask,
+      uint64_t all_readers_mask,
       span<uint8_t, L> buffer,
       atomic<uint64_t>* message_count_sync,
       atomic<uint64_t>* wraparound_sync
   ) noexcept
-      : all_readers_mask_(all_subs_mask),
+      : all_readers_mask_(all_readers_mask),
         buffer_(buffer),
         message_count_sync_(message_count_sync),
         wraparound_sync_(wraparound_sync) {
@@ -74,9 +74,9 @@ class DemuxWriter {
       return WriteResult::Error;
     }
     if constexpr (B) {
-      return this->write_blocking_(source, 1);
+      return this->write_blocking(source, 1);
     } else {
-      return this->write_non_blocking_(source);
+      return this->write_non_blocking(source);
     }
   }
 
@@ -89,7 +89,7 @@ class DemuxWriter {
   /// @param `source` message that will be copied into the circular buffer.
   /// @return
   template <class T>
-    requires(sizeof(T) <= M)
+    requires(sizeof(T) <= M && sizeof(T) != 0)
   [[nodiscard]] auto write_object(const T& source) -> WriteResult {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-type-const-cast, modernize-use-auto)
     uint8_t* x = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(&source));
@@ -99,15 +99,20 @@ class DemuxWriter {
   }
 
   template <class A>
-    requires(sizeof(A) <= M)
-  [[nodiscard]] auto allocate_object() -> std::optional<A*> {
-    return this->buffer_.template allocate<A>(this->position_);
+    requires(sizeof(A) <= M && sizeof(A) != 0)
+  [[nodiscard]] auto allocate() -> std::optional<A*> {
+    if constexpr (B) {
+      return {this->allocate_blocking<A>(1)};
+    } else {
+      return this->allocate_non_blocking<A>();
+    }
   }
 
-  auto commit() -> WriteResult {
-    // TODO(Leo): increment message_count to notify that new message is allocated and available for the reader to read
-    // TODO(Leo): write a test for allocate + commit
-    return Error;
+  template <class A>
+    requires(sizeof(A) <= M && sizeof(A) != 0)
+  auto commit() -> void {
+    this->position_ += sizeof(A);
+    this->increment_message_count();
   }
 
   /// @brief does not check the size of the `span`, it is checked at compiles time, see the `requires` clause.
@@ -118,9 +123,9 @@ class DemuxWriter {
     requires(0 < N && N <= M)
   [[nodiscard]] auto write_safe(const span<uint8_t, N>& source) noexcept -> WriteResult {
     if constexpr (B) {
-      return this->write_blocking_(source, 1);
+      return this->write_blocking(source, 1);
     } else {
-      return this->write_non_blocking_(source);
+      return this->write_non_blocking(source);
     }
   }
 
@@ -153,22 +158,32 @@ class DemuxWriter {
   /// @param `source` message to write.
   /// @param recursion_level.
   /// @return WriteResult.
-  [[nodiscard]] auto write_blocking_(const span<uint8_t>& source, uint8_t recursion_level) noexcept -> WriteResult;
+  [[nodiscard]] auto write_blocking(const span<uint8_t>& source, uint8_t recursion_level) noexcept -> WriteResult;
 
   /// @brief does not block while waiting for readers to catch up, returns `WriteResult::Repeat` instead.
   /// @param `source` message to write.
   /// @return `WriteResult`.
-  [[nodiscard]] auto write_non_blocking_(const span<uint8_t>& source) noexcept -> WriteResult;
+  [[nodiscard]] auto write_non_blocking(const span<uint8_t>& source) noexcept -> WriteResult;
 
-  auto wait_for_subs_to_catch_up_and_wraparound_() noexcept -> void;
+  template <class A>
+    requires(sizeof(A) <= M && sizeof(A) != 0)
+  [[nodiscard]] auto allocate_non_blocking() noexcept -> std::optional<A*> {
+    return this->buffer_.template allocate<A>(this->position_);
+  }
 
-  inline auto initiate_wraparound_() noexcept -> void;
+  template <class A>
+    requires(sizeof(A) <= M && sizeof(A) != 0)
+  [[nodiscard]] auto allocate_blocking(uint8_t recursion_level) noexcept -> std::optional<A*>;
 
-  inline auto complete_wraparound_() noexcept -> void;
+  auto wait_for_readers_to_catch_up_and_wraparound() noexcept -> void;
 
-  [[nodiscard]] auto all_readers_caught_up_() noexcept -> bool;
+  inline auto initiate_wraparound() noexcept -> void;
 
-  auto increment_message_count_() noexcept -> void {
+  inline auto complete_wraparound() noexcept -> void;
+
+  [[nodiscard]] auto all_readers_caught_up() noexcept -> bool;
+
+  auto increment_message_count() noexcept -> void {
     this->message_count_ += 1;
     this->message_count_sync_->store(this->message_count_);
   }
@@ -268,38 +283,38 @@ class DemuxReader {
 
 template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
-auto DemuxWriter<L, M, B>::write_blocking_(const span<uint8_t>& source, uint8_t recursion_level) noexcept
+auto DemuxWriter<L, M, B>::write_blocking(const span<uint8_t>& source, uint8_t recursion_level) noexcept
     -> WriteResult {
   // it either writes the entire message or nothing
   const size_t written = this->buffer_.write(this->position_, source);
   if (written > 0) {
     this->position_ += written;
-    this->increment_message_count_();
+    this->increment_message_count();
     return WriteResult::Success;
   } else {
     if (recursion_level > 1) {
-      BOOST_LOG_TRIVIAL(error) << "[DemuxWriter::write_blocking_] recursion_level: " << recursion_level;
+      BOOST_LOG_TRIVIAL(error) << "[DemuxWriter::write_blocking] recursion_level: " << recursion_level;
       return WriteResult::Error;
     } else {
-      this->wait_for_subs_to_catch_up_and_wraparound_();
-      return this->write_blocking_(source, recursion_level + 1);
+      this->wait_for_readers_to_catch_up_and_wraparound();
+      return this->write_blocking(source, recursion_level + 1);
     }
   }
 }
 
 template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
-auto DemuxWriter<L, M, B>::write_non_blocking_(const span<uint8_t>& source) noexcept -> WriteResult {
+auto DemuxWriter<L, M, B>::write_non_blocking(const span<uint8_t>& source) noexcept -> WriteResult {
   const size_t n = source.size();
 
   if (n == 0 || n > M) {
-    BOOST_LOG_TRIVIAL(error) << "[DemuxWriter::write_non_blocking_] invalid message length: " << n;
+    BOOST_LOG_TRIVIAL(error) << "[DemuxWriter::write_non_blocking] invalid message length: " << n;
     return WriteResult::Error;
   }
 
   if (this->wraparound_) {
-    if (this->all_readers_caught_up_()) {
-      this->complete_wraparound_();
+    if (this->all_readers_caught_up()) {
+      this->complete_wraparound();
     } else {
       return WriteResult::Repeat;
     }
@@ -309,51 +324,69 @@ auto DemuxWriter<L, M, B>::write_non_blocking_(const span<uint8_t>& source) noex
   const size_t written = this->buffer_.write(this->position_, source);
   if (written > 0) {
     this->position_ += written;
-    this->increment_message_count_();
+    this->increment_message_count();
     return WriteResult::Success;
   } else {
-    this->initiate_wraparound_();
+    this->initiate_wraparound();
     return WriteResult::Repeat;
+  }
+}
+template <size_t L, uint16_t M, bool B>
+  requires(L >= M + 2 && M > 0)
+template <class A>
+  requires(sizeof(A) <= M && sizeof(A) != 0)
+[[nodiscard]] auto DemuxWriter<L, M, B>::allocate_blocking(uint8_t recursion_level) noexcept -> std::optional<A*> {
+  std::optional<A*> result = this->buffer_.template allocate<A>(this->position_);
+  if (result.has_value()) {
+    return result;
+  } else {
+    if (recursion_level > 1) {
+      BOOST_LOG_TRIVIAL(error) << "[DemuxWriter::allocate_blocking] recursion_level: " << recursion_level;
+      return std::nullopt;
+    } else {
+      this->wait_for_readers_to_catch_up_and_wraparound();
+      return this->allocate_blocking(recursion_level + 1);
+    }
   }
 }
 
 template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
-auto DemuxWriter<L, M, B>::wait_for_subs_to_catch_up_and_wraparound_() noexcept -> void {
-  this->initiate_wraparound_();
+auto DemuxWriter<L, M, B>::wait_for_readers_to_catch_up_and_wraparound() noexcept -> void {
+  this->initiate_wraparound();
 
 #ifndef NDEBUG
-  BOOST_LOG_TRIVIAL(debug) << "[DemuxWriter::wait_for_subs_to_catch_up_and_wraparound_] message_count_: "
+  BOOST_LOG_TRIVIAL(debug) << "[DemuxWriter::wait_for_readers_to_catch_up_and_wraparound] message_count_: "
                            << this->message_count_ << ", position_: " << this->position_ << " ... waiting ...";
 #endif
 
   // busy-wait
-  while (!this->all_readers_caught_up_()) {
+  while (!this->all_readers_caught_up()) {
   }
 
-  this->complete_wraparound_();
+  this->complete_wraparound();
 }
 
 template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
-inline auto DemuxWriter<L, M, B>::initiate_wraparound_() noexcept -> void {
+inline auto DemuxWriter<L, M, B>::initiate_wraparound() noexcept -> void {
   // see doc/adr/ADR003.md for more details
   this->wraparound_ = true;
   this->wraparound_sync_->store(0);
   std::ignore = this->buffer_.write(this->position_, {});
-  this->increment_message_count_();
+  this->increment_message_count();
 }
 
 template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
-inline auto DemuxWriter<L, M, B>::complete_wraparound_() noexcept -> void {
+inline auto DemuxWriter<L, M, B>::complete_wraparound() noexcept -> void {
   this->position_ = 0;
   this->wraparound_ = false;
 }
 
 template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
-inline auto DemuxWriter<L, M, B>::all_readers_caught_up_() noexcept -> bool {
+inline auto DemuxWriter<L, M, B>::all_readers_caught_up() noexcept -> bool {
   const uint64_t x = this->wraparound_sync_->load();
   return x == this->all_readers_mask_;
 }
