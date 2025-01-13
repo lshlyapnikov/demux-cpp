@@ -100,7 +100,7 @@ class DemuxWriter {
 
   template <class A>
     requires(sizeof(A) <= M && sizeof(A) != 0)
-  [[nodiscard]] auto allocate() -> std::optional<A*> {
+  [[nodiscard]] auto allocate() noexcept -> std::optional<A*> {
     if constexpr (B) {
       return {this->allocate_blocking<A>(1)};
     } else {
@@ -110,7 +110,7 @@ class DemuxWriter {
 
   template <class A>
     requires(sizeof(A) <= M && sizeof(A) != 0)
-  auto commit() -> void {
+  auto commit() noexcept -> void {
     this->position_ += sizeof(A);
     this->increment_message_count();
   }
@@ -165,15 +165,20 @@ class DemuxWriter {
   /// @return `WriteResult`.
   [[nodiscard]] auto write_non_blocking(const span<uint8_t>& source) noexcept -> WriteResult;
 
+  /// @brief Blocks/busy-spins while waiting for readers to catch up during a wraparound.
+  /// @param recursion_level.
+  /// @return std::optional<A*> -- pointer to allocated message or `null_opt` if error happened.
+  template <class A>
+    requires(sizeof(A) <= M && sizeof(A) != 0)
+  [[nodiscard]] auto allocate_blocking(uint8_t recursion_level) noexcept -> std::optional<A*>;
+
+  /// @brief does not block while waiting for readers to catch up, returns `std::null_opt` instead.
+  /// @return `std::optional<A*>` -- pointer to allocated message or `null_opt` if there is no space left in the buffer.
   template <class A>
     requires(sizeof(A) <= M && sizeof(A) != 0)
   [[nodiscard]] auto allocate_non_blocking() noexcept -> std::optional<A*> {
     return this->buffer_.template allocate<A>(this->position_);
   }
-
-  template <class A>
-    requires(sizeof(A) <= M && sizeof(A) != 0)
-  [[nodiscard]] auto allocate_blocking(uint8_t recursion_level) noexcept -> std::optional<A*>;
 
   auto wait_for_readers_to_catch_up_and_wraparound() noexcept -> void;
 
