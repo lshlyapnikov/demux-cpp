@@ -14,13 +14,19 @@
 #include <iostream>
 #include <memory>
 #include <span>
+#include <tuple>
 #include <vector>
+#include "../util/tuple_util.h"
 
 using lshl::demux::core::MessageBuffer;
 using std::array;
 using std::span;
 using std::uint8_t;
 using std::vector;
+
+using Tuple1 = std::tuple<int16_t>;
+using Tuple2 = std::tuple<int32_t, uint64_t>;
+using Tuple3 = std::tuple<int32_t, uint64_t, double>;
 
 auto create_test_array(const size_t size) -> vector<uint8_t> {
   vector<uint8_t> result{};
@@ -93,7 +99,7 @@ TEST(MessageBufferTest, WriteToSharedMemory) {
   });
 }
 
-TEST(MessageBufferTest, MessageBufferWriteRead) {
+TEST(MessageBufferTest, MessageBufferWriteAndRead) {
   rc::check([](const uint8_t position, const uint8_t src_size) {
     std::cout << "position: " << static_cast<int>(position) << ", src_size: " << static_cast<int>(src_size) << '\n';
 
@@ -134,6 +140,96 @@ TEST(MessageBufferTest, MessageBufferWriteEmpty) {
   ASSERT_EQ(written, 2);
   const span<uint8_t> read = buf.read(0);
   ASSERT_EQ(read.size(), 0);
+}
+
+TEST(MessageBufferTest, MessageBufferAllocateAndRead) {
+  rc::check([](size_t position, const Tuple1& x1, const Tuple2& x2, const Tuple3& x3) {
+    using lshl::demux::util::operator<<;
+
+    constexpr size_t t1_needed = MessageBuffer<0>::required<Tuple1>();
+    constexpr size_t t2_needed = MessageBuffer<0>::required<Tuple2>();
+    constexpr size_t t3_needed = MessageBuffer<0>::required<Tuple3>();
+
+    constexpr size_t BUF_SIZE = (t1_needed + t2_needed + t3_needed) * 2;
+
+    position = position % BUF_SIZE;
+
+    std::cout << "position: " << static_cast<int>(position) << ", x1: " << x1 << ", x2: " << x2 << ", x3: " << x3
+              << ", BUF_SIZE: " << BUF_SIZE << '\n';
+
+    std::array<uint8_t, BUF_SIZE> data{};
+    MessageBuffer<BUF_SIZE> buf(data);
+
+    // allocate Tuple1 and set fields
+
+    const size_t p1 = position;
+    std::optional<Tuple1*> t1_opt = buf.allocate<Tuple1>(p1);
+
+    if (buf.remaining(p1) >= t1_needed) {
+      ASSERT_TRUE(t1_opt.has_value());
+      Tuple1* t1 = t1_opt.value();
+      *t1 = x1;
+    } else {
+      ASSERT_FALSE(t1_opt.has_value());
+    }
+
+    // allocate Tuple2 and set fields
+
+    const size_t p2 = p1 + t1_needed;
+    std::optional<Tuple2*> t2_opt = buf.allocate<Tuple2>(p2);
+
+    if (buf.remaining(p2) >= t2_needed) {
+      ASSERT_TRUE(t2_opt.has_value());
+      Tuple2* t2 = t2_opt.value();
+      *t2 = x2;
+    } else {
+      ASSERT_FALSE(t2_opt.has_value());
+    }
+
+    // allocate Tuple3 and set fields
+
+    const size_t p3 = p2 + t2_needed;
+    std::optional<Tuple3*> t3_opt = buf.allocate<Tuple3>(p3);
+
+    if (buf.remaining(p3) >= t3_needed) {
+      ASSERT_TRUE(t3_opt.has_value());
+      Tuple3* t3 = t3_opt.value();
+      *t3 = x3;
+    } else {
+      ASSERT_FALSE(t3_opt.has_value());
+    }
+
+    // read Tuple1
+    if (t1_opt.has_value()) {
+      RC_TAG("Tuple1");
+      const std::optional<const Tuple1*> read = buf.read_unsafe<Tuple1>(p1);
+      ASSERT_TRUE(read.has_value());
+      ASSERT_EQ(x1, *(read.value()));
+    }
+
+    // read Tuple2
+    if (t2_opt.has_value()) {
+      RC_TAG("Tuple2");
+      const std::optional<const Tuple2*> read = buf.read_unsafe<Tuple2>(p2);
+      ASSERT_TRUE(read.has_value());
+      ASSERT_EQ(x2, *(read.value()));
+    }
+
+    // read Tuple3
+    if (t3_opt.has_value()) {
+      RC_TAG("Tuple3");
+      const std::optional<const Tuple3*> read = buf.read_unsafe<Tuple3>(p3);
+      ASSERT_TRUE(read.has_value());
+      ASSERT_EQ(x3, *(read.value()));
+    }
+
+    // read Tuple3 at non-existent position
+    {
+      RC_TAG("Non-existent");
+      const std::optional<const Tuple3*> read = buf.read_unsafe<Tuple3>(BUF_SIZE);
+      ASSERT_FALSE(read.has_value());
+    }
+  });
 }
 
 // NOLINTEND(readability-function-cognitive-complexity, misc-include-cleaner)
