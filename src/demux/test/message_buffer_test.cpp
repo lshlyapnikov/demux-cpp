@@ -14,6 +14,7 @@
 #include <iostream>
 #include <memory>
 #include <span>
+#include <tuple>
 #include <vector>
 
 using lshl::demux::core::MessageBuffer;
@@ -93,7 +94,7 @@ TEST(MessageBufferTest, WriteToSharedMemory) {
   });
 }
 
-TEST(MessageBufferTest, MessageBufferWriteRead) {
+TEST(MessageBufferTest, MessageBufferWriteAndRead) {
   rc::check([](const uint8_t position, const uint8_t src_size) {
     std::cout << "position: " << static_cast<int>(position) << ", src_size: " << static_cast<int>(src_size) << '\n';
 
@@ -134,6 +135,73 @@ TEST(MessageBufferTest, MessageBufferWriteEmpty) {
   ASSERT_EQ(written, 2);
   const span<uint8_t> read = buf.read(0);
   ASSERT_EQ(read.size(), 0);
+}
+
+TEST(MessageBufferTest, MessageBufferAllocateAndRead) {
+  rc::check([](const uint8_t position, const int32_t a0, const uint64_t a1, const double a2) {
+    std::cout << "position: " << static_cast<int>(position) << ", a0: " << a0 << ", a1: " << a1 << ", a2: " << a2
+              << '\n';
+
+    using Tuple2 = std::tuple<int32_t, uint64_t>;
+    using Tuple3 = std::tuple<int32_t, uint64_t, double>;
+
+    constexpr size_t t2_needed = MessageBuffer<0>::required<Tuple2>();
+    constexpr size_t t3_needed = MessageBuffer<0>::required<Tuple3>();
+    constexpr size_t BUF_SIZE = (t2_needed + t3_needed) * 2;
+
+    std::array<uint8_t, BUF_SIZE> data{};
+    MessageBuffer<BUF_SIZE> buf(data);
+
+    // allocate Tuple2 and set fields
+
+    const size_t p2 = position;
+    std::optional<Tuple2*> t2_opt = buf.allocate<Tuple2>(p2);
+
+    if (buf.remaining(p2) >= t2_needed) {
+      ASSERT_TRUE(t2_opt.has_value());
+      Tuple2* t2 = t2_opt.value();
+      std::get<0>(*t2) = a0;
+      std::get<1>(*t2) = a1;
+    } else {
+      ASSERT_FALSE(t2_opt.has_value());
+    }
+
+    // allocate Tuple3 and set fields
+
+    const size_t p3 = p2 + t2_needed;
+    std::optional<Tuple3*> t3_opt = buf.allocate<Tuple3>(p3);
+
+    if (buf.remaining(p3) >= t3_needed) {
+      ASSERT_TRUE(t3_opt.has_value());
+      Tuple3* t3 = t3_opt.value();
+      std::get<0>(*t3) = a0;
+      std::get<1>(*t3) = a1;
+      std::get<2>(*t3) = a2;
+    } else {
+      ASSERT_FALSE(t3_opt.has_value());
+    }
+
+    // read Tuple2
+
+    if (t2_opt.has_value()) {
+      const std::span<uint8_t> x = buf.read(p2);
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-type-const-cast, modernize-use-auto)
+      const auto* const t2 = reinterpret_cast<const Tuple2*>(x.data());
+      ASSERT_EQ(a0, std::get<0>(*t2));
+      ASSERT_EQ(a1, std::get<1>(*t2));
+    }
+
+    // read Tuple3
+
+    if (t3_opt.has_value()) {
+      const std::span<uint8_t> x = buf.read(p3);
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-type-const-cast, modernize-use-auto)
+      const auto* const t3 = reinterpret_cast<const Tuple3*>(x.data());
+      ASSERT_EQ(a0, std::get<0>(*t3));
+      ASSERT_EQ(a1, std::get<1>(*t3));
+      ASSERT_EQ(a2, std::get<2>(*t3));
+    }
+  });
 }
 
 // NOLINTEND(readability-function-cognitive-complexity, misc-include-cleaner)

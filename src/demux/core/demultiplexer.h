@@ -7,6 +7,7 @@
 #include <atomic>
 #include <boost/log/trivial.hpp>
 #include <cassert>
+#include <concepts>
 #include <cstdint>
 #include <cstring>
 #include <optional>
@@ -99,7 +100,7 @@ class DemuxWriter {
   }
 
   template <class A>
-    requires(sizeof(A) <= M && sizeof(A) != 0)
+    requires(std::default_initializable<A> && sizeof(A) != 0 && sizeof(A) <= M)
   [[nodiscard]] auto allocate() noexcept -> std::optional<A*> {
     if constexpr (B) {
       return {this->allocate_blocking<A>(1)};
@@ -169,13 +170,13 @@ class DemuxWriter {
   /// @param recursion_level.
   /// @return std::optional<A*> -- pointer to allocated message or `null_opt` if error happened.
   template <class A>
-    requires(sizeof(A) <= M && sizeof(A) != 0)
+    requires(std::default_initializable<A> && sizeof(A) != 0 && sizeof(A) <= M)
   [[nodiscard]] auto allocate_blocking(uint8_t recursion_level) noexcept -> std::optional<A*>;
 
   /// @brief does not block while waiting for readers to catch up, returns `std::null_opt` instead.
   /// @return `std::optional<A*>` -- pointer to allocated message or `null_opt` if there is no space left in the buffer.
   template <class A>
-    requires(sizeof(A) <= M && sizeof(A) != 0)
+    requires(std::default_initializable<A> && sizeof(A) != 0 && sizeof(A) <= M)
   [[nodiscard]] auto allocate_non_blocking() noexcept -> std::optional<A*> {
     return this->buffer_.template allocate<A>(this->position_);
   }
@@ -339,7 +340,7 @@ auto DemuxWriter<L, M, B>::write_non_blocking(const span<uint8_t>& source) noexc
 template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
 template <class A>
-  requires(sizeof(A) <= M && sizeof(A) != 0)
+  requires(std::default_initializable<A> && sizeof(A) != 0 && sizeof(A) <= M)
 [[nodiscard]] auto DemuxWriter<L, M, B>::allocate_blocking(uint8_t recursion_level) noexcept -> std::optional<A*> {
   std::optional<A*> result = this->buffer_.template allocate<A>(this->position_);
   if (result.has_value()) {
