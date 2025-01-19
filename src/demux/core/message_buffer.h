@@ -5,6 +5,7 @@
 #define DEMUX_CPP_LSHL_DEMUX_MESSAGE_BUFFER_H
 
 #include <algorithm>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -49,23 +50,35 @@ struct MessageBuffer {
     }
   }
 
+  /// @brief Returns required space in bytes for allocating an object of type A in the buffer.
+  /// @tparam A -- type of the message.
+  /// @return total space in the buffer required fo allocating an object of type A in the buffer.
+  template <class A>
+  [[nodiscard]] static constexpr auto required() -> std::size_t {
+    return sizeof(message_length_t) + sizeof(A);
+  }
+
   /// @brief Allocates a message directly in the buffer.
   /// @tparam A -- type of the message.
   /// @param position -- the zero-based byte offset at which the message should be allocated in the buffer.
   /// @return std::optional<A*> none when message could not be allocated because there is not enough space.
   template <class A>
+    requires std::default_initializable<A>
   [[nodiscard]] auto allocate(const size_t position) -> std::optional<A*> {
     constexpr size_t x = sizeof(message_length_t);
     constexpr size_t n = sizeof(A);
     constexpr size_t total_required = n + x;
 
     if (this->remaining(position) >= total_required) {
-      // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-type-reinterpret-cast)
+      // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
       uint8_t* data = this->data_;
-      std::copy_n(&n, x, data + position);  // write message length
-      uint8_t* obj = data + position + x;   // start of the message bytes
-      A* a = reinterpret_cast<A*>(obj);
-      // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-type-reinterpret-cast)
+      std::copy_n(&n, x, data + position);    // write message length
+      uint8_t* buffer = data + position + x;  // start of the message bytes
+      // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
+      // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+      A* a = new (buffer) A{};  // construct A at the specified buffer, aka placement new
+
       return {a};
     } else {
       return std::nullopt;
