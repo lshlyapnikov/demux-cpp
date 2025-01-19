@@ -84,14 +84,15 @@ class DemuxWriter {
   /// @brief Serializes the `source` object of type `T` using `reinterpret_cast` and copies it into the circular
   /// buffer. `T` must be a simple, flat class without references to other objects; otherwise, behavior is
   /// unspecified. Consider using custom serialization/deserialization with `write` and `next` that take and return
-  /// `span`.
+  /// `span`. This is a safe operation because `reinterpret_cast<const uint8_t*>(&source)` is well defined,
+  /// it is casting to a byte pointer.
   /// @see [reinterpret_cast documentation](https://en.cppreference.com/w/cpp/language/reinterpret_cast)
   /// @tparam `T`
   /// @param `source` message that will be copied into the circular buffer.
   /// @return
   template <class T>
     requires(sizeof(T) <= M && sizeof(T) != 0)
-  [[nodiscard]] auto write_object(const T& source) -> WriteResult {
+  [[nodiscard]] auto write_safe(const T& source) -> WriteResult {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-type-const-cast, modernize-use-auto)
     uint8_t* x = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(&source));
     constexpr size_t X = sizeof(T);
@@ -245,7 +246,7 @@ class DemuxReader {
   /// @tparam T
   /// @return optional `T`.
   template <class T>
-  [[nodiscard]] auto next_object() noexcept -> std::optional<const T*> {
+  [[nodiscard]] auto next_unsafe() noexcept -> std::optional<const T*> {
     const span<uint8_t> raw = this->next();
     if (raw.empty()) {
       return std::nullopt;

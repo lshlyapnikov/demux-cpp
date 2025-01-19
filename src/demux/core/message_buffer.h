@@ -114,6 +114,22 @@ struct MessageBuffer {
     }
   }
 
+  /// @brief Reads a message at the specified position and `reinterpret_cast`s it to the specified type.
+  /// @tparam A -- type of the object.
+  /// @param position -- the zero-based byte offset at which the message should be allocated in the buffer.
+  /// @return std::optional<A*> none when message could not be read because there is not enough space.
+  template <class A>
+    requires(std::default_initializable<A> && sizeof(message_length_t) + sizeof(A) <= L)
+  [[nodiscard]] auto read_unsafe(const size_t position) const noexcept -> std::optional<const A*> {
+    span<uint8_t> raw = this->read(position);
+    if (raw.empty()) {
+      return std::nullopt;
+    } else {
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-type-const-cast, modernize-use-auto)
+      return reinterpret_cast<A*>(raw.data());
+    }
+  }
+
  private:
   uint8_t* data_;
 };

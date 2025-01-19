@@ -218,7 +218,7 @@ template <class T, size_t L, uint16_t M>
 [[nodiscard]] inline auto send_(DemuxWriter<L, M, false>& pub, const T& md) noexcept -> bool {
   int attempt = 0;
   while (true) {
-    const WriteResult result = pub.write_object(md);
+    const WriteResult result = pub.write_safe(md);
     switch (result) {
       case WriteResult::Success:
         return true;
@@ -285,7 +285,7 @@ auto run_reader_loop(lshl::demux::core::DemuxReader<L, M>& sub, const uint64_t m
 
   // consume the expected number of messages
   for (uint64_t i = 0; i < msg_num;) {
-    const std::optional<const MarketDataUpdate*> read = sub.template next_object<MarketDataUpdate>();
+    const std::optional<const MarketDataUpdate*> read = sub.template next_unsafe<MarketDataUpdate>();
     if (read.has_value()) {
       i += 1;
       const MarketDataUpdate* md = read.value();
