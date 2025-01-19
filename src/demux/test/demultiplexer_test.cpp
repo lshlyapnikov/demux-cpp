@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <future>
+#include <limits>
 #include <set>
 #include <span>
 #include <vector>
@@ -58,7 +59,11 @@ namespace rc {
 template <>
 struct Arbitrary<TestMessage> {
   static auto arbitrary() -> Gen<TestMessage> {
-    const Gen<vector<uint8_t>> nonempty_vec_gen = gen::resize(M, gen::nonEmpty<vector<uint8_t>>());
+    // looks like gen::resize also affects the generated uint8_t values, use the entire byte range [0, 255]
+    // enable TEST(TestMessageGenerator, CheckByteDistribution)
+    const Gen<vector<uint8_t>> nonempty_vec_with_improved_distribution_gen =
+        gen::resize(std::numeric_limits<uint8_t>::max(), gen::nonEmpty<vector<uint8_t>>());
+    const Gen<vector<uint8_t>> nonempty_vec_gen = gen::resize(M, nonempty_vec_with_improved_distribution_gen);
     // The above generator might still generate a vector with `size() > M`, `gen::resize` does not always work.
     // Run TestMessageGenerator.CheckDistribution1 500 times and check `RC_CLASSIFY(message_size > M, "size > M")`
     const Gen<vector<uint8_t>> valid_size_vec_gen = gen::suchThat(nonempty_vec_gen, is_valid_length);
@@ -415,12 +420,6 @@ TEST(TestMessageGenerator, CheckLengthDistribution) {
   GTEST_SKIP();
   rc::check([](const TestMessage& message) {
     const size_t message_size = message.t.size();
-    // RC_CLASSIFY(message_size == 0, "size == 0");
-    // RC_CLASSIFY(message_size == 1, "size == 1");
-    // RC_CLASSIFY(0 < message_size && message_size <= 32, "0 < size <= 32");
-    // RC_CLASSIFY(message_size > 32, "size > 32");
-    // RC_CLASSIFY(message_size == M, "size == M");
-    // RC_CLASSIFY(message_size > M, "size > M");
     RC_TAG(message_size);
   });
 }
