@@ -47,7 +47,9 @@ TEST(MessageBufferTest, MessageBufferRemaining0) {
     const MessageBuffer<BUF_SIZE> buf(span<uint8_t, BUF_SIZE>{data});
 
     const size_t actual = buf.remaining(position + BUF_SIZE);
-    ASSERT_EQ(actual, 0);
+    EXPECT_EQ(actual, 0);
+
+    return !::testing::Test::HasFailure();
   });
 }
 
@@ -63,11 +65,13 @@ TEST(MessageBufferTest, MessageBufferRemaining) {
     const size_t actual = buf.remaining(position);
     if (position >= BUF_SIZE) {
       RC_TAG("position >= BUF_SIZE");
-      ASSERT_EQ(actual, 0);
+      EXPECT_EQ(actual, 0);
     } else {
       RC_TAG("position < BUF_SIZE");
-      ASSERT_EQ(actual, (BUF_SIZE - position));
+      EXPECT_EQ(actual, (BUF_SIZE - position));
     }
+
+    return !::testing::Test::HasFailure();
   });
 }
 
@@ -80,22 +84,24 @@ TEST(MessageBufferTest, WriteToSharedMemory) {
 
     const size_t written = buf.write(0, message);
     if (message.size() + 2 <= BUF_SIZE) {
-      ASSERT_EQ(written, message.size() + 2);
+      EXPECT_EQ(written, message.size() + 2);
 
       uint16_t written_length = 0;
       std::copy_n(data.data(), sizeof(uint16_t), &written_length);
-      ASSERT_EQ(written_length, message.size());
+      EXPECT_EQ(written_length, message.size());
 
       const span<uint8_t> read = buf.read(0);
-      ASSERT_EQ(read.size(), message.size());
+      EXPECT_EQ(read.size(), message.size());
 
       for (size_t i = 0; i < message.size(); ++i) {
-        ASSERT_EQ(data.at(i + 2), message[i]);
-        ASSERT_EQ(read[i], message[i]);
+        EXPECT_EQ(data.at(i + 2), message[i]);
+        EXPECT_EQ(read[i], message[i]);
       }
     } else {
-      ASSERT_EQ(written, 0);
+      EXPECT_EQ(written, 0);
     }
+
+    return !::testing::Test::HasFailure();
   });
 }
 
@@ -113,17 +119,22 @@ TEST(MessageBufferTest, MessageBufferWriteAndRead) {
     vector<uint8_t> src = create_test_array(src_size);
     const size_t written = buf.write(position, src);
     if (remaining >= src_size + sizeof(uint16_t)) {
-      ASSERT_EQ(src_size + sizeof(uint16_t), written);
+      EXPECT_EQ(src_size + sizeof(uint16_t), written);
       const span<uint8_t> read = buf.read(position);
-      ASSERT_EQ(read.size(), src_size);
+      EXPECT_EQ(read.size(), src_size);
       // compare read bytes with the src bytes
       for (uint8_t i = 0; i < src_size; i++) {
         std::cout << "\ti:" << static_cast<int>(i) << ", value: " << static_cast<int>(src[i]) << '\n';
-        ASSERT_EQ(read[i], src[i]);
+        EXPECT_EQ(read[i], src[i]);
+        if (::testing::Test::HasFailure()) {
+          return false;
+        }
       }
     } else {
-      ASSERT_EQ(0, written);
+      EXPECT_EQ(0, written);
     }
+
+    return !::testing::Test::HasFailure();
   });
 }
 
@@ -166,11 +177,11 @@ TEST(MessageBufferTest, MessageBufferAllocateAndRead) {
     std::optional<Tuple1*> t1_opt = buf.allocate<Tuple1>(p1);
 
     if (buf.remaining(p1) >= t1_needed) {
-      ASSERT_TRUE(t1_opt.has_value());
+      EXPECT_TRUE(t1_opt.has_value());
       Tuple1* t1 = t1_opt.value();
       *t1 = x1;
     } else {
-      ASSERT_FALSE(t1_opt.has_value());
+      EXPECT_FALSE(t1_opt.has_value());
     }
 
     // allocate Tuple2 and set fields
@@ -179,11 +190,11 @@ TEST(MessageBufferTest, MessageBufferAllocateAndRead) {
     std::optional<Tuple2*> t2_opt = buf.allocate<Tuple2>(p2);
 
     if (buf.remaining(p2) >= t2_needed) {
-      ASSERT_TRUE(t2_opt.has_value());
+      EXPECT_TRUE(t2_opt.has_value());
       Tuple2* t2 = t2_opt.value();
       *t2 = x2;
     } else {
-      ASSERT_FALSE(t2_opt.has_value());
+      EXPECT_FALSE(t2_opt.has_value());
     }
 
     // allocate Tuple3 and set fields
@@ -192,43 +203,45 @@ TEST(MessageBufferTest, MessageBufferAllocateAndRead) {
     std::optional<Tuple3*> t3_opt = buf.allocate<Tuple3>(p3);
 
     if (buf.remaining(p3) >= t3_needed) {
-      ASSERT_TRUE(t3_opt.has_value());
+      EXPECT_TRUE(t3_opt.has_value());
       Tuple3* t3 = t3_opt.value();
       *t3 = x3;
     } else {
-      ASSERT_FALSE(t3_opt.has_value());
+      EXPECT_FALSE(t3_opt.has_value());
     }
 
     // read Tuple1
     if (t1_opt.has_value()) {
       RC_TAG("Tuple1");
       const std::optional<const Tuple1*> read = buf.read_unsafe<Tuple1>(p1);
-      ASSERT_TRUE(read.has_value());
-      ASSERT_EQ(x1, *(read.value()));
+      EXPECT_TRUE(read.has_value());
+      EXPECT_EQ(x1, *(read.value()));
     }
 
     // read Tuple2
     if (t2_opt.has_value()) {
       RC_TAG("Tuple2");
       const std::optional<const Tuple2*> read = buf.read_unsafe<Tuple2>(p2);
-      ASSERT_TRUE(read.has_value());
-      ASSERT_EQ(x2, *(read.value()));
+      EXPECT_TRUE(read.has_value());
+      EXPECT_EQ(x2, *(read.value()));
     }
 
     // read Tuple3
     if (t3_opt.has_value()) {
       RC_TAG("Tuple3");
       const std::optional<const Tuple3*> read = buf.read_unsafe<Tuple3>(p3);
-      ASSERT_TRUE(read.has_value());
-      ASSERT_EQ(x3, *(read.value()));
+      EXPECT_TRUE(read.has_value());
+      EXPECT_EQ(x3, *(read.value()));
     }
 
     // read Tuple3 at non-existent position
     {
       RC_TAG("Non-existent");
       const std::optional<const Tuple3*> read = buf.read_unsafe<Tuple3>(BUF_SIZE);
-      ASSERT_FALSE(read.has_value());
+      EXPECT_FALSE(read.has_value());
     }
+
+    return !::testing::Test::HasFailure();
   });
 }
 
