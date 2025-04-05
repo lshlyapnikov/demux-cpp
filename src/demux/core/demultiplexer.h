@@ -104,7 +104,7 @@ class DemuxWriter {
     requires(std::default_initializable<A> && sizeof(A) != 0 && sizeof(A) <= M)
   [[nodiscard]] auto allocate() noexcept -> std::optional<A*> {
     if constexpr (B) {
-      return {this->allocate_blocking<A>(1)};
+      return this->allocate_blocking<A>(1);
     } else {
       return this->allocate_non_blocking<A>();
     }
@@ -113,7 +113,7 @@ class DemuxWriter {
   template <class A>
     requires(sizeof(A) <= M && sizeof(A) != 0)
   auto commit() noexcept -> void {
-    this->position_ += sizeof(A);
+    this->position_ += MessageBuffer<0>::required<A>();
     this->increment_message_count();
   }
 
@@ -178,9 +178,7 @@ class DemuxWriter {
   /// @return `std::optional<A*>` -- pointer to allocated message or `null_opt` if there is no space left in the buffer.
   template <class A>
     requires(std::default_initializable<A> && sizeof(A) != 0 && sizeof(A) <= M)
-  [[nodiscard]] auto allocate_non_blocking() noexcept -> std::optional<A*> {
-    return this->buffer_.template allocate<A>(this->position_);
-  }
+  [[nodiscard]] auto allocate_non_blocking() noexcept -> std::optional<A*>;
 
   auto wait_for_readers_to_catch_up_and_wraparound() noexcept -> void;
 
@@ -352,9 +350,29 @@ template <class A>
       return std::nullopt;
     } else {
       this->wait_for_readers_to_catch_up_and_wraparound();
-      return this->allocate_blocking(recursion_level + 1);
+      return this->allocate_blocking<A>(recursion_level + 1);
     }
   }
+}
+
+template <size_t L, uint16_t M, bool B>
+  requires(L >= M + 2 && M > 0)
+template <class A>
+  requires(std::default_initializable<A> && sizeof(A) != 0 && sizeof(A) <= M)
+[[nodiscard]] auto DemuxWriter<L, M, B>::allocate_non_blocking() noexcept -> std::optional<A*> {
+  if (this->wraparound_) {
+    if (this->all_readers_caught_up()) {
+      this->complete_wraparound();
+    } else {
+      return std::nullopt;
+    }
+  }
+
+  auto result = this->buffer_.template allocate<A>(this->position_);
+  if (!result.has_value()) {
+    this->initiate_wraparound();
+  }
+  return result;
 }
 
 template <size_t L, uint16_t M, bool B>

@@ -8,6 +8,7 @@
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <span>
 
@@ -54,6 +55,7 @@ struct MessageBuffer {
   /// @tparam A -- type of the message.
   /// @return total space in the buffer required fo allocating an object of type A in the buffer.
   template <class A>
+    requires(sizeof(A) <= std::numeric_limits<message_length_t>::max())
   [[nodiscard]] static constexpr auto required() -> std::size_t {
     return sizeof(message_length_t) + sizeof(A);
   }
@@ -63,7 +65,8 @@ struct MessageBuffer {
   /// @param position -- the zero-based byte offset at which the message should be allocated in the buffer.
   /// @return std::optional<A*> none when message could not be allocated because there is not enough space.
   template <class A>
-    requires(std::default_initializable<A> && sizeof(message_length_t) + sizeof(A) <= L)
+    requires(std::default_initializable<A> && sizeof(A) <= std::numeric_limits<message_length_t>::max() &&
+             sizeof(message_length_t) + sizeof(A) <= L)
   [[nodiscard]] auto allocate(const size_t position) -> std::optional<A*> {
     constexpr size_t x = sizeof(message_length_t);
     constexpr size_t n = sizeof(A);
