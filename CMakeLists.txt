@@ -175,6 +175,25 @@ target_compile_options(
 gtest_discover_tests(demultiplexer_test)
 
 add_executable(
+  demultiplexer_allocate_test
+  src/demux/test/demultiplexer_allocate_test.cpp
+)
+target_link_libraries(
+  demultiplexer_allocate_test
+  demultiplexer
+  reader_id
+  gtest::gtest
+  rapidcheck::rapidcheck
+  Boost::log
+  atomic
+)
+target_compile_options(
+  demultiplexer_allocate_test
+  PRIVATE ${MY_CXX_FLAGS}
+)
+gtest_discover_tests(demultiplexer_allocate_test)
+
+add_executable(
   shm_util_test
   src/demux/test/shm_util_test.cpp
 )

@@ -30,7 +30,7 @@
 
 namespace lshl::demux::core {
 
-const std::chrono::seconds DEFAULT_WAIT(5);  // NOLINT(cert-err58-cpp)
+constexpr std::chrono::seconds DEFAULT_WAIT(5);
 
 // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
 BOOST_STRONG_TYPEDEF(std::vector<uint8_t>, TestMessage);
