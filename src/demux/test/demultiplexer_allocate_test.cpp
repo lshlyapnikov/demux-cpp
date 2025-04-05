@@ -50,8 +50,7 @@ constexpr std::size_t MAX_SYMBOL_LEN = 8;
 using Symbol = boost::static_string<MAX_SYMBOL_LEN>;
 
 using MarketDataTick = std::tuple<
-    // Symbol,          // symbol
-    std::uint32_t,   // symbol ID
+    Symbol,          // symbol
     Side,            // side
     std::uint16_t,   // price-level
     std::uint64_t,   // exchange timestamp
@@ -121,19 +120,18 @@ auto read_n(const size_t message_num, DemuxReader<L, M>& reader) -> vector<Marke
   using lshl::demux::util::operator<<;
 
   vector<MarketDataTick> result;
+  result.reserve(message_num);
 
   while (result.size() < message_num) {
-    optional<const MarketDataTick*> mo = reader.template next_unsafe<MarketDataTick>();
+    const optional<const MarketDataTick*> mo = reader.template next_unsafe<MarketDataTick>();
     if (mo.has_value()) {
-      const MarketDataTick* m0 = mo.value();
-      MarketDataTick m1 = *m0;
-      result.emplace_back(m1);
+      result.push_back(*mo.value());
     }
   }
 
   // read one more to unblock the reader, which might be waiting for the wraparound unblock
-  optional<const MarketDataTick*> m = reader.template next_unsafe<MarketDataTick>();
-  //   assert(!m.has_value());
+  const optional<const MarketDataTick*> m = reader.template next_unsafe<MarketDataTick>();
+  assert(!m.has_value());
 
   return result;
 }
