@@ -99,7 +99,6 @@ auto write_all_with_allocate(const vector<MarketDataTick>& messages, DemuxWriter
   size_t result = 0;
   for (size_t i = 0; i < messages.size();) {
     const optional<MarketDataTick*> m1_opt = writer.template allocate<MarketDataTick>();
-
     if (m1_opt.has_value()) {
       MarketDataTick* m1 = m1_opt.value();
       *m1 = messages[i];
@@ -207,12 +206,65 @@ TEST(SymbolGenerator, SymbolDistribution) {
   rc::check([](const Symbol& symbol) { RC_TAG(symbol); });
 }
 
-// TEST(TupleTest, Equals) {
-//   rc::check([](const vector<MarketDataTick>& x1) {
-//     EXPECT_EQ(x1, x1);
-//     return !::testing::Test::HasFailure();
-//   });
-// }
+auto fill_up_buffer(DemuxWriter<L, M, false>* writer, const MarketDataTick& message) -> void {
+  while (true) {
+    const optional<MarketDataTick*> m_opt = writer->template allocate<MarketDataTick>();
+    if (m_opt.has_value()) {
+      MarketDataTick* m = m_opt.value();
+      *m = message;
+      writer->template commit<MarketDataTick>();
+    } else {
+      return;
+    }
+  }
+}
+
+auto read_all_expect_eq(DemuxReader<L, M>* reader, const MarketDataTick& expected) -> bool {
+  while (true) {
+    const std::optional<const MarketDataTick*> read = reader->next_unsafe<MarketDataTick>();
+    if (read.has_value()) {
+      EXPECT_EQ(expected, *read.value());
+      if (::testing::Test::HasFailure()) {
+        return false;
+      }
+    } else {
+      return true;
+    }
+  }
+}
+
+auto slow_reader_test(const MarketDataTick& message) -> bool {
+  array<uint8_t, L> buffer{};
+  atomic<uint64_t> msg_counter_sync{0};
+  atomic<uint64_t> wraparound_sync{0};
+  const ReaderId reader_id{1};
+
+  DemuxWriter<L, M, false> writer(0, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxReader<L, M> reader(reader_id, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  writer.add_reader(reader_id);
+
+  EXPECT_EQ(vector{reader_id}, writer.lagging_readers());
+
+  fill_up_buffer(&writer, message);
+
+  // the buffer is full, can't write into it
+  EXPECT_FALSE(writer.allocate<MarketDataTick>().has_value());
+  EXPECT_EQ(vector{reader_id}, writer.lagging_readers());
+
+  read_all_expect_eq(&reader, message);
+  EXPECT_TRUE(writer.lagging_readers().empty());
+
+  // all readers caught up, can write again
+  const auto x = writer.template allocate<MarketDataTick>();
+  writer.template commit<MarketDataTick>();
+  EXPECT_TRUE(x.has_value());
+
+  return !::testing::Test::HasFailure();
+}
+
+TEST(NonBlockingDemuxWriterWithAllocateTest, SlowReader) {
+  rc::check(slow_reader_test);
+}
 
 auto main(int argc, char** argv) -> int {
   namespace logging = boost::log;
