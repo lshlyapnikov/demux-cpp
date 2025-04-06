@@ -3,10 +3,10 @@
 
 // NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner)
 
+#include <rapidcheck/Check.h>
 #define UNIT_TEST
 #undef NDEBUG  // for assert to work in release build
 
-#include "../core/demultiplexer.h"
 #include <gtest/gtest.h>
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
 #include <array>
@@ -24,6 +24,7 @@
 #include <set>
 #include <span>
 #include <vector>
+#include "../core/demultiplexer.h"
 #include "../core/message_buffer.h"
 #include "../core/reader_id.h"
 #include "./reader_id_gen.h"
@@ -516,6 +517,28 @@ TEST(BlockingDemuxWriterTest, LaggingReaders) {
 
 TEST(NonBlockingDemuxWriterTest, LaggingReaders) {
   rc::check(writer_lagging_readers<false>);
+}
+
+auto lagging_readers_behavior(const ReaderId& reader_id) -> bool {
+  array<uint8_t, L> buffer{};
+  atomic<uint64_t> msg_counter_sync{0};
+  atomic<uint64_t> wraparound_sync{0};
+  DemuxWriter<L, M, false> writer(0, span{buffer}, &msg_counter_sync, &wraparound_sync);
+
+  EXPECT_TRUE(writer.lagging_readers().empty());
+
+  writer.add_reader(reader_id);
+  EXPECT_EQ(vector{reader_id}, writer.lagging_readers());
+
+  wraparound_sync.store(reader_id.mask());
+
+  EXPECT_TRUE(writer.lagging_readers().empty());
+
+  return !::testing::Test::HasFailure();
+}
+
+TEST(NonBlockingDemuxWriter, LaggingReadersBehavior) {
+  rc::check(lagging_readers_behavior);
 }
 
 auto fill_up_buffer(DemuxWriter<L, M, false>* writer, TestMessage message) -> bool {
