@@ -13,13 +13,14 @@ __root="$(cd "$(dirname "${__dir}")" && pwd)"
 cd "${__root}"
 
 msg_num=${1:-10000000}
+zero_copy=${2:-"false"}
 
 #valgrind_cmd="valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --track-origins=yes --trace-children=yes --track-fds=yes --log-file=valgrind.out"
 
 #CPUPROFILE=shm_demux_writer.prof
 
 # start writer expecting 2 readers
-./build/shm_demux writer 2 "${msg_num}" > ./example-writer.out 2>&1 &
+./build/shm_demux writer 2 "${msg_num}" "${zero_copy}" > ./example-writer.out 2>&1 &
 writer_pid="$!"
 
 # let the writer start and initialize all shared memory objects, it will wait for both readers
@@ -27,8 +28,8 @@ sleep 2s
 
 # start 2 readers
 
-./build/shm_demux reader 1 "${msg_num}" &> ./example-reader-1.out &
-./build/shm_demux reader 2 "${msg_num}" &> ./example-reader-2.out &
+./build/shm_demux reader 1 "${msg_num}" "${zero_copy}" &> ./example-reader-1.out &
+./build/shm_demux reader 2 "${msg_num}" "${zero_copy}" &> ./example-reader-2.out &
 
 # report the state
 #ps -ef|grep -F "./build/shm_demux"
