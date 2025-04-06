@@ -91,10 +91,26 @@ $ ./bin/release.sh
 
 ## 7. Run Tests
 
-Execute tests using the following command:
+### 7.1. Run All Tests
+
+Execute all tests using cmake:
 
 ```
 $ cmake --build ./build --target test
+```
+
+### 7.2. Run One Test
+
+Execute "SlowReader" test using ctest:
+
+```
+$ ctest --test-dir ./build -R SlowReader -V
+```
+
+Execute "SlowReader" test using main function:
+
+```
+$ ./build/demultiplexer_test --gtest_filter=*SlowReader
 ```
 
 ## 8. Run Example

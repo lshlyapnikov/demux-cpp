@@ -107,6 +107,17 @@ auto assert_eq(const span<uint8_t>& left, const span<uint8_t>& right) {
   }
 }
 
+[[nodiscard]] auto expect_eq(const span<uint8_t>& left, const span<uint8_t>& right) -> bool {
+  EXPECT_EQ(left.size(), right.size());
+  for (size_t i = 0; i < right.size(); ++i) {
+    EXPECT_EQ(left[i], right[i]) << "index: " << i;
+    if (::testing::Test::HasFailure()) {
+      return false;
+    }
+  }
+  return !::testing::Test::HasFailure();
+}
+
 auto assert_eq(const TestMessage& left, const TestMessage& right) {
   ASSERT_EQ(left.t.size(), right.t.size());
   for (size_t i = 0; i < right.t.size(); ++i) {
@@ -487,7 +498,7 @@ auto writer_lagging_readers(const vector<ReaderId>& readers) {
 
   const std::set<ReaderId> expected(readers.begin(), readers.end());
 
-  const std::vector xs = writer.lagging_readers();
+  const std::vector<ReaderId> xs = writer.lagging_readers();
   const std::set<ReaderId> actual(xs.begin(), xs.end());
 
   ASSERT_EQ(expected, actual);
@@ -505,6 +516,62 @@ TEST(BlockingDemuxWriterTest, LaggingReaders) {
 
 TEST(NonBlockingDemuxWriterTest, LaggingReaders) {
   rc::check(writer_lagging_readers<false>);
+}
+
+auto fill_up_buffer(DemuxWriter<L, M, false>* writer, TestMessage message) -> bool {
+  while (true) {
+    switch (writer->write(message.t)) {
+      case WriteResult::Success:
+        break;  // continue
+      case WriteResult::Repeat:
+        return true;  // buffer is full
+      case WriteResult::Error:
+        return false;  // fail test, should not happen
+    }
+  }
+}
+
+auto read_all_expect_eq(DemuxReader<L, M>* reader, TestMessage expected) -> bool {
+  while (true) {
+    const span<uint8_t> read = reader->next();
+    if (read.empty()) {
+      return true;
+    }
+    if (!expect_eq(expected.t, read)) {
+      return false;
+    }
+  }
+}
+
+auto slow_reader_test(TestMessage message) -> bool {
+  array<uint8_t, L> buffer{};
+  atomic<uint64_t> msg_counter_sync{0};
+  atomic<uint64_t> wraparound_sync{0};
+  const ReaderId reader_id{1};
+
+  DemuxWriter<L, M, false> writer(0, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxReader<L, M> reader(reader_id, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  writer.add_reader(reader_id);
+
+  EXPECT_EQ(vector{reader_id}, writer.lagging_readers());
+
+  fill_up_buffer(&writer, message);
+
+  // the buffer is full, can't write into it
+  EXPECT_EQ(WriteResult::Repeat, writer.write(message.t));
+  EXPECT_EQ(vector{reader_id}, writer.lagging_readers());
+
+  read_all_expect_eq(&reader, message);
+  EXPECT_TRUE(writer.lagging_readers().empty());
+
+  // all readers caught up, can write again
+  EXPECT_EQ(WriteResult::Success, writer.write(message.t));
+
+  return !::testing::Test::HasFailure();
+}
+
+TEST(NonBlockingDemuxWriterTest, SlowReader) {
+  rc::check(slow_reader_test);
 }
 
 auto main(int argc, char** argv) -> int {
