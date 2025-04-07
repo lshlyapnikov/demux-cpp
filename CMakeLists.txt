@@ -95,7 +95,7 @@ target_link_libraries(
   reader_id
   hdr_histogram::hdr_histogram_static
   Boost::log
-  profiler
+  # profiler
 )
 target_compile_options(
   shm_demux
