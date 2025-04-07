@@ -29,7 +29,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # generate a compile_commands.json file, n
 set(MY_CXX_FLAGS -Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wconversion -Wsign-conversion -Werror)
 
 set(CMAKE_CXX_FLAGS_DEBUG "-gdwarf-4 -O0") # valgrind needs `-gdwarf-4`
-#set(CMAKE_CXX_FLAGS_DEBUG "-gdwarf-4 -O3 -DNDEBUG") # `-03 -DNDEBUG` for gperftools
+#set(CMAKE_CXX_FLAGS_DEBUG "-g -gdwarf-4 -O3 -DNDEBUG") # `-03 -DNDEBUG` for gperftools
 
 # default settins for other build types:
 # set(CMAKE_CXX_FLAGS_RELEASE "-O3")
@@ -95,7 +95,7 @@ target_link_libraries(
   reader_id
   hdr_histogram::hdr_histogram_static
   Boost::log
-  #profiler
+  profiler
 )
 target_compile_options(
   shm_demux
