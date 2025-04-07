@@ -62,9 +62,13 @@ jobs:
         working-directory: ${{github.workspace}}
         run: cmake --build ./build --target test
 
-      - name: Run Example
+      - name: Run Example zero_copy=false
         working-directory: ${{github.workspace}}
-        run: ./bin/run-example.sh
+        run: ./bin/run-example.sh 10000000 false
+
+      - name: Run Example zero_copy=true
+        working-directory: ${{github.workspace}}
+        run: ./bin/run-example.sh 10000000 true
 
       - name: Run clang-tidy Checks
         working-directory: ${{github.workspace}}

@@ -13,7 +13,7 @@ __root="$(cd "$(dirname "${__dir}")" && pwd)"
 cd "${__root}"
 
 msg_num=${1:-10000000}
-zero_copy=${2:-"true"}
+zero_copy=${2:-"false"}
 
 #valgrind_cmd="valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --track-origins=yes --trace-children=yes --track-fds=yes --log-file=valgrind.out"
 
