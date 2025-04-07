@@ -194,7 +194,7 @@ $ ./bin/run-example.sh
 ### 11.4. Generate the profiling report
 
 ```
-$ google-pprof --text ./build/shm_demux ./shm_demux_pub.prof &> pprof-report.out
+$ google-pprof --text ./build/shm_demux ./shm_demux_writer.prof &> pprof-report.out
 ```
 
 ## 12. Conan Commands
