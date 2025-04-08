@@ -172,13 +172,13 @@ class DemuxWriter {
   /// @return std::optional<A*> -- pointer to allocated message or `null_opt` if error happened.
   template <class A>
     requires(std::default_initializable<A> && sizeof(A) != 0 && sizeof(A) <= M)
-  [[nodiscard]] auto allocate_blocking(uint8_t recursion_level) noexcept -> std::optional<A*>;
+  [[nodiscard]] inline auto allocate_blocking(uint8_t recursion_level) noexcept -> std::optional<A*>;
 
   /// @brief does not block while waiting for readers to catch up, returns `std::null_opt` instead.
   /// @return `std::optional<A*>` -- pointer to allocated message or `null_opt` if there is no space left in the buffer.
   template <class A>
     requires(std::default_initializable<A> && sizeof(A) != 0 && sizeof(A) <= M)
-  [[nodiscard]] auto allocate_non_blocking() noexcept -> std::optional<A*>;
+  [[nodiscard]] inline auto allocate_non_blocking() noexcept -> std::optional<A*>;
 
   auto wait_for_readers_to_catch_up_and_wraparound() noexcept -> void;
 
@@ -340,7 +340,8 @@ template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
 template <class A>
   requires(std::default_initializable<A> && sizeof(A) != 0 && sizeof(A) <= M)
-[[nodiscard]] auto DemuxWriter<L, M, B>::allocate_blocking(uint8_t recursion_level) noexcept -> std::optional<A*> {
+[[nodiscard]] inline auto DemuxWriter<L, M, B>::allocate_blocking(uint8_t recursion_level
+) noexcept -> std::optional<A*> {
   std::optional<A*> result = this->buffer_.template allocate<A>(this->position_);
   if (result.has_value()) {
     return result;
@@ -359,7 +360,7 @@ template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
 template <class A>
   requires(std::default_initializable<A> && sizeof(A) != 0 && sizeof(A) <= M)
-[[nodiscard]] auto DemuxWriter<L, M, B>::allocate_non_blocking() noexcept -> std::optional<A*> {
+[[nodiscard]] inline auto DemuxWriter<L, M, B>::allocate_non_blocking() noexcept -> std::optional<A*> {
   if (this->wraparound_) {
     if (this->all_readers_caught_up()) {
       this->complete_wraparound();
