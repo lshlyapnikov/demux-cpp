@@ -26,8 +26,8 @@
 #include <tuple>
 #include <vector>
 #include "../core/demultiplexer.h"
+#include "../core/endpoint_id.h"
 #include "../core/message_buffer.h"
-#include "../core/reader_id.h"
 #include "../util/tuple_util.h"
 
 constexpr std::chrono::seconds DEFAULT_WAIT(5);
@@ -65,7 +65,7 @@ using MarketDataTick = std::tuple<
 
 using lshl::demux::core::DemuxReader;
 using lshl::demux::core::DemuxWriter;
-using lshl::demux::core::ReaderId;
+using lshl::demux::core::EndpointId;
 using std::array;
 using std::atomic;
 using std::optional;
@@ -156,12 +156,12 @@ auto multiple_readers_read_x(const vector<MarketDataTick>& messages) -> bool {
   array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
-  const uint64_t all_readers_mask = ReaderId::all_readers_mask(READER_NUM);
+  const uint64_t all_readers_mask = EndpointId::all_endpoints_mask(READER_NUM);
 
   vector<DemuxReader<L, M>> readers{};
   readers.reserve(READER_NUM);
   for (uint8_t i = 1; i <= READER_NUM; ++i) {
-    const ReaderId id(i);
+    const EndpointId id(i);
     readers.emplace_back(id, span{buffer}, &msg_counter_sync, &wraparound_sync);
   }
 
@@ -237,7 +237,7 @@ auto slow_reader_test(const MarketDataTick& message) -> bool {
   array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
-  const ReaderId reader_id{1};
+  const EndpointId reader_id{1};
 
   DemuxWriter<L, M, false> writer(0, span{buffer}, &msg_counter_sync, &wraparound_sync);
   DemuxReader<L, M> reader(reader_id, span{buffer}, &msg_counter_sync, &wraparound_sync);

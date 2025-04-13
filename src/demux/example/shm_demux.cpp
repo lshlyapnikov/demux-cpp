@@ -29,7 +29,7 @@
 #include <string>
 #include <thread>
 #include "../core/demultiplexer.h"
-#include "../core/reader_id.h"
+#include "../core/endpoint_id.h"
 #include "../util/hdr_histogram_util.h"
 #include "../util/shm_remover.h"
 #include "../util/shm_util.h"
@@ -41,7 +41,7 @@ auto print_usage(const char* prog) -> void {
             << " | [reader <unique-reader-number> <number-of-messages> <zero-copy>]\n"
             << "  where\n"
             << "    <number-of-readers> and <unique-reader-number> are within the interval [1, "
-            << static_cast<int>(lshl::demux::core::MAX_READER_NUM) << "]\n"
+            << static_cast<int>(lshl::demux::core::MAX_ENDPOINT_NUM) << "]\n"
             << "    <number-of-messages> is within the interval [1, " << std::numeric_limits<uint64_t>::max()
             << "] (uint64_t)\n"
             << "    <zero-copy> true/false\n";
@@ -84,7 +84,7 @@ namespace bipc = boost::interprocess;
 
 using lshl::demux::core::DemuxReader;
 using lshl::demux::core::DemuxWriter;
-using lshl::demux::core::ReaderId;
+using lshl::demux::core::EndpointId;
 using lshl::demux::core::WriteResult;
 using lshl::demux::util::HDR_histogram_util;
 using lshl::demux::util::ShmRemover;
@@ -108,7 +108,7 @@ auto main_(const span<char*> args) noexcept(false) -> int {
 
   const std::string command(args[1]);
   const auto num16 = boost::lexical_cast<uint16_t>(args[2]);
-  if (num16 < 1 || num16 > lshl::demux::core::MAX_READER_NUM) {
+  if (num16 < 1 || num16 > lshl::demux::core::MAX_ENDPOINT_NUM) {
     print_usage(args[0]);
     return ERROR;
   }
@@ -145,7 +145,7 @@ auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool z
   const ShmRemover remover1(BUFFER_SHARED_MEM_NAME);
   const ShmRemover remover2(UTIL_SHARED_MEM_NAME);
 
-  const uint64_t all_readers_mask = ReaderId::all_readers_mask(total_reader_num);
+  const uint64_t all_readers_mask = EndpointId::all_endpoints_mask(total_reader_num);
 
   // segment for the circular buffer and message counter, written by writer, read by readers
   bipc::managed_shared_memory segment1(bipc::create_only, BUFFER_SHARED_MEM_NAME, SHM_SIZE);
@@ -325,7 +325,7 @@ auto start_reader(const uint8_t reader_num, const uint64_t msg_num) noexcept(fal
   atomic<uint64_t>* startup_sync = segment2.find<atomic<uint64_t>>("startup_sync").first;
   BOOST_LOG_TRIVIAL(info) << "startup_sync found, segment2.free_memory: " << segment2.get_free_memory();
 
-  const ReaderId id{reader_num};
+  const EndpointId id{reader_num};
 
   lshl::demux::core::DemuxReader<L, M> reader(id, span{*buffer}, message_count_sync, wraparound_sync);
   BOOST_LOG_TRIVIAL(info) << "DemuxReader created, segment1.free_memory: " << segment2.get_free_memory()
