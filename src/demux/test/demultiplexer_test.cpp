@@ -25,9 +25,9 @@
 #include <span>
 #include <vector>
 #include "../core/demultiplexer.h"
-#include "../core/endpoint_id.h"
 #include "../core/message_buffer.h"
-#include "./endpoint_id_gen.h"
+#include "../core/reader_id.h"
+#include "./reader_id_gen.h"
 
 namespace lshl::demux::core {
 
@@ -41,8 +41,8 @@ BOOST_STRONG_TYPEDEF(std::vector<uint8_t>, TestMessage);
 using lshl::demux::core::DEFAULT_WAIT;
 using lshl::demux::core::DemuxReader;
 using lshl::demux::core::DemuxWriter;
-using lshl::demux::core::EndpointId;
-using lshl::demux::core::mask_to_endpoint_ids;
+using lshl::demux::core::mask_to_reader_ids;
+using lshl::demux::core::ReaderId;
 using lshl::demux::core::TestMessage;
 using lshl::demux::core::WriteResult;
 using std::array;
@@ -77,27 +77,27 @@ struct Arbitrary<TestMessage> {
 
 }  // namespace rc
 
-TEST(DemuxWriter, MaskToEndpointIds) {
-  ASSERT_EQ(mask_to_endpoint_ids(0), vector<EndpointId>{});
-  ASSERT_EQ(mask_to_endpoint_ids(0b1), vector<EndpointId>{EndpointId{1}});
-  ASSERT_EQ(mask_to_endpoint_ids(0b10), vector<EndpointId>{EndpointId{2}});
-  ASSERT_EQ(mask_to_endpoint_ids(0b100), vector<EndpointId>{EndpointId{3}});
-  ASSERT_EQ(mask_to_endpoint_ids(0b10000000000000000000000000000000), vector<EndpointId>{EndpointId{32}});
+TEST(DemuxWriter, MaskToReaderIds) {
+  ASSERT_EQ(mask_to_reader_ids(0), vector<ReaderId>{});
+  ASSERT_EQ(mask_to_reader_ids(0b1), vector<ReaderId>{ReaderId{1}});
+  ASSERT_EQ(mask_to_reader_ids(0b10), vector<ReaderId>{ReaderId{2}});
+  ASSERT_EQ(mask_to_reader_ids(0b100), vector<ReaderId>{ReaderId{3}});
+  ASSERT_EQ(mask_to_reader_ids(0b10000000000000000000000000000000), vector<ReaderId>{ReaderId{32}});
   ASSERT_EQ(
-      mask_to_endpoint_ids(0b1000000000000000000000000000000000000000000000000000000000000000),
-      vector<EndpointId>{EndpointId{64}}
+      mask_to_reader_ids(0b1000000000000000000000000000000000000000000000000000000000000000),
+      vector<ReaderId>{ReaderId{64}}
   );
   {
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
-    const vector<EndpointId> expected{EndpointId{1}, EndpointId{2}, EndpointId{5}, EndpointId{12}, EndpointId{64}};
-    ASSERT_EQ(mask_to_endpoint_ids(0b1000000000000000000000000000000000000000000000000000100000010011), expected);
+    const vector<ReaderId> expected{ReaderId{1}, ReaderId{2}, ReaderId{5}, ReaderId{12}, ReaderId{64}};
+    ASSERT_EQ(mask_to_reader_ids(0b1000000000000000000000000000000000000000000000000000100000010011), expected);
   }
   {
-    vector<EndpointId> expected;
-    for (uint8_t i = 1; i <= lshl::demux::core::MAX_ENDPOINT_NUM; ++i) {
+    vector<ReaderId> expected;
+    for (uint8_t i = 1; i <= lshl::demux::core::MAX_READER_NUM; ++i) {
       expected.emplace_back(i);
     }
-    ASSERT_EQ(mask_to_endpoint_ids(0xFFFFFFFFFFFFFFFF), expected);
+    ASSERT_EQ(mask_to_reader_ids(0xFFFFFFFFFFFFFFFF), expected);
   }
 }
 
@@ -207,7 +207,7 @@ auto write_empty_message() {
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
   const uint8_t all_readers_mask = 0b1;
-  const EndpointId reader_id(1);
+  const ReaderId reader_id(1);
 
   DemuxWriter<L, M, Blocking> writer(all_readers_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
   DemuxReader<L, M> reader{reader_id, span{buffer}, &msg_counter_sync, &wraparound_sync};
@@ -215,8 +215,8 @@ auto write_empty_message() {
   ASSERT_TRUE(reader.is_id(reader_id));
   ASSERT_TRUE(reader.id() == reader_id);
 
-  ASSERT_FALSE(reader.is_id(EndpointId(2)));
-  ASSERT_FALSE(reader.id() == EndpointId(2));
+  ASSERT_FALSE(reader.is_id(ReaderId(2)));
+  ASSERT_FALSE(reader.id() == ReaderId(2));
 
   // write an empty message
   const WriteResult result = writer.write({});
@@ -243,7 +243,7 @@ auto write_invalid_large_message() -> void {
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
   const uint8_t all_readers_mask = 0b1;
-  const EndpointId subId(1);
+  const ReaderId subId(1);
 
   DemuxWriter<L, M, Blocking> writer(all_readers_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
   DemuxReader<L, M> reader(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
@@ -271,7 +271,7 @@ TEST(NonBlockingDemuxWriterTest, WriteWhenBufferIfFullAndGetWriteRepeatResult) {
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
   const uint8_t all_readers_mask = 0b1;
-  const EndpointId subId(1);
+  const ReaderId subId(1);
 
   DemuxWriter<L, M, false> writer(all_readers_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
   DemuxReader<L, M> reader(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
@@ -305,7 +305,7 @@ auto write_and_read_1(TestMessage message) {
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
   const uint8_t all_readers_mask = 0b1;
-  const EndpointId subId(1);
+  const ReaderId subId(1);
 
   DemuxWriter<L, M, Blocking> writer(all_readers_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
   DemuxReader<L, M> reader(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
@@ -341,7 +341,7 @@ auto one_reader_read_x(const vector<TestMessage>& valid_messages) {
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
   const uint8_t all_readers_mask = 0b1;
-  const EndpointId subId(1);
+  const ReaderId subId(1);
 
   DemuxWriter<L, M, Blocking> writer(all_readers_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
   DemuxReader<L, M> reader(subId, span{buffer}, &msg_counter_sync, &wraparound_sync);
@@ -386,12 +386,12 @@ auto multiple_readers_read_x(const vector<TestMessage>& valid_messages) {
   array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
-  const uint64_t all_readers_mask = EndpointId::all_endpoints_mask(SUB_NUM);
+  const uint64_t all_readers_mask = ReaderId::all_readers_mask(SUB_NUM);
 
   vector<DemuxReader<L, M>> readers{};
   readers.reserve(SUB_NUM);
   for (uint8_t i = 1; i <= SUB_NUM; ++i) {
-    const EndpointId id(i);
+    const ReaderId id(i);
     // readers.emplace_back(DemuxReader<L, M>{id, span{buffer}, &msg_counter_sync, &wraparound_sync});
     readers.emplace_back(id, span{buffer}, &msg_counter_sync, &wraparound_sync);
   }
@@ -446,7 +446,7 @@ TEST(TestMessageGenerator, CheckByteDistribution) {
 }
 
 template <bool Blocking>
-auto writer_add_remove_reader(const vector<EndpointId>& subs) {
+auto writer_add_remove_reader(const vector<ReaderId>& subs) {
   array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
@@ -485,7 +485,7 @@ TEST(NonBlockingDemuxWriterTest, AddRemoveReader) {
 }
 
 template <bool Blocking>
-auto writer_lagging_readers(const vector<EndpointId>& readers) {
+auto writer_lagging_readers(const vector<ReaderId>& readers) {
   array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
@@ -497,10 +497,10 @@ auto writer_lagging_readers(const vector<EndpointId>& readers) {
     writer.add_reader(reader);
   }
 
-  const std::set<EndpointId> expected(readers.begin(), readers.end());
+  const std::set<ReaderId> expected(readers.begin(), readers.end());
 
-  const std::vector<EndpointId> xs = writer.lagging_readers();
-  const std::set<EndpointId> actual(xs.begin(), xs.end());
+  const std::vector<ReaderId> xs = writer.lagging_readers();
+  const std::set<ReaderId> actual(xs.begin(), xs.end());
 
   ASSERT_EQ(expected, actual);
 
@@ -519,7 +519,7 @@ TEST(NonBlockingDemuxWriterTest, LaggingReaders) {
   rc::check(writer_lagging_readers<false>);
 }
 
-auto lagging_readers_behavior(const EndpointId& reader_id) -> bool {
+auto lagging_readers_behavior(const ReaderId& reader_id) -> bool {
   array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
@@ -570,7 +570,7 @@ auto slow_reader_test(TestMessage message) -> bool {
   array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
   atomic<uint64_t> wraparound_sync{0};
-  const EndpointId reader_id{1};
+  const ReaderId reader_id{1};
 
   DemuxWriter<L, M, false> writer(0, span{buffer}, &msg_counter_sync, &wraparound_sync);
   DemuxReader<L, M> reader(reader_id, span{buffer}, &msg_counter_sync, &wraparound_sync);

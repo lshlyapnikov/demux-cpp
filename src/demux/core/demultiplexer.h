@@ -15,8 +15,8 @@
 #include <tuple>
 #include <utility>
 #include <vector>
-#include "./endpoint_id.h"
 #include "./message_buffer.h"
+#include "./reader_id.h"
 
 namespace lshl::demux::core {
 
@@ -32,7 +32,7 @@ enum WriteResult : std::uint8_t {
   Error,    // message cannot be sent, log error and drop it
 };
 
-auto mask_to_endpoint_ids(const uint64_t value) -> std::vector<EndpointId>;
+auto mask_to_reader_ids(const uint64_t value) -> std::vector<ReaderId>;
 
 /// @brief Demultiplexer writer.
 /// @tparam `L` The size of the circular buffer in bytes. When allocating the buffer in shared memory,
@@ -133,17 +133,17 @@ class DemuxWriter {
 
   [[nodiscard]] auto message_count() const noexcept -> uint64_t { return this->message_count_; }
 
-  [[nodiscard]] auto is_registered_reader(const EndpointId& id) const noexcept -> bool {
+  [[nodiscard]] auto is_registered_reader(const ReaderId& id) const noexcept -> bool {
     return this->all_readers_mask_ & id.mask();
   }
 
-  auto add_reader(const EndpointId& id) noexcept -> void { this->all_readers_mask_ |= id.mask(); }
+  auto add_reader(const ReaderId& id) noexcept -> void { this->all_readers_mask_ |= id.mask(); }
 
-  auto remove_reader(const EndpointId& id) noexcept -> void { this->all_readers_mask_ &= ~id.mask(); }
+  auto remove_reader(const ReaderId& id) noexcept -> void { this->all_readers_mask_ &= ~id.mask(); }
 
   /// @brief Returns lagging readers, based on `wraparound_sync_` and `all_readers_mask_`.
   /// iterates over 64bits.
-  [[nodiscard]] auto lagging_readers() const noexcept -> std::vector<EndpointId>;
+  [[nodiscard]] auto lagging_readers() const noexcept -> std::vector<ReaderId>;
 
 #ifdef UNIT_TEST
 
@@ -211,13 +211,13 @@ template <size_t L, uint16_t M>
 class DemuxReader {
  public:
   DemuxReader(
-      const EndpointId& id,
+      const ReaderId& reader_id,
       const span<uint8_t, L> buffer,
       const atomic<uint64_t>* message_count_sync,
       atomic<uint64_t>* wraparound_sync
   ) noexcept
-      : id_(id),
-        mask_(id.mask()),
+      : id_(reader_id),
+        mask_(reader_id.mask()),
         buffer_(buffer),
         message_count_sync_(message_count_sync),
         wraparound_sync_(wraparound_sync) {
@@ -255,9 +255,9 @@ class DemuxReader {
     }
   }
 
-  [[nodiscard]] auto is_id(const EndpointId& id) const noexcept -> bool { return this->mask_ == id.mask(); }
+  [[nodiscard]] auto is_id(const ReaderId& id) const noexcept -> bool { return this->mask_ == id.mask(); }
 
-  [[nodiscard]] auto id() const noexcept -> const EndpointId& { return this->id_; }
+  [[nodiscard]] auto id() const noexcept -> const ReaderId& { return this->id_; }
 
   [[nodiscard]] auto has_next() noexcept -> bool;
 
@@ -273,7 +273,7 @@ class DemuxReader {
 
  private:
   // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
-  const EndpointId id_;
+  const ReaderId id_;
   const uint64_t mask_;  // micro-optimization
 
   size_t position_{0};
@@ -419,10 +419,10 @@ inline auto DemuxWriter<L, M, B>::all_readers_caught_up() noexcept -> bool {
 
 template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
-[[nodiscard]] auto DemuxWriter<L, M, B>::lagging_readers() const noexcept -> std::vector<EndpointId> {
+[[nodiscard]] auto DemuxWriter<L, M, B>::lagging_readers() const noexcept -> std::vector<ReaderId> {
   const uint64_t reader_ids = this->wraparound_sync_->load();
   const uint64_t lagging_reader_ids = reader_ids ^ this->all_readers_mask_;
-  return mask_to_endpoint_ids(lagging_reader_ids);
+  return mask_to_reader_ids(lagging_reader_ids);
 }
 
 template <size_t L, uint16_t M>
