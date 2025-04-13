@@ -1,5 +1,5 @@
 {
-  "my.terminal.run.cmd1": "clear; ${LLVM_HOME}/bin/scan-build cmake --build ./build -- -j8",
+  "my.terminal.run.cmd1": "clear; ${LLVM_HOME}/bin/scan-build cmake --build ./build",
   // "my.terminal.run.cmd2": "clear; cmake --build ./build && cmake --build ./build --target test",
   "my.terminal.run.cmd2": "clear; cmake --build ./build && ctest --test-dir ./build/",
   // "my.terminal.run.cmd2": "clear; cmake --build ./build && ctest --test-dir ./build/ --verbose",

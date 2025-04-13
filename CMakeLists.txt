@@ -81,7 +81,7 @@ add_library(
 )
 target_link_libraries(
   ${PROJECT_NAME}
-  endpoint_id
+  reader_id
   demultiplexer
 )
 
@@ -92,7 +92,7 @@ add_executable(
 )
 target_link_libraries(
   shm_demux
-  endpoint_id
+  reader_id
   hdr_histogram::hdr_histogram_static
   Boost::log
   # profiler
@@ -103,11 +103,11 @@ target_compile_options(
 )
 
 add_library(
-  endpoint_id
-  OBJECT src/demux/core/endpoint_id.cpp
+  reader_id
+  OBJECT src/demux/core/reader_id.cpp
 )
 target_compile_options(
-  endpoint_id
+  reader_id
   PRIVATE ${MY_CXX_FLAGS}
 )
 
@@ -124,20 +124,20 @@ enable_testing()
 include(GoogleTest)
 
 add_executable(
-  endpoint_id_test
-  src/demux/test/endpoint_id_test.cpp
+  reader_id_test
+  src/demux/test/reader_id_test.cpp
 )
 target_link_libraries(
-  endpoint_id_test
-  endpoint_id
+  reader_id_test
+  reader_id
   gtest::gtest
   rapidcheck::rapidcheck
 )
 target_compile_options(
-  endpoint_id_test
+  reader_id_test
   PRIVATE ${MY_CXX_FLAGS}
 )
-gtest_discover_tests(endpoint_id_test)
+gtest_discover_tests(reader_id_test)
 
 add_executable(
   message_buffer_test
@@ -162,7 +162,7 @@ add_executable(
 target_link_libraries(
   demultiplexer_test
   demultiplexer
-  endpoint_id
+  reader_id
   gtest::gtest
   rapidcheck::rapidcheck
   Boost::log
@@ -181,7 +181,7 @@ add_executable(
 target_link_libraries(
   demultiplexer_allocate_test
   demultiplexer
-  endpoint_id
+  reader_id
   gtest::gtest
   rapidcheck::rapidcheck
   Boost::log
@@ -199,7 +199,7 @@ add_executable(
 )
 target_link_libraries(
   shm_util_test
-  endpoint_id
+  reader_id
   gtest::gtest
   rapidcheck::rapidcheck
   Boost::log
