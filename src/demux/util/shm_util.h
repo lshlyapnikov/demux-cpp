@@ -1,8 +1,7 @@
 // Copyright 2024 Leonid Shlyapnikov.
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef LSHL_UTIL_SHM_UTIL_H
-#define LSHL_UTIL_SHM_UTIL_H
+#pragma once
 
 #include <cstddef>
 
@@ -32,5 +31,3 @@ constexpr auto calculate_required_shared_mem_size(
 }
 
 }  // namespace lshl::demux::util
-
-#endif  // LSHL_UTIL_SHM_UTIL_H

@@ -1,8 +1,7 @@
 // Copyright 2024 Leonid Shlyapnikov.
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef LSHL_UTIL_HDR_HISTOGRAM_UTIL_H
-#define LSHL_UTIL_HDR_HISTOGRAM_UTIL_H
+#pragma once
 
 #include <hdr/hdr_histogram.h>
 #include <cstdint>
@@ -45,5 +44,3 @@ struct HDR_histogram_util {
 };
 
 }  // namespace lshl::demux::util
-
-#endif  // LSHL_UTIL_HDR_HISTOGRAM_UTIL_H

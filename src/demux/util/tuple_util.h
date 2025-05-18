@@ -1,5 +1,7 @@
-#ifndef TUPLE_UTIL_H_589e1e98cc3f459892f440f01e885c4c
-#define TUPLE_UTIL_H_589e1e98cc3f459892f440f01e885c4c
+// Copyright 2024 Leonid Shlyapnikov.
+// SPDX-License-Identifier: Apache-2.0
+
+#pragma once
 
 #include <cstddef>
 #include <iostream>
@@ -42,5 +44,3 @@ auto operator<<(std::ostream& os, const std::tuple<Types...>& t) -> std::ostream
 }
 
 }  // namespace lshl::demux::util
-
-#endif  // TUPLE_UTIL_H_589e1e98cc3f459892f440f01e885c4c

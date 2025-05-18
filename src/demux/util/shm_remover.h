@@ -1,8 +1,7 @@
 // Copyright 2024 Leonid Shlyapnikov.
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef LSHL_UTIL_SHM_REMOVER_H
-#define LSHL_UTIL_SHM_REMOVER_H
+#pragma once
 
 #include <boost/interprocess/shared_memory_object.hpp>
 #include "./boost_log_util.h"
@@ -40,5 +39,3 @@ struct ShmRemover {
 };
 
 }  // namespace lshl::demux::util
-
-#endif  // LSHL_UTIL_SHM_REMOVER_H

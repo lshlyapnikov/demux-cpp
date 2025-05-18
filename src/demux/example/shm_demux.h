@@ -1,8 +1,7 @@
 // Copyright 2024 Leonid Shlyapnikov.
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef LSHL_DEMUX_EXAMPLE_DEMUX_H
-#define LSHL_DEMUX_EXAMPLE_DEMUX_H
+#pragma once
 
 #include <cstddef>
 #include <cstdint>
@@ -49,5 +48,3 @@ auto run_reader_loop(lshl::demux::core::DemuxReader<L, M>& reader, uint64_t msg_
 auto inline calculate_latency(uint64_t x0) -> int64_t;
 
 }  // namespace lshl::demux::example
-
-#endif  // LSHL_DEMUX_EXAMPLE_DEMUX_H

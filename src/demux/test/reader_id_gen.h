@@ -3,8 +3,7 @@
 
 // NOLINTBEGIN(misc-include-cleaner)
 
-#ifndef DEMUX_CPP_LSHL_DEMUX_SUBSCRIBER_ID_TEST_H
-#define DEMUX_CPP_LSHL_DEMUX_SUBSCRIBER_ID_TEST_H
+#pragma once
 
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
 #include <cstdint>
@@ -26,7 +25,5 @@ struct Arbitrary<lshl::demux::core::ReaderId> {
 };
 
 }  // namespace rc
-
-#endif  // DEMUX_CPP_LSHL_DEMUX_SUBSCRIBER_ID_TEST_H
 
 // NOLINTEND(misc-include-cleaner)
