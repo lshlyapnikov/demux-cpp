@@ -14,7 +14,6 @@
 #include <atomic>
 #include <boost/log/core.hpp>         // NOLINT(misc-include-cleaner)
 #include <boost/log/expressions.hpp>  // NOLINT(misc-include-cleaner)
-#include <boost/log/trivial.hpp>
 #include <boost/serialization/strong_typedef.hpp>
 #include <boost/static_string/static_string.hpp>
 #include <cassert>

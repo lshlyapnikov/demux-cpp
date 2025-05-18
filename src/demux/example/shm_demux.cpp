@@ -15,7 +15,6 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/log/core.hpp>
 #include <boost/log/expressions.hpp>
-#include <boost/log/trivial.hpp>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -30,6 +29,7 @@
 #include <thread>
 #include "../core/demultiplexer.h"
 #include "../core/reader_id.h"
+#include "../util/boost_log_util.h"
 #include "../util/hdr_histogram_util.h"
 #include "../util/shm_remover.h"
 #include "../util/shm_util.h"
@@ -53,13 +53,13 @@ auto main(int argc, char* argv[]) noexcept -> int {
     const auto args = std::span<char*>(argv, static_cast<size_t>(argc));
     return lshl::demux::example::main_(args);
   } catch (const boost::exception& e) {
-    BOOST_LOG_TRIVIAL(error) << "boost::exception: " << boost::diagnostic_information(e);
+    LOG_ERROR << "boost::exception: " << boost::diagnostic_information(e);
     return ERROR;
   } catch (const std::exception& e) {
-    BOOST_LOG_TRIVIAL(error) << "std::exception: " << e.what();
+    LOG_ERROR << "std::exception: " << e.what();
     return ERROR;
   } catch (...) {
-    BOOST_LOG_TRIVIAL(error) << "unexpected exception";
+    LOG_ERROR << "unexpected exception";
     return ERROR;
   }
 }
@@ -138,9 +138,8 @@ auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool z
       L, lshl::demux::util::BOOST_IPC_INTERNAL_METADATA_SIZE, lshl::demux::util::LINUX_PAGE_SIZE
   );
 
-  BOOST_LOG_TRIVIAL(info) << "start_writer " << BUFFER_SHARED_MEM_NAME << ", size: " << SHM_SIZE << ", L: " << L
-                          << ", M: " << M << ", total_reader_num: " << static_cast<int>(total_reader_num)
-                          << ", zero_copy: " << zero_copy;
+  LOG_INFO << "start_writer " << BUFFER_SHARED_MEM_NAME << ", size: " << SHM_SIZE << ", L: " << L << ", M: " << M
+           << ", total_reader_num: " << static_cast<int>(total_reader_num) << ", zero_copy: " << zero_copy;
 
   const ShmRemover remover1(BUFFER_SHARED_MEM_NAME);
   const ShmRemover remover2(UTIL_SHARED_MEM_NAME);
@@ -149,33 +148,33 @@ auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool z
 
   // segment for the circular buffer and message counter, written by writer, read by readers
   bipc::managed_shared_memory segment1(bipc::create_only, BUFFER_SHARED_MEM_NAME, SHM_SIZE);
-  BOOST_LOG_TRIVIAL(info) << "created shared_memory_object segment1: " << BUFFER_SHARED_MEM_NAME
-                          << ", segment1.free_memory: " << segment1.get_free_memory();
+  LOG_INFO << "created shared_memory_object segment1: " << BUFFER_SHARED_MEM_NAME
+           << ", segment1.free_memory: " << segment1.get_free_memory();
 
   array<uint8_t, L>* buffer = segment1.construct<array<uint8_t, L>>("buffer")();
-  BOOST_LOG_TRIVIAL(info) << "buffer allocated, segment1.free_memory: " << segment1.get_free_memory();
+  LOG_INFO << "buffer allocated, segment1.free_memory: " << segment1.get_free_memory();
 
   atomic<uint64_t>* message_count_sync = segment1.construct<atomic<uint64_t>>("message_count_sync")(0);
-  BOOST_LOG_TRIVIAL(info) << "message_count_sync allocated, segment1.free_memory: " << segment1.get_free_memory();
+  LOG_INFO << "message_count_sync allocated, segment1.free_memory: " << segment1.get_free_memory();
 
   // segment for synchronization
   bipc::managed_shared_memory segment2(bipc::create_only, UTIL_SHARED_MEM_NAME, lshl::demux::util::LINUX_PAGE_SIZE);
-  BOOST_LOG_TRIVIAL(info) << "created shared_memory_object segment2: " << UTIL_SHARED_MEM_NAME
-                          << ", segment2.free_memory: " << segment2.get_free_memory();
+  LOG_INFO << "created shared_memory_object segment2: " << UTIL_SHARED_MEM_NAME
+           << ", segment2.free_memory: " << segment2.get_free_memory();
 
   atomic<uint64_t>* wraparound_sync = segment2.construct<atomic<uint64_t>>("wraparound_sync")(0);
-  BOOST_LOG_TRIVIAL(info) << "wraparound_sync allocated, segment2.free_memory: " << segment2.get_free_memory();
+  LOG_INFO << "wraparound_sync allocated, segment2.free_memory: " << segment2.get_free_memory();
 
   atomic<uint64_t>* startup_sync = segment2.construct<atomic<uint64_t>>("startup_sync")(0);
-  BOOST_LOG_TRIVIAL(info) << "startup_sync allocated, segment2.free_memory: " << segment2.get_free_memory();
+  LOG_INFO << "startup_sync allocated, segment2.free_memory: " << segment2.get_free_memory();
 
   lshl::demux::core::DemuxWriter<L, M, false> writer(
       all_readers_mask, span{*buffer}, message_count_sync, wraparound_sync
   );
-  BOOST_LOG_TRIVIAL(info) << "DemuxWriter created, segment1.free_memory: " << segment1.get_free_memory()
-                          << ", segment2.free_memory: " << segment2.get_free_memory();
+  LOG_INFO << "DemuxWriter created, segment1.free_memory: " << segment1.get_free_memory()
+           << ", segment2.free_memory: " << segment2.get_free_memory();
 
-  BOOST_LOG_TRIVIAL(info) << "waiting for all readers ...";
+  LOG_INFO << "waiting for all readers ...";
   while (true) {
     const uint64_t x = startup_sync->load();
     if (x == all_readers_mask) {
@@ -185,21 +184,21 @@ auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool z
       std::this_thread::sleep_for(1s);
     }
   }
-  BOOST_LOG_TRIVIAL(info) << "all readers connected";
+  LOG_INFO << "all readers connected";
 
   if (zero_copy) {
     run_writer_loop_zero_copy(writer, msg_num);
   } else {
     run_writer_loop(writer, msg_num);
   }
-  BOOST_LOG_TRIVIAL(info) << "DemuxWriter completed, segment1.free_memory: " << segment1.get_free_memory()
-                          << ", segment2.free_memory: " << segment2.get_free_memory();
+  LOG_INFO << "DemuxWriter completed, segment1.free_memory: " << segment1.get_free_memory()
+           << ", segment2.free_memory: " << segment2.get_free_memory();
 }
 
 template <size_t L, uint16_t M>
 auto run_writer_loop(lshl::demux::core::DemuxWriter<L, M, false>& writer, const uint64_t msg_num) noexcept(false
 ) -> void {
-  BOOST_LOG_TRIVIAL(info) << "sending " << msg_num << " md updates ...";
+  LOG_INFO << "sending " << msg_num << " md updates ...";
 
   MarketDataUpdate md{};
   MarketDataUpdateGenerator md_gen{};
@@ -207,22 +206,20 @@ auto run_writer_loop(lshl::demux::core::DemuxWriter<L, M, false>& writer, const 
 
   for (uint64_t i = 1; i <= msg_num; ++i) {
     md_gen.generate_market_data_update(&md);
-#ifndef NDEBUG
-    BOOST_LOG_TRIVIAL(debug) << md;
-#endif
+    LOG_DEBUG << md;
     const bool ok = write_(writer, md);
     if (!ok) {
-      BOOST_LOG_TRIVIAL(error) << "dropping message, could not write: " << md;
+      LOG_ERROR << "dropping message, could not write: " << md;
       continue;
     }
     if (i % REPORT_PROGRESS == 0) {
-      BOOST_LOG_TRIVIAL(info) << "number of messages sent: " << i;
+      LOG_INFO << "number of messages sent: " << i;
     }
     hash.update(&md, sizeof(MarketDataUpdate));
   }
 
-  BOOST_LOG_TRIVIAL(info) << "writer sequence number: " << writer.message_count()
-                          << ", XXH64_hash: " << XXH64_util::format(hash.digest());
+  LOG_INFO << "writer sequence number: " << writer.message_count()
+           << ", XXH64_hash: " << XXH64_util::format(hash.digest());
 }
 
 template <class T, size_t L, uint16_t M>
@@ -238,8 +235,8 @@ template <class T, size_t L, uint16_t M>
       case WriteResult::Repeat:
         attempt += 1;
         if (attempt % REPORT_PROGRESS == 0) {
-          BOOST_LOG_TRIVIAL(warning) << "one or more readers are lagging, wraparound is blocked, write attempt: "
-                                     << attempt << ", writer sequence: " << writer.message_count();
+          LOG_WARNING << "one or more readers are lagging, wraparound is blocked, write attempt: " << attempt
+                      << ", writer sequence: " << writer.message_count();
         }
         continue;
     }
@@ -250,7 +247,7 @@ template <size_t L, uint16_t M>
 auto run_writer_loop_zero_copy(lshl::demux::core::DemuxWriter<L, M, false>& writer, const uint64_t msg_num) noexcept(
     false
 ) -> void {
-  BOOST_LOG_TRIVIAL(info) << "sending " << msg_num << " md updates ...";
+  LOG_INFO << "sending " << msg_num << " md updates ...";
 
   MarketDataUpdateGenerator md_gen{};
   XXH64_util hash{};
@@ -258,16 +255,16 @@ auto run_writer_loop_zero_copy(lshl::demux::core::DemuxWriter<L, M, false>& writ
   for (uint64_t i = 1; i <= msg_num; ++i) {
     const bool ok = write_zero_copy_(&writer, &md_gen, &hash);
     if (!ok) {
-      BOOST_LOG_TRIVIAL(error) << "dropped one message, could not write";
+      LOG_ERROR << "dropped one message, could not write";
       continue;
     }
     if (i % REPORT_PROGRESS == 0) {
-      BOOST_LOG_TRIVIAL(info) << "number of messages sent: " << i;
+      LOG_INFO << "number of messages sent: " << i;
     }
   }
 
-  BOOST_LOG_TRIVIAL(info) << "writer sequence number: " << writer.message_count()
-                          << ", XXH64_hash: " << XXH64_util::format(hash.digest());
+  LOG_INFO << "writer sequence number: " << writer.message_count()
+           << ", XXH64_hash: " << XXH64_util::format(hash.digest());
 }
 
 template <size_t L, uint16_t M>
@@ -278,9 +275,7 @@ write_zero_copy_(DemuxWriter<L, M, false>* writer, MarketDataUpdateGenerator* md
     const std::optional<MarketDataUpdate*> mo = writer->template allocate<MarketDataUpdate>();
     if (mo.has_value()) {
       MarketDataUpdate* md = mo.value();
-#ifndef NDEBUG
-      BOOST_LOG_TRIVIAL(debug) << md;
-#endif
+      LOG_DEBUG << md;
       md_gen->generate_market_data_update(md);
       writer->template commit<MarketDataUpdate>();
       hash->update(md, sizeof(MarketDataUpdate));
@@ -288,8 +283,8 @@ write_zero_copy_(DemuxWriter<L, M, false>* writer, MarketDataUpdateGenerator* md
     } else {
       attempt += 1;
       if (attempt % REPORT_PROGRESS == 0) {
-        BOOST_LOG_TRIVIAL(warning) << "one or more readers are lagging, wraparound is blocked, write attempt: "
-                                   << attempt << ", writer sequence: " << writer->message_count();
+        LOG_WARNING << "one or more readers are lagging, wraparound is blocked, write attempt: " << attempt
+                    << ", writer sequence: " << writer->message_count();
       }
     }
   }
@@ -300,42 +295,42 @@ auto start_reader(const uint8_t reader_num, const uint64_t msg_num) noexcept(fal
   using lshl::demux::example::BUFFER_SHARED_MEM_NAME;
   using std::atomic;
 
-  BOOST_LOG_TRIVIAL(info) << "reader BUFFER_SHARED_MEM_NAME: " << BUFFER_SHARED_MEM_NAME << ", L: " << L << ", M: " << M
-                          << ", reader_num: " << static_cast<int>(reader_num);
+  LOG_INFO << "reader BUFFER_SHARED_MEM_NAME: " << BUFFER_SHARED_MEM_NAME << ", L: " << L << ", M: " << M
+           << ", reader_num: " << static_cast<int>(reader_num);
 
   // read-only segment for the circular buffer and message counter
   bipc::managed_shared_memory segment1(bipc::open_read_only, BUFFER_SHARED_MEM_NAME);
-  BOOST_LOG_TRIVIAL(info) << "opened shared_memory_object segment1: " << BUFFER_SHARED_MEM_NAME
-                          << ", segment1.free_memory: " << segment1.get_free_memory();
+  LOG_INFO << "opened shared_memory_object segment1: " << BUFFER_SHARED_MEM_NAME
+           << ", segment1.free_memory: " << segment1.get_free_memory();
 
   array<uint8_t, L>* buffer = segment1.find<array<uint8_t, L>>("buffer").first;
-  BOOST_LOG_TRIVIAL(info) << "buffer found, segment1.free_memory: " << segment1.get_free_memory();
+  LOG_INFO << "buffer found, segment1.free_memory: " << segment1.get_free_memory();
 
   atomic<uint64_t>* message_count_sync = segment1.find<atomic<uint64_t>>("message_count_sync").first;
-  BOOST_LOG_TRIVIAL(info) << "message_count_sync found, segment1.free_memory: " << segment1.get_free_memory();
+  LOG_INFO << "message_count_sync found, segment1.free_memory: " << segment1.get_free_memory();
 
   // read-write segment for atomic variables
   bipc::managed_shared_memory segment2(bipc::open_only, UTIL_SHARED_MEM_NAME);
-  BOOST_LOG_TRIVIAL(info) << "opened shared_memory_object segment2: " << UTIL_SHARED_MEM_NAME
-                          << ", segment2.free_memory: " << segment2.get_free_memory();
+  LOG_INFO << "opened shared_memory_object segment2: " << UTIL_SHARED_MEM_NAME
+           << ", segment2.free_memory: " << segment2.get_free_memory();
 
   atomic<uint64_t>* wraparound_sync = segment2.find<atomic<uint64_t>>("wraparound_sync").first;
-  BOOST_LOG_TRIVIAL(info) << "wraparound_sync found, segment2.free_memory: " << segment2.get_free_memory();
+  LOG_INFO << "wraparound_sync found, segment2.free_memory: " << segment2.get_free_memory();
 
   atomic<uint64_t>* startup_sync = segment2.find<atomic<uint64_t>>("startup_sync").first;
-  BOOST_LOG_TRIVIAL(info) << "startup_sync found, segment2.free_memory: " << segment2.get_free_memory();
+  LOG_INFO << "startup_sync found, segment2.free_memory: " << segment2.get_free_memory();
 
   const ReaderId id{reader_num};
 
   lshl::demux::core::DemuxReader<L, M> reader(id, span{*buffer}, message_count_sync, wraparound_sync);
-  BOOST_LOG_TRIVIAL(info) << "DemuxReader created, segment1.free_memory: " << segment2.get_free_memory()
-                          << ", segment2.free_memory: " << segment2.get_free_memory();
+  LOG_INFO << "DemuxReader created, segment1.free_memory: " << segment2.get_free_memory()
+           << ", segment2.free_memory: " << segment2.get_free_memory();
 
   startup_sync->fetch_or(id.mask());
 
   run_reader_loop(reader, msg_num);
-  BOOST_LOG_TRIVIAL(info) << "DemuxReader completed, segment1.free_memory: " << segment2.get_free_memory()
-                          << ", segment2.free_memory: " << segment2.get_free_memory();
+  LOG_INFO << "DemuxReader completed, segment1.free_memory: " << segment2.get_free_memory()
+           << ", segment2.free_memory: " << segment2.get_free_memory();
 }
 
 template <size_t L, uint16_t M>
@@ -351,22 +346,20 @@ auto run_reader_loop(lshl::demux::core::DemuxReader<L, M>& reader, const uint64_
       const MarketDataUpdate* md = read.value();
       // track the latency
       histogram.record_value(calculate_latency(md->timestamp));
-#ifndef NDEBUG
-      BOOST_LOG_TRIVIAL(debug) << *md;
-#endif
+      LOG_DEBUG << *md;
       // report progress
       if (i % REPORT_PROGRESS == 0) {
-        BOOST_LOG_TRIVIAL(info) << "number of messages received: " << i;
+        LOG_INFO << "number of messages received: " << i;
       }
       // calculate the hash
       hash.update(md, sizeof(MarketDataUpdate));
     }
   }
 
-  BOOST_LOG_TRIVIAL(info) << "reader sequence number: " << reader.message_count()
-                          << ", XXH64_hash: " << XXH64_util::format(hash.digest());
+  LOG_INFO << "reader sequence number: " << reader.message_count()
+           << ", XXH64_hash: " << XXH64_util::format(hash.digest());
 
-  BOOST_LOG_TRIVIAL(info) << "message latency, ns:";
+  LOG_INFO << "message latency, ns:";
   histogram.print_report();
 }
 
