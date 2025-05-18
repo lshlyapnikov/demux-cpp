@@ -1,8 +1,7 @@
 // Copyright 2024 Leonid Shlyapnikov.
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef LSHL_DEMUX_EXAMPLE_MARKET_DATA_H
-#define LSHL_DEMUX_EXAMPLE_MARKET_DATA_H
+#pragma once
 
 #include <cstdint>
 #include <iostream>
@@ -58,5 +57,3 @@ class MarketDataUpdateGenerator {
 };
 
 }  // namespace lshl::demux::example
-
-#endif  // LSHL_DEMUX_EXAMPLE_MARKET_DATA_H
