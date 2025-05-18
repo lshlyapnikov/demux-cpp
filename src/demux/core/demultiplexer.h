@@ -1,11 +1,9 @@
 // Copyright 2024 Leonid Shlyapnikov.
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef DEMUX_CPP_LSHL_DEMUX_DEMULTIPLEXER_H
-#define DEMUX_CPP_LSHL_DEMUX_DEMULTIPLEXER_H
+#pragma once
 
 #include <atomic>
-#include <boost/log/trivial.hpp>
 #include <cassert>
 #include <concepts>
 #include <cstdint>
@@ -15,6 +13,7 @@
 #include <tuple>
 #include <utility>
 #include <vector>
+#include "../util/boost_log_util.h"
 #include "./message_buffer.h"
 #include "./reader_id.h"
 
@@ -55,8 +54,8 @@ class DemuxWriter {
         buffer_(buffer),
         message_count_sync_(message_count_sync),
         wraparound_sync_(wraparound_sync) {
-    BOOST_LOG_TRIVIAL(info) << "[DemuxWriter::constructor] L: " << L << ", M: " << M << ", B: " << B
-                            << ", all_readers_mask_: " << this->all_readers_mask_;
+    LOG_INFO << "[DemuxWriter::constructor] L: " << L << ", M: " << M << ", B: " << B
+             << ", all_readers_mask_: " << this->all_readers_mask_;
   }
 
   ~DemuxWriter() = default;
@@ -71,7 +70,7 @@ class DemuxWriter {
   [[nodiscard]] auto write(const span<uint8_t>& source) noexcept -> WriteResult {
     const size_t n = source.size();
     if (n == 0 || n > M) {
-      BOOST_LOG_TRIVIAL(error) << "[DemuxWriter::write] invalid message length: " << n;
+      LOG_ERROR << "[DemuxWriter::write] invalid message length: " << n;
       return WriteResult::Error;
     }
     if constexpr (B) {
@@ -221,7 +220,7 @@ class DemuxReader {
         buffer_(buffer),
         message_count_sync_(message_count_sync),
         wraparound_sync_(wraparound_sync) {
-    BOOST_LOG_TRIVIAL(info) << "[DemuxReader::constructor] L: " << L << ", M: " << M << ", " << this->id_;
+    LOG_INFO << "[DemuxReader::constructor] L: " << L << ", M: " << M << ", " << this->id_;
   }
 
   ~DemuxReader() = default;
@@ -298,7 +297,7 @@ auto DemuxWriter<L, M, B>::write_blocking(const span<uint8_t>& source, uint8_t r
     return WriteResult::Success;
   } else {
     if (recursion_level > 1) {
-      BOOST_LOG_TRIVIAL(error) << "[DemuxWriter::write_blocking] recursion_level: " << recursion_level;
+      LOG_ERROR << "[DemuxWriter::write_blocking] recursion_level: " << recursion_level;
       return WriteResult::Error;
     } else {
       this->wait_for_readers_to_catch_up_and_wraparound();
@@ -313,7 +312,7 @@ auto DemuxWriter<L, M, B>::write_non_blocking(const span<uint8_t>& source) noexc
   const size_t n = source.size();
 
   if (n == 0 || n > M) {
-    BOOST_LOG_TRIVIAL(error) << "[DemuxWriter::write_non_blocking] invalid message length: " << n;
+    LOG_ERROR << "[DemuxWriter::write_non_blocking] invalid message length: " << n;
     return WriteResult::Error;
   }
 
@@ -347,7 +346,7 @@ template <class A>
     return result;
   } else {
     if (recursion_level > 1) {
-      BOOST_LOG_TRIVIAL(error) << "[DemuxWriter::allocate_blocking] recursion_level: " << recursion_level;
+      LOG_ERROR << "[DemuxWriter::allocate_blocking] recursion_level: " << recursion_level;
       return std::nullopt;
     } else {
       this->wait_for_readers_to_catch_up_and_wraparound();
@@ -381,10 +380,8 @@ template <size_t L, uint16_t M, bool B>
 auto DemuxWriter<L, M, B>::wait_for_readers_to_catch_up_and_wraparound() noexcept -> void {
   this->initiate_wraparound();
 
-#ifndef NDEBUG
-  BOOST_LOG_TRIVIAL(debug) << "[DemuxWriter::wait_for_readers_to_catch_up_and_wraparound] message_count_: "
-                           << this->message_count_ << ", position_: " << this->position_ << " ... waiting ...";
-#endif
+  LOG_DEBUG << "[DemuxWriter::wait_for_readers_to_catch_up_and_wraparound] message_count_: " << this->message_count_
+            << ", position_: " << this->position_ << " ... waiting ...";
 
   // busy-wait
   while (!this->all_readers_caught_up()) {
@@ -429,12 +426,8 @@ template <size_t L, uint16_t M>
   requires(L >= M + 2 && M > 0)
 // NOLINTNEXTLINE(readability-const-return-type)
 [[nodiscard]] auto DemuxReader<L, M>::next() noexcept -> const span<uint8_t> {
-#ifndef NDEBUG
-  BOOST_LOG_TRIVIAL(debug) << "[DemuxReader::next()] " << this->id_
-                           << ", read_message_count_: " << this->read_message_count_
-                           << ", position_: " << this->position_;
-#endif
-
+  LOG_DEBUG << "[DemuxReader::next()] " << this->id_ << ", read_message_count_: " << this->read_message_count_
+            << ", position_: " << this->position_;
   if (!this->has_next()) {
     return {};
   }
@@ -447,21 +440,15 @@ template <size_t L, uint16_t M>
   if (msg_size > 0) {
     this->position_ += msg_size;
     this->position_ += sizeof(uint16_t);
-#ifndef NDEBUG
-    BOOST_LOG_TRIVIAL(debug) << "[DemuxReader::next()] continue, " << this->id_
-                             << ", read_message_count_: " << this->read_message_count_
-                             << ", available_message_count_: " << this->available_message_count_
-                             << ", position_: " << this->position_;
-#endif
+    LOG_DEBUG << "[DemuxReader::next()] continue, " << this->id_
+              << ", read_message_count_: " << this->read_message_count_
+              << ", available_message_count_: " << this->available_message_count_ << ", position_: " << this->position_;
     assert(this->position_ <= L);
     return result;
   } else {
-#ifndef NDEBUG
-    BOOST_LOG_TRIVIAL(debug) << "[DemuxReader::next()] wrapping up, " << this->id_
-                             << ", read_message_count_: " << this->read_message_count_
-                             << ", available_message_count_: " << this->available_message_count_
-                             << ", position_: " << this->position_;
-#endif
+    LOG_DEBUG << "[DemuxReader::next()] wrapping up, " << this->id_
+              << ", read_message_count_: " << this->read_message_count_
+              << ", available_message_count_: " << this->available_message_count_ << ", position_: " << this->position_;
     // signal that it is ready to wraparound, see doc/adr/ADR003.md for more details
     assert(this->read_message_count_ == this->available_message_count_);
     this->position_ = 0;
@@ -487,5 +474,3 @@ template <size_t L, uint16_t M>
 }
 
 }  // namespace lshl::demux::core
-
-#endif  // DEMUX_CPP_LSHL_DEMUX_DEMULTIPLEXER_H

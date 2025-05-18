@@ -5,7 +5,7 @@
 #define LSHL_UTIL_SHM_REMOVER_H
 
 #include <boost/interprocess/shared_memory_object.hpp>
-#include <boost/log/trivial.hpp>
+#include "./boost_log_util.h"
 
 namespace lshl::demux::util {
 
@@ -14,10 +14,9 @@ struct ShmRemover {
     namespace bipc = boost::interprocess;
     const bool ok = bipc::shared_memory_object::remove(this->name_);
     if (ok) {
-      BOOST_LOG_TRIVIAL(warning) << "[startup] removed shared_memory_object: " << this->name_;
+      LOG_WARNING << "[startup] removed shared_memory_object: " << this->name_;
     } else {
-      BOOST_LOG_TRIVIAL(info) << "[startup] could not remove shared_memory_object: " << this->name_
-                              << ", possible it did not exist.";
+      LOG_INFO << "[startup] could not remove shared_memory_object: " << this->name_ << ", possible it did not exist.";
     }
   }
 
@@ -25,9 +24,9 @@ struct ShmRemover {
     namespace bipc = boost::interprocess;
     const bool ok = bipc::shared_memory_object::remove(this->name_);
     if (ok) {
-      BOOST_LOG_TRIVIAL(info) << "[shutdown] removed shared_memory_object: " << this->name_;
+      LOG_INFO << "[shutdown] removed shared_memory_object: " << this->name_;
     } else {
-      BOOST_LOG_TRIVIAL(error) << "[shutdown] could not remove shared_memory_object: " << this->name_;
+      LOG_WARNING << "[shutdown] could not remove shared_memory_object: " << this->name_;
     }
   }
 

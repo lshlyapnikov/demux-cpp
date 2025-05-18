@@ -1,8 +1,7 @@
 // Copyright 2024 Leonid Shlyapnikov.
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef DEMUX_CPP_LSHL_DEMUX_READER_ID_H
-#define DEMUX_CPP_LSHL_DEMUX_READER_ID_H
+#pragma once
 
 #include <array>
 #include <cstddef>
@@ -97,5 +96,3 @@ class ReaderId {
 };
 
 }  // namespace lshl::demux::core
-
-#endif  // DEMUX_CPP_LSHL_DEMUX_READER_ID_H
