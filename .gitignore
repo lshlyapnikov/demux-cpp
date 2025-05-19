@@ -28,10 +28,9 @@
 
 # Executables
 *.exe
-*.out
+*.log
 *.prof
 *.app
-out.txt
 
 build/
 Testing/

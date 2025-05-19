@@ -136,15 +136,15 @@ $ cmake --build ./build --target clean
 ### 10.1. modify `run-example.sh`
 
 ```
-valgrind_cmd="valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --log-file=valgrind.out"
-${valgrind_cmd} ./build/shm_demux pub 2 "${msg_num}" > ./example-pub.out 2>&1 &
+valgrind_cmd="valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --log-file=valgrind.log"
+${valgrind_cmd} ./build/shm_demux pub 2 "${msg_num}" > ./example-pub.log 2>&1 &
 ```
 
 or
 
 ```
-valgrind_cmd="valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --log-file=valgrind.out"
-${valgrind_cmd} ./build/shm_demux sub 1 "${msg_num}" &> ./example-sub-1.out &
+valgrind_cmd="valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --log-file=valgrind.log"
+${valgrind_cmd} ./build/shm_demux sub 1 "${msg_num}" &> ./example-sub-1.log &
 ```
 
 ### 10.2. Run the example script
@@ -153,7 +153,7 @@ ${valgrind_cmd} ./build/shm_demux sub 1 "${msg_num}" &> ./example-sub-1.out &
 $ ./bin/run-example.sh
 ```
 
-**Notes:** `--track-origins=yes` can be slow. The report will be generated in the `valgrind.out` file.
+**Notes:** `--track-origins=yes` can be slow. The report will be generated in the `valgrind.log` file.
 
 ## 11. Performance Profiling with gperftools (Google Performance Tools)
 
@@ -182,7 +182,7 @@ target_link_libraries(
 Define `CPUPROFILE` to generate a profile file named `shm_demux_pub.prof`:
 
 ```
-CPUPROFILE=shm_demux_pub.prof ./build/shm_demux pub 2 "${msg_num}" > ./example-pub.out 2>&1 &
+CPUPROFILE=shm_demux_pub.prof ./build/shm_demux pub 2 "${msg_num}" > ./example-pub.log 2>&1 &
 ```
 
 ### 11.3. Run the example script
@@ -194,7 +194,7 @@ $ ./bin/run-example.sh
 ### 11.4. Generate the profiling report
 
 ```
-$ google-pprof --text ./build/shm_demux ./shm_demux_writer.prof &> pprof-report.out
+$ google-pprof --text ./build/shm_demux ./shm_demux_writer.prof &> pprof-report.log
 ```
 
 ## 12. Conan Commands
