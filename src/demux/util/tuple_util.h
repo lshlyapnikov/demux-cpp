@@ -34,8 +34,8 @@ auto print_tuple(std::ostream& os, const std::tuple<Types...>& t) -> void {
 // Overload operator<< for std::tuple
 template <typename... Types>
   requires(requires(std::ostream& os, const std::tuple<Types...>& t) {
-            print_tuple(os, t);  // Ensure we can print the tuple
-          })
+    print_tuple(os, t);  // Ensure we can print the tuple
+  })
 auto operator<<(std::ostream& os, const std::tuple<Types...>& t) -> std::ostream& {
   os << "(";
   print_tuple(os, t);  // Call the recursive helper function to print the tuple elements

@@ -27,15 +27,11 @@ class DemuxCppRecipe(ConanFile):
     exports_sources = "CMakeLists.txt", "src/*", "include/*", "test/*"
 
     def requirements(self):
-        self.requires("boost/1.83.0")
-        self.requires("xxhash/0.8.2")
+        self.requires("boost/1.88.0")
+        self.requires("xxhash/0.8.3")
         self.requires("hdrhistogram-c/0.11.8")
-        self.requires("gtest/1.15.0")
-        self.requires("rapidcheck/cci.20230815")
-
-    def config_options(self):
-        if self.settings.os == "Windows":
-            self.options.rm_safe("fPIC")
+        self.requires("gtest/1.16.0")
+        self.requires("rapidcheck/cci.20231215")
 
     def configure(self):
         if self.options.shared:

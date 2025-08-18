@@ -196,8 +196,8 @@ auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool z
 }
 
 template <size_t L, uint16_t M>
-auto run_writer_loop(lshl::demux::core::DemuxWriter<L, M, false>& writer, const uint64_t msg_num) noexcept(false
-) -> void {
+auto run_writer_loop(lshl::demux::core::DemuxWriter<L, M, false>& writer, const uint64_t msg_num) noexcept(false)
+    -> void {
   LOG_INFO << "sending " << msg_num << " md updates ...";
 
   MarketDataUpdate md{};
@@ -269,8 +269,8 @@ auto run_writer_loop_zero_copy(lshl::demux::core::DemuxWriter<L, M, false>& writ
 
 template <size_t L, uint16_t M>
 [[nodiscard]] inline auto
-write_zero_copy_(DemuxWriter<L, M, false>* writer, MarketDataUpdateGenerator* md_gen, XXH64_util* hash) noexcept(false
-) -> bool {
+write_zero_copy_(DemuxWriter<L, M, false>* writer, MarketDataUpdateGenerator* md_gen, XXH64_util* hash) noexcept(false)
+    -> bool {
   for (int attempt = 0;; ++attempt) {
     const std::optional<MarketDataUpdate*> mo = writer->template allocate<MarketDataUpdate>();
     if (mo.has_value()) {

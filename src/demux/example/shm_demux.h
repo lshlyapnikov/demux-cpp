@@ -26,8 +26,8 @@ template <size_t L, uint16_t M>
 auto run_writer_loop(lshl::demux::core::DemuxWriter<L, M, false>& writer, uint64_t msg_num) noexcept(false) -> void;
 
 template <size_t L, uint16_t M>
-auto run_writer_loop_zero_copy(lshl::demux::core::DemuxWriter<L, M, false>& writer, uint64_t msg_num) noexcept(false
-) -> void;
+auto run_writer_loop_zero_copy(lshl::demux::core::DemuxWriter<L, M, false>& writer, uint64_t msg_num) noexcept(false)
+    -> void;
 
 template <class T, size_t L, uint16_t M>
 [[nodiscard]] inline auto write_(lshl::demux::core::DemuxWriter<L, M, false>* writer, const T& md) noexcept -> bool;
