@@ -29,20 +29,20 @@ jobs:
       - name: Setup Conan Package Manager
         uses: jwidauer/setup-conan@v1
 
-      - name: Set up Clang v18 Compiler
+      - name: Set up Clang v20 Compiler
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 18 all
+          sudo ./llvm.sh 20 all
 
       - name: Print Environment Details
         run: |
           echo ${{github.workspace}}
           echo ${{env.BUILD_TYPE}}
-          which clang-18
-          which clang++-18
-          which clang-format-18
-          which clang-tidy-18
+          which clang-20
+          which clang++-20
+          which clang-format-20
+          which clang-tidy-20
           conan --version
           cmake --version
 

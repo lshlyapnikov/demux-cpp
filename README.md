@@ -67,7 +67,7 @@ To generate the Makefile for your project using CMake:
 $ ./bin/init-cmake-build.sh
 ```
 
-## 5. Build (Debug)
+## 5. Build
 
 To build the project in debug mode:
 
@@ -78,7 +78,7 @@ $ cmake --build ./build
 To build with the Clang Static Analyzer (recommended):
 
 ```
-$ scan-build-17 cmake --build ./build
+$ scan-build-20 cmake --build ./build
 ```
 
 ## 6. Build (Release)
@@ -157,27 +157,21 @@ $ ./bin/run-example.sh
 
 ## 11. Performance Profiling with gperftools (Google Performance Tools)
 
-<https://github.com/gperftools/gperftools/tree/master>
+<https://github.com/gperftools/gperftools/tree/master>\
 
-### 11.1. Update `CMakeLists.txt`
-
-To enable optimization in the Debug build, replace `-O0` with `-O3` in the `CMAKE_CXX_FLAGS_DEBUG` definition. This will allow the Debug build to compile with optimization:
+### 11.1. Generate RelWithDebInfo Project
 
 ```
-set(CMAKE_CXX_FLAGS_DEBUG "-gdwarf-4 -O3")
+$ ./bin/init-cmake-build.sh RelWithDebInfo
 ```
 
-Add `profiler` to the `target_link_libraries(shm_demux ...)` section to include `-lprofiler` linking option:
+## 11.2. Build Project
 
 ```
-target_link_libraries(
-  shm_demux
-...
-  profiler
-)
+$ cmake --build ./build
 ```
 
-### 11.2. Modify `run-example.sh`
+### 11.3. Modify `run-example.sh`
 
 Define `CPUPROFILE` to generate a profile file named `shm_demux_pub.prof`:
 
@@ -185,13 +179,13 @@ Define `CPUPROFILE` to generate a profile file named `shm_demux_pub.prof`:
 CPUPROFILE=shm_demux_pub.prof ./build/shm_demux pub 2 "${msg_num}" > ./example-pub.log 2>&1 &
 ```
 
-### 11.3. Run the example script
+### 11.4. Run the example script
 
 ```
 $ ./bin/run-example.sh
 ```
 
-### 11.4. Generate the profiling report
+### 11.5. Generate the profiling report
 
 ```
 $ google-pprof --text ./build/shm_demux ./shm_demux_writer.prof &> pprof-report.log

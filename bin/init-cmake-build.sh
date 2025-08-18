@@ -12,12 +12,12 @@ __root="$(cd "$(dirname "${__dir}")" && pwd)"
 
 cd "${__root}"
 
-# Debug/Release
+# Debug/Release/RelWithDebInfo
 build_type="${1:-Debug}"
 
-if [ "${build_type}" != "Debug" ] && [ "${build_type}" != "Release" ]; then
+if [ "${build_type}" != "Debug" ] && [ "${build_type}" != "Release" ] && [ "${build_type}" != "RelWithDebInfo" ]; then
     echo "Unsupported build_type: ${build_type} ..."
-    echo "Try Release or Debug"
+    echo "Supported build_types: Release, Debug, RelWithDebInfo"
     exit 101
 fi
 
@@ -31,9 +31,9 @@ echo "build_type: ${build_type}"
 source ./.envrc
 
 # Conan: configure profile and resolve package dependencies
-conan install . --profile:all=./etc/conan2/profiles/clang.profile \
-    --build=missing \
-    --settings=build_type="${build_type}"
+conan install . --profile:all=./etc/conan2/profiles/clang-"${build_type}" --build=missing
+
+# --settings=build_type="${build_type}"
 
 # CMake: generate build files
 cd ./build

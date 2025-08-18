@@ -146,8 +146,6 @@ class DemuxWriter {
 
 #ifdef UNIT_TEST
 
-  auto data() const noexcept -> span<uint8_t> { return {this->buffers_.data(), this->position_}; }
-
   auto position() const noexcept -> size_t { return this->position_; }
 
   auto all_readers_mask() const noexcept -> uint64_t { return this->all_readers_mask_; }
@@ -262,14 +260,6 @@ class DemuxReader {
 
   [[nodiscard]] auto message_count() const noexcept -> uint64_t { return this->read_message_count_; }
 
-#ifdef UNIT_TEST
-  auto data() const noexcept -> span<uint8_t> { return {this->buffers_.data(), this->position_}; }
-
-  auto position() const noexcept -> size_t { return this->position_; }
-
-  auto mask() const noexcept -> uint64_t { return this->all_readers_mask_; }
-#endif  // UNIT_TEST
-
  private:
   // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
   const ReaderId id_;
@@ -339,8 +329,8 @@ template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
 template <class A>
   requires(std::default_initializable<A> && sizeof(A) != 0 && sizeof(A) <= M)
-[[nodiscard]] inline auto DemuxWriter<L, M, B>::allocate_blocking(uint8_t recursion_level
-) noexcept -> std::optional<A*> {
+[[nodiscard]] inline auto DemuxWriter<L, M, B>::allocate_blocking(uint8_t recursion_level) noexcept
+    -> std::optional<A*> {
   std::optional<A*> result = this->buffer_.template allocate<A>(this->position_);
   if (result.has_value()) {
     return result;

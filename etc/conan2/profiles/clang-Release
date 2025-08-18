@@ -1,0 +1,17 @@
+# code: language=toml
+# shellcheck disable=all
+# cSpell: disable
+
+include(clang-Common)
+
+[settings]
+build_type=Release
+
+[conf]
+# valgrind needs `-gdwarf-4`
+tools.build:cxxflags=["-O3", "-DNDEBUG"]
+tools.build:cflags=["-O3", "-DNDEBUG"]
+
+# [env]
+# optional extra warnings for your environment
+# CXXFLAGS=-Wall -Wextra

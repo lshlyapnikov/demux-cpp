@@ -1,0 +1,13 @@
+# code: language=toml
+# shellcheck disable=all
+# cSpell: disable
+
+include(clang-Common)
+
+[settings]
+build_type=Debug
+
+[conf]
+# valgrind needs `-gdwarf-4`
+tools.build:cxxflags=["-gdwarf-4", "-O0"]
+tools.build:cflags=["-gdwarf-4", "-O0"]

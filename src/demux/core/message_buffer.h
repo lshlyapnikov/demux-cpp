@@ -64,8 +64,10 @@ struct MessageBuffer {
   /// @param position -- the zero-based byte offset at which the message should be allocated in the buffer.
   /// @return std::optional<A*> none when message could not be allocated because there is not enough space.
   template <class A>
-    requires(std::default_initializable<A> && sizeof(A) <= std::numeric_limits<message_length_t>::max() &&
-             sizeof(message_length_t) + sizeof(A) <= L)
+    requires(
+        std::default_initializable<A> && sizeof(A) <= std::numeric_limits<message_length_t>::max() &&
+        sizeof(message_length_t) + sizeof(A) <= L
+    )
   [[nodiscard]] auto allocate(const size_t position) -> std::optional<A*> {
     constexpr size_t x = sizeof(message_length_t);
     constexpr size_t n = sizeof(A);
