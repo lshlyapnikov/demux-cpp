@@ -64,11 +64,11 @@ jobs:
 
       - name: Run Example zero_copy=false
         working-directory: ${{github.workspace}}
-        run: ./bin/run-example.sh 10000000 false
+        run: ./bin/run-example.sh false 10000000
 
       - name: Run Example zero_copy=true
         working-directory: ${{github.workspace}}
-        run: ./bin/run-example.sh 10000000 true
+        run: ./bin/run-example.sh true 10000000
 
       - name: Run clang-tidy Checks
         working-directory: ${{github.workspace}}
