@@ -100,6 +100,7 @@ TEST(DemuxWriter, MaskToReaderIds) {
   }
 }
 
+namespace {
 auto assert_eq(const span<uint8_t>& left, const span<uint8_t>& right) {
   ASSERT_EQ(left.size(), right.size());
   for (size_t i = 0; i < right.size(); ++i) {
@@ -171,6 +172,8 @@ auto read_n(const size_t message_num, DemuxReader<L, M>& reader) -> vector<TestM
   return result;
 }
 
+}  // namespace
+
 TEST(MultiplexerTest, Atomic) {
   ASSERT_EQ(std::atomic<uint8_t>{}.is_lock_free(), true);
   ASSERT_EQ(std::atomic<uint16_t>{}.is_lock_free(), true);
@@ -180,6 +183,7 @@ TEST(MultiplexerTest, Atomic) {
   ASSERT_EQ(sizeof(size_t), sizeof(uint64_t));
 }
 
+namespace {
 template <bool Blocking>
 auto writer_constructor_does_not_throw(const uint8_t all_readers_mask) -> void {
   array<uint8_t, 32> buffer{};  // NOLINT(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
@@ -191,6 +195,7 @@ auto writer_constructor_does_not_throw(const uint8_t all_readers_mask) -> void {
   ASSERT_EQ(0, m.position());
   ASSERT_EQ(all_readers_mask, m.all_readers_mask());
 }
+}  // namespace
 
 TEST(BlockingDemuxWriterTest, ConstructorDoesNotThrow) {
   rc::check(writer_constructor_does_not_throw<true>);
@@ -200,6 +205,7 @@ TEST(NonBlockingDemuxWriterTest, ConstructorDoesNotThrow) {
   rc::check(writer_constructor_does_not_throw<false>);
 }
 
+namespace {
 template <bool Blocking>
 auto write_empty_message() {
   array<uint8_t, L> buffer{};
@@ -227,6 +233,7 @@ auto write_empty_message() {
   ASSERT_EQ(0, read.size());
   ASSERT_EQ(0, reader.message_count());
 }
+}  // namespace
 
 TEST(BlockingDemuxWriterTest, WriteEmptyMessage) {
   write_empty_message<true>();
@@ -236,6 +243,7 @@ TEST(NonBlockingDemuxWriterTest, WriteEmptyMessage) {
   write_empty_message<false>();
 }
 
+namespace {
 template <bool Blocking>
 auto write_invalid_large_message() -> void {
   array<uint8_t, L> buffer{};
@@ -256,6 +264,7 @@ auto write_invalid_large_message() -> void {
   ASSERT_EQ(0, read.size());
   ASSERT_EQ(0, reader.message_count());
 }
+}  // namespace
 
 TEST(BlockingDemuxWriterTest, WriteInvalidLargeMessage) {
   write_invalid_large_message<true>();
@@ -295,6 +304,7 @@ TEST(NonBlockingDemuxWriterTest, WriteWhenBufferIfFullAndGetWriteRepeatResult) {
   ASSERT_EQ(0, read2.size());
 }
 
+namespace {
 template <bool Blocking>
 auto write_and_read_1(TestMessage message) {
   if (message.t.size() > M) {
@@ -319,6 +329,7 @@ auto write_and_read_1(TestMessage message) {
   ASSERT_EQ(1, reader.message_count());
   assert_eq(read, message.t);
 }
+}  // namespace
 
 TEST(BlockingDemuxWriterTest, WriteRead1) {
   rc::check(write_and_read_1<true>);
@@ -328,6 +339,7 @@ TEST(NonBlockingDemuxWriterTest, WriteRead1) {
   rc::check(write_and_read_1<false>);
 }
 
+namespace {
 template <bool Blocking>
 auto one_reader_read_x(const vector<TestMessage>& valid_messages) {
   if (valid_messages.empty()) {
@@ -363,6 +375,7 @@ auto one_reader_read_x(const vector<TestMessage>& valid_messages) {
   const auto received_messages = received_messages_future.get();
   assert_eq(valid_messages, received_messages);
 }
+}  // namespace
 
 TEST(BlockingDemuxWriterTest, OneReaderReadX) {
   rc::check(one_reader_read_x<true>);
@@ -372,8 +385,9 @@ TEST(NonBlockingDemuxWriterTest, OneReaderReadX) {
   rc::check(one_reader_read_x<false>);
 }
 
+namespace {
 template <bool Blocking>
-auto multiple_readers_read_x(const vector<TestMessage>& valid_messages) {
+auto multiple_readers_read_x(const vector<TestMessage>& valid_messages) -> void {
   if (valid_messages.empty()) {
     return;
   }
@@ -418,6 +432,7 @@ auto multiple_readers_read_x(const vector<TestMessage>& valid_messages) {
     assert_eq(valid_messages, future_sub_result.get());
   }
 }
+}  // namespace
 
 TEST(BlockingDemuxWriterTest, MultipleReadersReadX) {
   rc::check(multiple_readers_read_x<true>);
@@ -444,6 +459,7 @@ TEST(TestMessageGenerator, CheckByteDistribution) {
   });
 }
 
+namespace {
 template <bool Blocking>
 auto writer_add_remove_reader(const vector<ReaderId>& subs) {
   array<uint8_t, L> buffer{};
@@ -474,6 +490,7 @@ auto writer_add_remove_reader(const vector<ReaderId>& subs) {
 
   ASSERT_EQ(0, writer.all_readers_mask());
 }
+}  // namespace
 
 TEST(BlockingDemuxWriterTest, AddRemoveReader) {
   rc::check(writer_add_remove_reader<true>);
@@ -483,6 +500,7 @@ TEST(NonBlockingDemuxWriterTest, AddRemoveReader) {
   rc::check(writer_add_remove_reader<false>);
 }
 
+namespace {
 template <bool Blocking>
 auto writer_lagging_readers(const vector<ReaderId>& readers) {
   array<uint8_t, L> buffer{};
@@ -509,6 +527,7 @@ auto writer_lagging_readers(const vector<ReaderId>& readers) {
 
   ASSERT_TRUE(writer.lagging_readers().empty());
 }
+}  // namespace
 
 TEST(BlockingDemuxWriterTest, LaggingReaders) {
   rc::check(writer_lagging_readers<true>);
@@ -518,6 +537,7 @@ TEST(NonBlockingDemuxWriterTest, LaggingReaders) {
   rc::check(writer_lagging_readers<false>);
 }
 
+namespace {
 auto lagging_readers_behavior(const ReaderId& reader_id) -> bool {
   array<uint8_t, L> buffer{};
   atomic<uint64_t> msg_counter_sync{0};
@@ -535,11 +555,13 @@ auto lagging_readers_behavior(const ReaderId& reader_id) -> bool {
 
   return !::testing::Test::HasFailure();
 }
+}  // namespace
 
 TEST(NonBlockingDemuxWriter, LaggingReadersBehavior) {
   rc::check(lagging_readers_behavior);
 }
 
+namespace {
 auto fill_up_buffer(DemuxWriter<L, M, false>* writer, TestMessage message) -> bool {
   while (true) {
     switch (writer->write(message.t)) {
@@ -591,6 +613,7 @@ auto slow_reader_test(TestMessage message) -> bool {
 
   return !::testing::Test::HasFailure();
 }
+}  // namespace
 
 TEST(NonBlockingDemuxWriterTest, SlowReader) {
   rc::check(slow_reader_test);

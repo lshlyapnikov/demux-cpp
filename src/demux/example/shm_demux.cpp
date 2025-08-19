@@ -36,6 +36,7 @@
 #include "../util/xxhash_util.h"
 #include "./market_data.h"
 
+namespace {
 auto print_usage(const char* prog) -> void {
   std::cerr << "Usage: " << prog << " [writer <number-of-readers> <number-of-messages> <zero-copy>]"
             << " | [reader <unique-reader-number> <number-of-messages> <zero-copy>]\n"
@@ -46,6 +47,7 @@ auto print_usage(const char* prog) -> void {
             << "] (uint64_t)\n"
             << "    <zero-copy> true/false\n";
 }
+}  // namespace
 
 auto main(int argc, char* argv[]) noexcept -> int {
   constexpr int ERROR = 100;
@@ -75,7 +77,7 @@ constexpr int REPORT_PROGRESS = 1000000;
 
 // circular buffer size in bytes
 constexpr std::size_t BUFFER_SIZE =
-    16 * lshl::demux::util::LINUX_PAGE_SIZE - lshl::demux::util::BOOST_IPC_INTERNAL_METADATA_SIZE;
+    (16 * lshl::demux::util::LINUX_PAGE_SIZE) - lshl::demux::util::BOOST_IPC_INTERNAL_METADATA_SIZE;
 
 // max message size that would be allowed
 constexpr std::uint16_t MAX_MESSAGE_SIZE = 256;
@@ -222,6 +224,7 @@ auto run_writer_loop(lshl::demux::core::DemuxWriter<L, M, false>& writer, const 
            << ", XXH64_hash: " << XXH64_util::format(hash.digest());
 }
 
+// NOLINTBEGIN(misc-use-internal-linkage) // clang-tidy thinks it must be static, you make it static it complains again
 template <class T, size_t L, uint16_t M>
 [[nodiscard]] inline auto write_(DemuxWriter<L, M, false>& writer, const T& md) noexcept -> bool {
   int attempt = 0;
@@ -242,6 +245,7 @@ template <class T, size_t L, uint16_t M>
     }
   }
 }
+// NOLINTEND(misc-use-internal-linkage)
 
 template <size_t L, uint16_t M>
 auto run_writer_loop_zero_copy(lshl::demux::core::DemuxWriter<L, M, false>& writer, const uint64_t msg_num) noexcept(

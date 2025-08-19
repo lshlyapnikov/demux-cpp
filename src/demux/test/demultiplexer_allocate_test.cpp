@@ -31,6 +31,8 @@
 
 constexpr std::chrono::seconds DEFAULT_WAIT(5);
 
+namespace {
+
 enum class Side : std::uint8_t { Bid, Ask };
 
 auto operator<<(std::ostream& os, const Side& x) -> std::ostream& {
@@ -56,11 +58,7 @@ using MarketDataTick = std::tuple<
     std::uint64_t,   // price
     std::uint32_t>;  // size
 
-// auto operator<<(std::ostream& os, const MarketDataTick& x) -> std::ostream& {
-//   os << "MarketDataTick{" << std::get<0>(x) << ", " << std::get<1>(x) << ", " << std::get<2>(x) << ", "
-//      << std::get<3>(x) << ", " << std::get<4>(x) << ", " << std::get<5>(x);
-//   return os;
-// }
+}  // namespace
 
 using lshl::demux::core::DemuxReader;
 using lshl::demux::core::DemuxWriter;
@@ -91,6 +89,7 @@ struct rc::Arbitrary<Symbol> {
 constexpr uint16_t M = sizeof(MarketDataTick);
 constexpr size_t L = 4 * lshl::demux::core::MessageBuffer<0>::required<MarketDataTick>();
 
+namespace {
 template <size_t L, uint16_t M, bool B>
 auto write_all_with_allocate(const vector<MarketDataTick>& messages, DemuxWriter<L, M, B>& writer) -> size_t {
   using lshl::demux::util::operator<<;
@@ -193,6 +192,8 @@ auto multiple_readers_read_x(const vector<MarketDataTick>& messages) -> bool {
   return !::testing::Test::HasFailure();
 }
 
+}  // namespace
+
 TEST(BlockingDemuxWriterWithAllocateTest, AllocateAndCommitWithMultipleReadersReadX) {
   rc::check(multiple_readers_read_x<true>);
 }
@@ -205,6 +206,7 @@ TEST(SymbolGenerator, SymbolDistribution) {
   rc::check([](const Symbol& symbol) { RC_TAG(symbol); });
 }
 
+namespace {
 auto fill_up_buffer(DemuxWriter<L, M, false>* writer, const MarketDataTick& message) -> void {
   while (true) {
     const optional<MarketDataTick*> m_opt = writer->template allocate<MarketDataTick>();
@@ -260,6 +262,7 @@ auto slow_reader_test(const MarketDataTick& message) -> bool {
 
   return !::testing::Test::HasFailure();
 }
+}  // namespace
 
 TEST(NonBlockingDemuxWriterWithAllocateTest, SlowReader) {
   rc::check(slow_reader_test);
