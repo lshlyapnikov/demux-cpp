@@ -18,7 +18,7 @@ msg_num=${2:-10000000}
 #valgrind_cmd="valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --track-origins=yes --trace-children=yes --track-fds=yes --log-file=valgrind.log"
 
 # start writer expecting 2 readers
-CPUPROFILE=shm_demux_writer.prof CPUPROFILE_FREQUENCY=1000 \
+#CPUPROFILE=shm_demux_writer.prof CPUPROFILE_FREQUENCY=1000 \
 ./build/shm_demux writer 2 "${msg_num}" "${zero_copy}" > ./example-writer.log 2>&1 &
 writer_pid="$!"
 
