@@ -18,4 +18,4 @@ build_type="${1:-Debug}"
 echo "build_type: ${build_type}"
 
 conan remove --confirm demux-cpp/*
-conan create . -s build_type="${build_type}"
+conan create . -s build_type="${build_type}" --profile:all=./etc/conan2/profiles/clang-"${build_type}"
