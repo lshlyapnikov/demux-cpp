@@ -33,3 +33,5 @@ echo "Running clang-format..."
 source ./.envrc
 
 "${LLVM_HOME}"/bin/clang-format "${options}" --Werror ./src/**/**/*
+
+echo "Done"
