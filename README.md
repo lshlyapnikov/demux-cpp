@@ -165,7 +165,7 @@ $ ./bin/run-example.sh
 $ ./bin/init-cmake-build.sh RelWithDebInfo
 ```
 
-## 11.2. Build Project
+### 11.2. Build Project
 
 ```
 $ cmake --build ./build
