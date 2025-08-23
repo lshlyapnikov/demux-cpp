@@ -35,6 +35,7 @@ namespace {
 
 enum class Side : std::uint8_t { Bid, Ask };
 
+[[maybe_unused]] // it is actually used, but clangd thinks it isn't
 auto operator<<(std::ostream& os, const Side& x) -> std::ostream& {
   switch (x) {
     case Side::Bid:

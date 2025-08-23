@@ -4,6 +4,7 @@
 // NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner)
 
 #include <rapidcheck/Check.h>
+#include <rapidcheck/gen/Arbitrary.hpp>
 #define UNIT_TEST
 #undef NDEBUG  // for assert to work in release build
 
@@ -29,6 +30,9 @@
 #include "./reader_id_gen.h"
 
 namespace lshl::demux::core {
+
+// explicitly reference the generator to make clangd happy
+using _ = rc::Arbitrary<lshl::demux::core::ReaderId>;
 
 constexpr std::chrono::seconds DEFAULT_WAIT(5);
 

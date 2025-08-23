@@ -1,6 +1,6 @@
 #pragma once
 
-#include <boost/log/trivial.hpp>
+#include <boost/log/trivial.hpp>  // IWYU pragma: export
 
 // clang-format off
 

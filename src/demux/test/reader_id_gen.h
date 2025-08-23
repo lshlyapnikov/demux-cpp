@@ -1,8 +1,6 @@
 // Copyright 2024 Leonid Shlyapnikov.
 // SPDX-License-Identifier: Apache-2.0
 
-// NOLINTBEGIN(misc-include-cleaner)
-
 #pragma once
 
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
@@ -25,5 +23,3 @@ struct Arbitrary<lshl::demux::core::ReaderId> {
 };
 
 }  // namespace rc
-
-// NOLINTEND(misc-include-cleaner)

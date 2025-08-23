@@ -1,8 +1,6 @@
 // Copyright 2024 Leonid Shlyapnikov.
 // SPDX-License-Identifier: Apache-2.0
 
-// NOLINTBEGIN(misc-include-cleaner, cppcoreguidelines-pro-bounds-array-to-pointer-decay)
-
 #define XXH_INLINE_ALL  // <xxhash.h>
 
 #include "./shm_demux.h"
@@ -11,10 +9,8 @@
 #include <boost/exception/diagnostic_information.hpp>
 #include <boost/exception/exception.hpp>
 #include <boost/interprocess/managed_shared_memory.hpp>
-#include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/log/core.hpp>
-#include <boost/log/expressions.hpp>
+#include <boost/log/expressions.hpp>  // NOLINT(misc-include-cleaner)
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -24,7 +20,6 @@
 #include <limits>
 #include <optional>
 #include <span>
-#include <stdexcept>
 #include <string>
 #include <thread>
 #include "../core/demultiplexer.h"
@@ -68,10 +63,8 @@ auto main(int argc, char* argv[]) noexcept -> int {
 
 namespace lshl::demux::example {
 
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays)
-constexpr char BUFFER_SHARED_MEM_NAME[] = "lshl_demux_buf";
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays)
-constexpr char UTIL_SHARED_MEM_NAME[] = "lshl_demux_util";
+constexpr std::string BUFFER_SHARED_MEM_NAME{"lshl_demux_buf"};
+constexpr std::string UTIL_SHARED_MEM_NAME{"lshl_demux_util"};
 
 constexpr int REPORT_PROGRESS = 1000000;
 
@@ -131,6 +124,7 @@ auto main_(const span<char*> args) noexcept(false) -> int {
 }
 
 auto init_logging() noexcept -> void {
+  // NOLINTNEXTLINE(misc-include-cleaner)
   boost::log::core::get()->set_filter(boost::log::trivial::severity >= boost::log::trivial::info);
 }
 
@@ -143,13 +137,14 @@ auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool z
   LOG_INFO << "start_writer " << BUFFER_SHARED_MEM_NAME << ", size: " << SHM_SIZE << ", L: " << L << ", M: " << M
            << ", total_reader_num: " << static_cast<int>(total_reader_num) << ", zero_copy: " << zero_copy;
 
-  const ShmRemover remover1(BUFFER_SHARED_MEM_NAME);
-  const ShmRemover remover2(UTIL_SHARED_MEM_NAME);
+  const ShmRemover remover1(BUFFER_SHARED_MEM_NAME.c_str());
+  const ShmRemover remover2(UTIL_SHARED_MEM_NAME.c_str());
 
   const uint64_t all_readers_mask = ReaderId::all_readers_mask(total_reader_num);
 
   // segment for the circular buffer and message counter, written by writer, read by readers
-  bipc::managed_shared_memory segment1(bipc::create_only, BUFFER_SHARED_MEM_NAME, SHM_SIZE);
+  // NOLINTNEXTLINE(misc-include-cleaner)
+  bipc::managed_shared_memory segment1(bipc::create_only, BUFFER_SHARED_MEM_NAME.c_str(), SHM_SIZE);
   LOG_INFO << "created shared_memory_object segment1: " << BUFFER_SHARED_MEM_NAME
            << ", segment1.free_memory: " << segment1.get_free_memory();
 
@@ -160,7 +155,9 @@ auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool z
   LOG_INFO << "message_count_sync allocated, segment1.free_memory: " << segment1.get_free_memory();
 
   // segment for synchronization
-  bipc::managed_shared_memory segment2(bipc::create_only, UTIL_SHARED_MEM_NAME, lshl::demux::util::LINUX_PAGE_SIZE);
+  bipc::managed_shared_memory segment2(
+      bipc::create_only, UTIL_SHARED_MEM_NAME.c_str(), lshl::demux::util::LINUX_PAGE_SIZE
+  );
   LOG_INFO << "created shared_memory_object segment2: " << UTIL_SHARED_MEM_NAME
            << ", segment2.free_memory: " << segment2.get_free_memory();
 
@@ -170,9 +167,7 @@ auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool z
   atomic<uint64_t>* startup_sync = segment2.construct<atomic<uint64_t>>("startup_sync")(0);
   LOG_INFO << "startup_sync allocated, segment2.free_memory: " << segment2.get_free_memory();
 
-  lshl::demux::core::DemuxWriter<L, M, false> writer(
-      all_readers_mask, span{*buffer}, message_count_sync, wraparound_sync
-  );
+  DemuxWriter<L, M, false> writer(all_readers_mask, span{*buffer}, message_count_sync, wraparound_sync);
   LOG_INFO << "DemuxWriter created, segment1.free_memory: " << segment1.get_free_memory()
            << ", segment2.free_memory: " << segment2.get_free_memory();
 
@@ -183,23 +178,22 @@ auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool z
       break;
     } else {
       using namespace std::chrono_literals;
-      std::this_thread::sleep_for(1s);
+      std::this_thread::sleep_for(1s);  // NOLINT(misc-include-cleaner)
     }
   }
   LOG_INFO << "all readers connected";
 
   if (zero_copy) {
-    run_writer_loop_zero_copy(writer, msg_num);
+    run_writer_loop_zero_copy(&writer, msg_num);
   } else {
-    run_writer_loop(writer, msg_num);
+    run_writer_loop(&writer, msg_num);
   }
   LOG_INFO << "DemuxWriter completed, segment1.free_memory: " << segment1.get_free_memory()
            << ", segment2.free_memory: " << segment2.get_free_memory();
 }
 
 template <size_t L, uint16_t M>
-auto run_writer_loop(lshl::demux::core::DemuxWriter<L, M, false>& writer, const uint64_t msg_num) noexcept(false)
-    -> void {
+auto run_writer_loop(DemuxWriter<L, M, false>* writer, const uint64_t msg_num) noexcept(false) -> void {
   LOG_INFO << "sending " << msg_num << " md updates ...";
 
   MarketDataUpdate md{};
@@ -209,7 +203,7 @@ auto run_writer_loop(lshl::demux::core::DemuxWriter<L, M, false>& writer, const 
   for (uint64_t i = 1; i <= msg_num; ++i) {
     md_gen.generate_market_data_update(&md);
     LOG_DEBUG << md;
-    const bool ok = write_(writer, md);
+    const bool ok = write(writer, md);
     if (!ok) {
       LOG_ERROR << "dropping message, could not write: " << md;
       continue;
@@ -220,16 +214,15 @@ auto run_writer_loop(lshl::demux::core::DemuxWriter<L, M, false>& writer, const 
     hash.update(&md, sizeof(MarketDataUpdate));
   }
 
-  LOG_INFO << "writer sequence number: " << writer.message_count()
+  LOG_INFO << "writer sequence number: " << writer->message_count()
            << ", XXH64_hash: " << XXH64_util::format(hash.digest());
 }
 
-// NOLINTBEGIN(misc-use-internal-linkage) // clang-tidy thinks it must be static, you make it static it complains again
 template <class T, size_t L, uint16_t M>
-[[nodiscard]] inline auto write_(DemuxWriter<L, M, false>& writer, const T& md) noexcept -> bool {
+[[nodiscard]] inline auto write(DemuxWriter<L, M, false>* writer, const T& md) noexcept -> bool {
   int attempt = 0;
   while (true) {
-    const WriteResult result = writer.write_safe(md);
+    const WriteResult result = writer->write_safe(md);
     switch (result) {
       case WriteResult::Success:
         return true;
@@ -239,25 +232,22 @@ template <class T, size_t L, uint16_t M>
         attempt += 1;
         if (attempt % REPORT_PROGRESS == 0) {
           LOG_WARNING << "one or more readers are lagging, wraparound is blocked, write attempt: " << attempt
-                      << ", writer sequence: " << writer.message_count();
+                      << ", writer sequence: " << writer->message_count();
         }
         continue;
     }
   }
 }
-// NOLINTEND(misc-use-internal-linkage)
 
 template <size_t L, uint16_t M>
-auto run_writer_loop_zero_copy(lshl::demux::core::DemuxWriter<L, M, false>& writer, const uint64_t msg_num) noexcept(
-    false
-) -> void {
+auto run_writer_loop_zero_copy(DemuxWriter<L, M, false>* writer, const uint64_t msg_num) noexcept(false) -> void {
   LOG_INFO << "sending " << msg_num << " md updates ...";
 
   MarketDataUpdateGenerator md_gen{};
   XXH64_util hash{};
 
   for (uint64_t i = 1; i <= msg_num; ++i) {
-    const bool ok = write_zero_copy_(&writer, &md_gen, &hash);
+    const bool ok = write_zero_copy(writer, &md_gen, &hash);
     if (!ok) {
       LOG_ERROR << "dropped one message, could not write";
       continue;
@@ -267,13 +257,13 @@ auto run_writer_loop_zero_copy(lshl::demux::core::DemuxWriter<L, M, false>& writ
     }
   }
 
-  LOG_INFO << "writer sequence number: " << writer.message_count()
+  LOG_INFO << "writer sequence number: " << writer->message_count()
            << ", XXH64_hash: " << XXH64_util::format(hash.digest());
 }
 
 template <size_t L, uint16_t M>
 [[nodiscard]] inline auto
-write_zero_copy_(DemuxWriter<L, M, false>* writer, MarketDataUpdateGenerator* md_gen, XXH64_util* hash) noexcept(false)
+write_zero_copy(DemuxWriter<L, M, false>* writer, MarketDataUpdateGenerator* md_gen, XXH64_util* hash) noexcept(false)
     -> bool {
   for (int attempt = 0;; ++attempt) {
     const std::optional<MarketDataUpdate*> mo = writer->template allocate<MarketDataUpdate>();
@@ -303,7 +293,8 @@ auto start_reader(const uint8_t reader_num, const uint64_t msg_num) noexcept(fal
            << ", reader_num: " << static_cast<int>(reader_num);
 
   // read-only segment for the circular buffer and message counter
-  bipc::managed_shared_memory segment1(bipc::open_read_only, BUFFER_SHARED_MEM_NAME);
+  // NOLINTNEXTLINE(misc-include-cleaner)
+  bipc::managed_shared_memory segment1(bipc::open_read_only, BUFFER_SHARED_MEM_NAME.c_str());
   LOG_INFO << "opened shared_memory_object segment1: " << BUFFER_SHARED_MEM_NAME
            << ", segment1.free_memory: " << segment1.get_free_memory();
 
@@ -314,7 +305,8 @@ auto start_reader(const uint8_t reader_num, const uint64_t msg_num) noexcept(fal
   LOG_INFO << "message_count_sync found, segment1.free_memory: " << segment1.get_free_memory();
 
   // read-write segment for atomic variables
-  bipc::managed_shared_memory segment2(bipc::open_only, UTIL_SHARED_MEM_NAME);
+  // NOLINTNEXTLINE(misc-include-cleaner)
+  bipc::managed_shared_memory segment2(bipc::open_only, UTIL_SHARED_MEM_NAME.c_str());
   LOG_INFO << "opened shared_memory_object segment2: " << UTIL_SHARED_MEM_NAME
            << ", segment2.free_memory: " << segment2.get_free_memory();
 
@@ -326,25 +318,25 @@ auto start_reader(const uint8_t reader_num, const uint64_t msg_num) noexcept(fal
 
   const ReaderId id{reader_num};
 
-  lshl::demux::core::DemuxReader<L, M> reader(id, span{*buffer}, message_count_sync, wraparound_sync);
+  DemuxReader<L, M> reader(id, span{*buffer}, message_count_sync, wraparound_sync);
   LOG_INFO << "DemuxReader created, segment1.free_memory: " << segment2.get_free_memory()
            << ", segment2.free_memory: " << segment2.get_free_memory();
 
   startup_sync->fetch_or(id.mask());
 
-  run_reader_loop(reader, msg_num);
+  run_reader_loop(&reader, msg_num);
   LOG_INFO << "DemuxReader completed, segment1.free_memory: " << segment2.get_free_memory()
            << ", segment2.free_memory: " << segment2.get_free_memory();
 }
 
 template <size_t L, uint16_t M>
-auto run_reader_loop(lshl::demux::core::DemuxReader<L, M>& reader, const uint64_t msg_num) noexcept(false) -> void {
+auto run_reader_loop(DemuxReader<L, M>* reader, const uint64_t msg_num) noexcept(false) -> void {
   XXH64_util hash{};
   HDR_histogram_util histogram{};
 
   // consume the expected number of messages
   for (uint64_t i = 0; i < msg_num;) {
-    const std::optional<const MarketDataUpdate*> read = reader.template next_unsafe<MarketDataUpdate>();
+    const std::optional<const MarketDataUpdate*> read = reader->template next_unsafe<MarketDataUpdate>();
     if (read.has_value()) {
       i += 1;
       const MarketDataUpdate* md = read.value();
@@ -360,7 +352,7 @@ auto run_reader_loop(lshl::demux::core::DemuxReader<L, M>& reader, const uint64_
     }
   }
 
-  LOG_INFO << "reader sequence number: " << reader.message_count()
+  LOG_INFO << "reader sequence number: " << reader->message_count()
            << ", XXH64_hash: " << XXH64_util::format(hash.digest());
 
   LOG_INFO << "message latency, ns:";
@@ -375,5 +367,3 @@ auto inline calculate_latency(const uint64_t x0) -> int64_t {
 }
 
 }  // namespace lshl::demux::example
-
-// NOLINTEND(misc-include-cleaner, cppcoreguidelines-pro-bounds-array-to-pointer-decay)

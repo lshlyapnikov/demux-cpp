@@ -12,6 +12,9 @@
 
 namespace lshl::demux::example {
 
+using lshl::demux::core::DemuxReader;
+using lshl::demux::core::DemuxWriter;
+
 using std::size_t;
 using std::uint16_t;
 
@@ -23,18 +26,17 @@ template <size_t L, uint16_t M>
 auto start_writer(uint8_t total_reader_num, uint64_t msg_num, bool zero_copy) noexcept(false) -> void;
 
 template <size_t L, uint16_t M>
-auto run_writer_loop(lshl::demux::core::DemuxWriter<L, M, false>& writer, uint64_t msg_num) noexcept(false) -> void;
-
-template <size_t L, uint16_t M>
-auto run_writer_loop_zero_copy(lshl::demux::core::DemuxWriter<L, M, false>& writer, uint64_t msg_num) noexcept(false)
-    -> void;
+auto run_writer_loop(DemuxWriter<L, M, false>* writer, uint64_t msg_num) noexcept(false) -> void;
 
 template <class T, size_t L, uint16_t M>
-[[nodiscard]] inline auto write_(lshl::demux::core::DemuxWriter<L, M, false>* writer, const T& md) noexcept -> bool;
+[[nodiscard]] inline auto write(DemuxWriter<L, M, false>* writer, const T& md) noexcept -> bool;
 
 template <size_t L, uint16_t M>
-[[nodiscard]] inline auto write_zero_copy_(
-    lshl::demux::core::DemuxWriter<L, M, false>* writer,
+auto run_writer_loop_zero_copy(DemuxWriter<L, M, false>* writer, uint64_t msg_num) noexcept(false) -> void;
+
+template <size_t L, uint16_t M>
+[[nodiscard]] inline auto write_zero_copy(
+    DemuxWriter<L, M, false>* writer,
     MarketDataUpdateGenerator* md_gen,
     lshl::demux::util::XXH64_util* hash
 ) noexcept(false) -> bool;
@@ -43,7 +45,7 @@ template <size_t L, uint16_t M>
 auto start_reader(uint8_t reader_num, uint64_t msg_num) noexcept(false) -> void;
 
 template <size_t L, uint16_t M>
-auto run_reader_loop(lshl::demux::core::DemuxReader<L, M>& reader, uint64_t msg_num) noexcept(false) -> void;
+auto run_reader_loop(DemuxReader<L, M>* reader, uint64_t msg_num) noexcept(false) -> void;
 
 auto inline calculate_latency(uint64_t x0) -> int64_t;
 
