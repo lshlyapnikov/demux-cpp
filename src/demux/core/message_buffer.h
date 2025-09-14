@@ -7,12 +7,15 @@
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <limits>
 #include <optional>
 #include <span>
 
 namespace lshl::demux::core {
 
+using std::int64_t;
+using std::size_t;
 using std::span;
 using std::uint16_t;
 using std::uint8_t;
@@ -34,17 +37,14 @@ struct MessageBuffer {
   /// @param message -- the bytes that should be written.
   /// @return the total number of written bytes (2 + message length) or zero.
   [[nodiscard]] auto write(const size_t position, const span<uint8_t>& message) noexcept -> size_t {
-    constexpr size_t x = sizeof(message_length_t);
-    const size_t n = message.size();
-    const size_t total_required = n + x;
+    const size_t required_space = sizeof(message_length_t) + message.size();
 
-    if (this->remaining(position) >= total_required) {
-      // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      uint8_t* data = this->data_;
-      std::copy_n(&n, x, data + position);                  // write message length
-      std::copy_n(message.data(), n, data + position + x);  // write message bytes
-      // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      return total_required;
+    if (this->remaining(position) >= required_space) {
+      const size_t length = message.size();
+      write_length(position, length);
+      uint8_t* data = std::next(this->data_, static_cast<int64_t>(position + sizeof(message_length_t)));
+      std::copy_n(message.data(), length, data);  // write message bytes
+      return required_space;
     } else {
       return 0;
     }
@@ -69,19 +69,13 @@ struct MessageBuffer {
         sizeof(message_length_t) + sizeof(A) <= L
     )
   [[nodiscard]] auto allocate(const size_t position) -> std::optional<A*> {
-    constexpr size_t x = sizeof(message_length_t);
-    constexpr size_t n = sizeof(A);
-    constexpr size_t total_required = n + x;
+    constexpr size_t required_space = sizeof(message_length_t) + sizeof(A);
 
-    if (this->remaining(position) >= total_required) {
-      // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      uint8_t* data = this->data_;
-      std::copy_n(&n, x, data + position);    // write message length
-      uint8_t* buffer = data + position + x;  // start of the message bytes
-      // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-
+    if (this->remaining(position) >= required_space) {
+      write_length(position, sizeof(A));
+      uint8_t* data = std::next(this->data_, static_cast<int64_t>(position + sizeof(message_length_t)));
       // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
-      A* a = new (buffer) A{};  // construct A at the specified buffer, aka placement new
+      A* a = new (data) A{};  // construct A at the specified buffer, aka placement new
 
       return {a};
     } else {
@@ -107,14 +101,13 @@ struct MessageBuffer {
     if (this->remaining(position) < sizeof(message_length_t)) {
       return {};
     } else {
-      // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      message_length_t msg_size = 0;
+      message_length_t length = 0;
       uint8_t* data = this->data_;
-      data += position;
-      std::copy_n(data, sizeof(message_length_t), &msg_size);
-      data += sizeof(message_length_t);
-      // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-      return {data, msg_size};
+      std::advance(data, position);
+      std::copy_n(data, sizeof(length), &length);
+      std::advance(data, sizeof(length));
+
+      return {data, length};
     }
   }
 
@@ -129,10 +122,20 @@ struct MessageBuffer {
     if (raw.empty()) {
       return std::nullopt;
     } else {
-      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast,cppcoreguidelines-pro-type-const-cast, modernize-use-auto)
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
       return reinterpret_cast<A*>(raw.data());
     }
   }
+
+  auto write_length(const size_t position, const size_t length) -> void {
+    uint8_t* data = std::next(this->data_, static_cast<int64_t>(position));
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    auto* length_data = reinterpret_cast<message_length_t*>(data);
+    *length_data = static_cast<message_length_t>(length);
+  }
+
+  // TODO(Leonid): make it visible for testing
+  auto data() const noexcept -> span<uint8_t, L> { return span<uint8_t, L>{this->data_, L}; }
 
  private:
   uint8_t* data_;

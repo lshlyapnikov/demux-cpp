@@ -16,6 +16,7 @@
 #include <span>
 #include <tuple>
 #include <vector>
+#include "../util/shm_util.h"
 #include "../util/tuple_util.h"
 
 using lshl::demux::core::MessageBuffer;
@@ -84,17 +85,32 @@ TEST(MessageBufferTest, WriteToSharedMemory) {
     std::array<uint8_t, BUF_SIZE> data{0};
     MessageBuffer<BUF_SIZE> buf(span<uint8_t, BUF_SIZE>{data});
 
+    using lshl::demux::util::operator<<;
+    std::cout << "data:    " << data << '\n';
+
+    // write message to the buffer
     const size_t written = buf.write(0, message);
+
     if (message.size() + 2 <= BUF_SIZE) {
       EXPECT_EQ(written, message.size() + 2);
 
-      uint16_t written_length = 0;
-      std::copy_n(data.data(), sizeof(uint16_t), &written_length);
-      EXPECT_EQ(written_length, message.size());
+      // copy 2 byte length field and check it
+      uint16_t length = 0;
+      std::copy_n(data.data(), sizeof(uint16_t), &length);
+      EXPECT_EQ(length, message.size());
 
+      // read message from the buffer
       const span<uint8_t> read = buf.read(0);
       EXPECT_EQ(read.size(), message.size());
 
+      using lshl::demux::util::operator<<;
+      std::cout << "message: " << message << '\n';
+      std::cout << "data:    " << data << '\n';
+      std::cout << "buffer:  " << buf.data() << '\n';
+      std::cout << "read:    " << read << '\n';
+      std::cout << '\n';
+
+      // compare original message with buffer and read message
       for (size_t i = 0; i < message.size(); ++i) {
         EXPECT_EQ(data.at(i + 2), message[i]);
         EXPECT_EQ(read[i], message[i]);

@@ -24,8 +24,10 @@ all_src_folders=(./src/demux/core/* ./src/demux/util/* ./src/demux/example/* ./s
 # shellcheck source=/dev/null
 source ./.envrc
 
+options=(-quiet -j "${jobs}")
+
 if [ "${mode}" = "all" ]; then
-    "${LLVM_HOME}"/bin/run-clang-tidy -j "${jobs}" -p=./build "${all_src_folders[@]}"
+    "${LLVM_HOME}"/bin/run-clang-tidy "${options[@]}" -p=./build "${all_src_folders[@]}"
 else
-    "${LLVM_HOME}"/bin/run-clang-tidy -j "${jobs}" -p=./build "$@"
+    "${LLVM_HOME}"/bin/run-clang-tidy "${options[@]}" -p=./build "$@"
 fi
