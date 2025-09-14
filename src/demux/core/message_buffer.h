@@ -134,8 +134,9 @@ struct MessageBuffer {
     *length_data = static_cast<message_length_t>(length);
   }
 
-  // TODO(Leonid): make it visible for testing
+#ifdef UNIT_TEST
   auto data() const noexcept -> span<uint8_t, L> { return span<uint8_t, L>{this->data_, L}; }
+#endif
 
  private:
   uint8_t* data_;
