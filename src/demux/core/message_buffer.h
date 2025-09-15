@@ -20,6 +20,8 @@ using std::span;
 using std::uint16_t;
 using std::uint8_t;
 
+using message_length_t = uint16_t;
+
 /// @brief MessageBuffer wraps a byte array, which can be allocated in shared memory. MessageBuffer does not take the
 /// ownership of the passed buffer. The outside logic is responsible to freeing the passed buffer. External
 /// synchronization is required for accessing the `data_` via `read` and `write` calls. Read or write `position` must be
@@ -27,8 +29,6 @@ using std::uint8_t;
 /// @tparam L total buffer size in bytes.
 template <size_t L>
 struct MessageBuffer {
-  using message_length_t = uint16_t;
-
  public:
   explicit MessageBuffer(span<uint8_t, L> buffer) : data_(buffer.data()) {}
 
@@ -101,12 +101,9 @@ struct MessageBuffer {
     if (this->remaining(position) < sizeof(message_length_t)) {
       return {};
     } else {
-      message_length_t length = 0;
-      uint8_t* data = this->data_;
-      std::advance(data, position);
-      std::copy_n(data, sizeof(length), &length);
-      std::advance(data, sizeof(length));
-
+      const message_length_t length = this->read_length(position);
+      const auto data_position = static_cast<int64_t>(position + sizeof(message_length_t));
+      uint8_t* data = std::next(this->data_, data_position);
       return {data, length};
     }
   }
@@ -127,18 +124,26 @@ struct MessageBuffer {
     }
   }
 
-  auto write_length(const size_t position, const size_t length) -> void {
+#ifdef UNIT_TEST
+  auto data() const noexcept -> span<uint8_t, L> { return span<uint8_t, L>{this->data_, L}; }
+#endif
+
+ private:
+  auto write_length(const size_t position, const size_t length) noexcept -> void {
     uint8_t* data = std::next(this->data_, static_cast<int64_t>(position));
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     auto* length_data = reinterpret_cast<message_length_t*>(data);
     *length_data = static_cast<message_length_t>(length);
   }
 
-#ifdef UNIT_TEST
-  auto data() const noexcept -> span<uint8_t, L> { return span<uint8_t, L>{this->data_, L}; }
-#endif
+  [[nodiscard]] auto read_length(const size_t position) const noexcept -> message_length_t {
+    uint8_t* data = std::next(this->data_, static_cast<int64_t>(position));
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    auto* length_data = reinterpret_cast<message_length_t*>(data);
+    const message_length_t length = *length_data;
+    return length;
+  }
 
- private:
   uint8_t* data_;
 };
 
