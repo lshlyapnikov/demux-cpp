@@ -136,15 +136,31 @@ $ cmake --build ./build --target clean
 ### 10.1. modify `run-example.sh`
 
 ```
-valgrind_cmd="valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --log-file=valgrind.log"
-${valgrind_cmd} ./build/shm_demux pub 2 "${msg_num}" > ./example-pub.log 2>&1 &
+valgrind_cmd="valgrind \
+  --tool=memcheck \
+  --leak-check=full \
+  --show-leak-kinds=all \
+  --track-origins=yes \
+  --track-fds=yes \
+  --num-callers=30 \
+  --error-limit=no"
+
+${valgrind_cmd} ./build/shm_demux writer 2 "${msg_num}" "${zero_copy}" > ./example-writer.log 2>&1 &
 ```
 
 or
 
 ```
-valgrind_cmd="valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --log-file=valgrind.log"
-${valgrind_cmd} ./build/shm_demux sub 1 "${msg_num}" &> ./example-sub-1.log &
+valgrind_cmd="valgrind \
+  --tool=memcheck \
+  --leak-check=full \
+  --show-leak-kinds=all \
+  --track-origins=yes \
+  --track-fds=yes \
+  --num-callers=30 \
+  --error-limit=no"
+
+${valgrind_cmd} ./build/shm_demux reader 1 "${msg_num}" "${zero_copy}" &> ./example-reader-1.log &
 ```
 
 ### 10.2. Run the example script
@@ -153,7 +169,7 @@ ${valgrind_cmd} ./build/shm_demux sub 1 "${msg_num}" &> ./example-sub-1.log &
 $ ./bin/run-example.sh
 ```
 
-**Notes:** `--track-origins=yes` can be slow. The report will be generated in the `valgrind.log` file.
+**Notes:** `--track-origins=yes` can be slow.
 
 ## 11. Performance Profiling with gperftools (Google Performance Tools)
 
