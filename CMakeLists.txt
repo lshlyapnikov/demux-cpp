@@ -68,7 +68,6 @@ add_library(${PROJECT_NAME}
 )
 target_link_libraries(${PROJECT_NAME}
   PRIVATE reader_id  # TODO(Leonid): should these two be PUBLIC, so other projects can get the automatically
-  PRIVATE demultiplexer
 )
 
 add_executable(shm_demux
@@ -79,6 +78,8 @@ target_link_libraries(shm_demux
   PRIVATE reader_id
   PRIVATE hdr_histogram::hdr_histogram_static
   PRIVATE Boost::log
+  PRIVATE Boost::stacktrace_backtrace
+  PRIVATE Boost::stacktrace_from_exception
 )
 if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     target_link_libraries(shm_demux PRIVATE profiler)
@@ -94,10 +95,10 @@ target_compile_options(reader_id
   PRIVATE ${MY_CXX_FLAGS}
 )
 
-add_library(demultiplexer
-  OBJECT src/demux/core/demultiplexer.cpp
+add_library(shm_util
+  OBJECT src/demux/util/shm_util.cpp
 )
-target_compile_options(demultiplexer
+target_compile_options(shm_util
   PRIVATE ${MY_CXX_FLAGS}
 )
 
@@ -134,7 +135,6 @@ add_executable(demultiplexer_test
   src/demux/test/demultiplexer_test.cpp
 )
 target_link_libraries(demultiplexer_test
-  PRIVATE demultiplexer
   PRIVATE reader_id
   PRIVATE gtest::gtest
   PRIVATE rapidcheck::rapidcheck
@@ -166,6 +166,7 @@ add_executable(shm_util_test
   src/demux/test/shm_util_test.cpp
 )
 target_link_libraries(shm_util_test
+  PRIVATE shm_util
   PRIVATE reader_id
   PRIVATE gtest::gtest
   PRIVATE rapidcheck::rapidcheck

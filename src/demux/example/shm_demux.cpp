@@ -11,7 +11,10 @@
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/log/expressions.hpp>  // NOLINT(misc-include-cleaner)
+#include <boost/stacktrace.hpp>
+#include <cerrno>
 #include <chrono>
+#include <csignal>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -26,8 +29,7 @@
 #include "../core/reader_id.h"
 #include "../util/boost_log_util.h"
 #include "../util/hdr_histogram_util.h"
-#include "../util/shm_remover.h"
-#include "../util/shm_util.h"
+#include "../util/shm_manager.h"
 #include "../util/xxhash_util.h"
 #include "./market_data.h"
 
@@ -42,21 +44,23 @@ auto print_usage(const char* prog) -> void {
             << "] (uint64_t)\n"
             << "    <zero-copy> true/false\n";
 }
+
+auto shutdown_handler() -> void {
+  LOG_INFO << "[shutdown_handler] trace: " << boost::stacktrace::stacktrace() << "\n" << "Shutting down... ";
+  std::abort();
+}
+
 }  // namespace
 
 auto main(int argc, char* argv[]) noexcept -> int {
+  std::set_terminate(&shutdown_handler);
   constexpr int ERROR = 100;
   try {
     const auto args = std::span<char*>(argv, static_cast<size_t>(argc));
     return lshl::demux::example::main_(args);
-  } catch (const boost::exception& e) {
-    LOG_ERROR << "boost::exception: " << boost::diagnostic_information(e);
-    return ERROR;
-  } catch (const std::exception& e) {
-    LOG_ERROR << "std::exception: " << e.what();
-    return ERROR;
   } catch (...) {
-    LOG_ERROR << "unexpected exception";
+    boost::stacktrace::stacktrace trace = boost::stacktrace::stacktrace::from_current_exception();
+    LOG_ERROR << "exception: " << boost::current_exception_diagnostic_information(true) << ", trace: " << trace;
     return ERROR;
   }
 }
@@ -68,13 +72,6 @@ constexpr std::string UTIL_SHARED_MEM_NAME{"lshl_demux_util"};
 
 constexpr int REPORT_PROGRESS = 1000000;
 
-// circular buffer size in bytes
-constexpr std::size_t BUFFER_SIZE =
-    (16 * lshl::demux::util::LINUX_PAGE_SIZE) - lshl::demux::util::BOOST_IPC_INTERNAL_METADATA_SIZE;
-
-// max message size that would be allowed
-constexpr std::uint16_t MAX_MESSAGE_SIZE = 256;
-
 namespace bipc = boost::interprocess;
 
 using lshl::demux::core::DemuxReader;
@@ -82,7 +79,6 @@ using lshl::demux::core::DemuxWriter;
 using lshl::demux::core::ReaderId;
 using lshl::demux::core::WriteResult;
 using lshl::demux::util::HDR_histogram_util;
-using lshl::demux::util::ShmRemover;
 using lshl::demux::util::XXH64_util;
 using std::array;
 using std::atomic;
@@ -94,6 +90,10 @@ auto main_(const span<char*> args) noexcept(false) -> int {
   constexpr int ERROR = 200;
   constexpr size_t EXPECTED_ARG_NUM = 5;
 
+  constexpr size_t MAX_READER_NUM = 2;
+  constexpr std::size_t BUFFER_SIZE = 16 * lshl::demux::util::LINUX_PAGE_SIZE;
+  constexpr std::uint16_t MAX_MESSAGE_SIZE = 256;
+
   init_logging();
 
   if (args.size() != EXPECTED_ARG_NUM) {
@@ -103,18 +103,25 @@ auto main_(const span<char*> args) noexcept(false) -> int {
 
   const std::string command(args[1]);
   const auto num16 = boost::lexical_cast<uint16_t>(args[2]);
-  if (num16 < 1 || num16 > lshl::demux::core::MAX_READER_NUM) {
+  if (num16 < 1 || num16 > MAX_READER_NUM) {
     print_usage(args[0]);
     return ERROR;
   }
-  const auto num8 = static_cast<uint8_t>(num16);
+  const auto total_reader_num = static_cast<uint8_t>(num16);
   const auto msg_num = boost::lexical_cast<uint64_t>(args[3]);
   const auto zero_copy = std::string("true") == args[4];
 
+  if (total_reader_num > MAX_READER_NUM) {
+    LOG_ERROR << "the requested number of readers: " << static_cast<int>(total_reader_num)
+              << " must be less than or equal to the MAX_READER_NUM the application was compiled with: "
+              << MAX_READER_NUM;
+    return ERROR;
+  }
+
   if (command == "writer") {
-    start_writer<BUFFER_SIZE, MAX_MESSAGE_SIZE>(num8, msg_num, zero_copy);
+    start_writer<MAX_READER_NUM, BUFFER_SIZE, MAX_MESSAGE_SIZE>(total_reader_num, msg_num, zero_copy);
   } else if (command == "reader") {
-    start_reader<BUFFER_SIZE, MAX_MESSAGE_SIZE>(num8, msg_num);
+    start_reader<BUFFER_SIZE, MAX_MESSAGE_SIZE>(total_reader_num, msg_num);
   } else {
     print_usage(args[0]);
     return ERROR;
@@ -128,20 +135,25 @@ auto init_logging() noexcept -> void {
   boost::log::core::get()->set_filter(boost::log::trivial::severity >= boost::log::trivial::info);
 }
 
-template <size_t L, uint16_t M>
+template <size_t MAX_READER_NUM, size_t BUFFER_SIZE, uint16_t MAX_MSG_SIZE>
 auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool zero_copy) noexcept(false) -> void {
-  const size_t SHM_SIZE = lshl::demux::util::calculate_required_shared_mem_size(
-      L, lshl::demux::util::BOOST_IPC_INTERNAL_METADATA_SIZE, lshl::demux::util::LINUX_PAGE_SIZE
-  );
-
-  LOG_INFO << "start_writer " << BUFFER_SHARED_MEM_NAME << ", size: " << SHM_SIZE << ", L: " << L << ", M: " << M
+  (void)total_reader_num;
+  (void)msg_num;
+  (void)zero_copy;
+  LOG_INFO << "start_writer " << BUFFER_SHARED_MEM_NAME << ", MAX_READER_NUM: " << MAX_READER_NUM
+           << ", BUFFER_SIZE : " << BUFFER_SIZE << ", MAX_MSG_SIZE: " << MAX_MSG_SIZE
            << ", total_reader_num: " << static_cast<int>(total_reader_num) << ", zero_copy: " << zero_copy;
 
-  const ShmRemover remover1(BUFFER_SHARED_MEM_NAME.c_str());
-  const ShmRemover remover2(UTIL_SHARED_MEM_NAME.c_str());
+  constexpr size_t SHARED_MEMORY_SIZE = 64 * util::LINUX_PAGE_SIZE;
+  util::ShmManager<3, BUFFER_SIZE> shm_manager{bipc::create_only, BUFFER_SHARED_MEM_NAME, SHARED_MEMORY_SIZE};
+  auto* primitives = shm_manager.construct_primitives();
 
-  const uint64_t all_readers_mask = ReaderId::all_readers_mask(total_reader_num);
+  LOG_INFO << "primitives.buffer cache line aligned: "
+           << lshl::demux::util::is_cache_line_aligned(primitives->buffer.data());
 
+  // const uint64_t all_readers_mask = ReaderId::all_readers_mask(total_reader_num);
+
+  /*
   // segment for the circular buffer and message counter, written by writer, read by readers
   // NOLINTNEXTLINE(misc-include-cleaner)
   bipc::managed_shared_memory segment1(bipc::create_only, BUFFER_SHARED_MEM_NAME.c_str(), SHM_SIZE);
@@ -151,7 +163,10 @@ auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool z
   array<uint8_t, L>* buffer = segment1.construct<array<uint8_t, L>>("buffer")();
   LOG_INFO << "buffer allocated, segment1.free_memory: " << segment1.get_free_memory();
 
-  atomic<uint64_t>* message_count_sync = segment1.construct<atomic<uint64_t>>("message_count_sync")(0);
+  auto* message_count_aligned = segment1.construct<util::CacheLinePaddedAtomicUint64>("message_count_sync")();
+
+  atomic<uint64_t>* message_count_sync = &message_count_aligned->value;
+  LOG_INFO << "message_count_sync is cache line aligned: " << util::is_cache_line_aligned(message_count_sync);
   LOG_INFO << "message_count_sync allocated, segment1.free_memory: " << segment1.get_free_memory();
 
   // segment for synchronization
@@ -190,6 +205,8 @@ auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool z
   }
   LOG_INFO << "DemuxWriter completed, segment1.free_memory: " << segment1.get_free_memory()
            << ", segment2.free_memory: " << segment2.get_free_memory();
+
+*/
 }
 
 template <size_t L, uint16_t M>

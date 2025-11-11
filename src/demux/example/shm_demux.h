@@ -22,11 +22,11 @@ auto init_logging() noexcept -> void;
 
 auto main_(std::span<char*> args) noexcept(false) -> int;
 
-template <size_t L, uint16_t M>
+template <size_t MAX_READER_NUM, size_t BUFFER_SIZE, uint16_t MAX_MSG_SIZE>
 auto start_writer(uint8_t total_reader_num, uint64_t msg_num, bool zero_copy) noexcept(false) -> void;
 
-template <size_t L, uint16_t M>
-auto run_writer_loop(DemuxWriter<L, M, false>* writer, uint64_t msg_num) noexcept(false) -> void;
+template <size_t BUFFER_SIZE, uint16_t MAX_MSG_SIZE>
+auto run_writer_loop(DemuxWriter<BUFFER_SIZE, MAX_MSG_SIZE, false>* writer, uint64_t msg_num) noexcept(false) -> void;
 
 template <class T, size_t L, uint16_t M>
 [[nodiscard]] inline auto write(DemuxWriter<L, M, false>* writer, const T& md) noexcept -> bool;
