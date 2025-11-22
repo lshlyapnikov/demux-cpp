@@ -97,10 +97,17 @@ target_compile_options(reader_id
   PRIVATE ${MY_CXX_FLAGS}
 )
 
-add_library(shm_util
-  OBJECT src/demux/util/shm_util.cpp
+add_library(operators
+  OBJECT src/demux/util/operators.cpp
 )
-target_compile_options(shm_util
+target_compile_options(operators
+  PRIVATE ${MY_CXX_FLAGS}
+)
+
+add_library(test_message
+  OBJECT src/demux/test/test_message.cpp
+)
+target_compile_options(test_message
   PRIVATE ${MY_CXX_FLAGS}
 )
 
@@ -137,6 +144,8 @@ add_executable(demultiplexer_test
   src/demux/test/demultiplexer_test.cpp
 )
 target_link_libraries(demultiplexer_test
+  PRIVATE operators
+  PRIVATE test_message
   PRIVATE reader_id
   PRIVATE gtest::gtest
   PRIVATE rapidcheck::rapidcheck
@@ -148,18 +157,18 @@ target_compile_options(demultiplexer_test
 )
 gtest_discover_tests(demultiplexer_test)
 
-add_executable(shm_util_test
-  src/demux/test/shm_util_test.cpp
+add_executable(shm_manager_test
+  src/demux/test/shm_manager_test.cpp
 )
-target_link_libraries(shm_util_test
-  PRIVATE shm_util
+target_link_libraries(shm_manager_test
+  PRIVATE operators
   PRIVATE reader_id
   PRIVATE gtest::gtest
   PRIVATE rapidcheck::rapidcheck
   PRIVATE Boost::log
   PRIVATE atomic
 )
-target_compile_options(shm_util_test
+target_compile_options(shm_manager_test
   PRIVATE ${MY_CXX_FLAGS}
 )
-gtest_discover_tests(shm_util_test)
+gtest_discover_tests(shm_manager_test)

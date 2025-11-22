@@ -14,14 +14,12 @@
 #include <boost/log/core.hpp>         // NOLINT(misc-include-cleaner)
 #include <boost/log/expressions.hpp>  // NOLINT(misc-include-cleaner)
 #include <boost/log/trivial.hpp>
-#include <boost/serialization/strong_typedef.hpp>
 #include <cassert>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <future>
 #include <limits>
-#include <ostream>
 #include <rapidcheck/gen/Arbitrary.hpp>
 #include <span>
 #include <vector>
@@ -29,8 +27,9 @@
 #include "../core/demux_writer.h"
 #include "../core/message_buffer.h"
 #include "../core/reader_id.h"
-#include "../util/shm_util.h"
+#include "../util/operators.h"
 #include "./reader_id_gen.h"
+#include "./test_message.h"
 
 namespace lshl::demux::core {
 
@@ -38,23 +37,15 @@ namespace lshl::demux::core {
 using _ = rc::Arbitrary<lshl::demux::core::ReaderId>;
 
 constexpr std::chrono::seconds DEFAULT_WAIT(5);
-
-// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions,hicpp-special-member-functions)
-BOOST_STRONG_TYPEDEF(std::vector<uint8_t>, TestMessage);
-
-static auto operator<<(std::ostream& os, const lshl::demux::core::TestMessage& message) -> std::ostream& {
-  using lshl::demux::util::operator<<;
-  return os << message.t;
-}
-
 }  // namespace lshl::demux::core
 
 using lshl::demux::core::DEFAULT_WAIT;
 using lshl::demux::core::DemuxReader;
 using lshl::demux::core::DemuxWriter;
 using lshl::demux::core::ReaderId;
-using lshl::demux::core::TestMessage;
 using lshl::demux::core::WriteResult;
+using lshl::demux::core::test::TestMessage;
+
 using std::array;
 using std::atomic;
 using std::span;
@@ -123,14 +114,7 @@ class DemuxSetup {
   }
 };
 
-auto assert_eq(const span<const uint8_t>& left, const span<const uint8_t>& right) {
-  ASSERT_EQ(left.size(), right.size());
-  for (size_t i = 0; i < right.size(); ++i) {
-    ASSERT_EQ(left[i], right[i]) << "index: " << i;
-  }
-}
-
-[[nodiscard]] auto expect_eq(const span<const uint8_t>& left, const span<const uint8_t>& right) -> bool {
+auto expect_eq(const span<const uint8_t>& left, const span<const uint8_t>& right) -> bool {
   EXPECT_EQ(left.size(), right.size());
   for (size_t i = 0; i < right.size(); ++i) {
     EXPECT_EQ(left[i], right[i]) << "index: " << i;
@@ -141,20 +125,18 @@ auto assert_eq(const span<const uint8_t>& left, const span<const uint8_t>& right
   return !::testing::Test::HasFailure();
 }
 
-auto assert_eq(const TestMessage& left, const TestMessage& right) {
-  ASSERT_EQ(left.t.size(), right.t.size());
-  for (size_t i = 0; i < right.t.size(); ++i) {
-    ASSERT_EQ(left.t[i], right.t[i]) << "index: " << i;
-  }
-}
-
-auto assert_eq(const vector<TestMessage>& left, const vector<TestMessage>& right) {
-  ASSERT_EQ(left.size(), right.size());
+auto expect_eq(const vector<TestMessage>& left, const vector<TestMessage>& right) -> bool {
+  EXPECT_EQ(left.size(), right.size());
   for (size_t i = 0; i < right.size(); ++i) {
     const TestMessage& x = left[i];
     const TestMessage& y = right[i];
-    assert_eq(x, y);
+    using lshl::demux::core::test::operator<<;
+    EXPECT_EQ(x, y) << "index: " << i;
+    if (::testing::Test::HasFailure()) {
+      return false;
+    }
   }
+  return !::testing::Test::HasFailure();
 }
 
 template <size_t L, uint16_t M, bool B>
@@ -199,12 +181,12 @@ auto read_n(const size_t message_num, DemuxReader<L, M>* reader) -> vector<TestM
 }  // namespace
 
 TEST(MultiplexerTest, Atomic) {
-  ASSERT_EQ(std::atomic<uint8_t>{}.is_lock_free(), true);
-  ASSERT_EQ(std::atomic<uint16_t>{}.is_lock_free(), true);
-  ASSERT_EQ(std::atomic<uint32_t>{}.is_lock_free(), true);
-  ASSERT_EQ(std::atomic<size_t>{}.is_lock_free(), true);
-  ASSERT_EQ(std::atomic<uint64_t>{}.is_lock_free(), true);
-  ASSERT_EQ(sizeof(size_t), sizeof(uint64_t));
+  EXPECT_EQ(std::atomic<uint8_t>{}.is_lock_free(), true);
+  EXPECT_EQ(std::atomic<uint16_t>{}.is_lock_free(), true);
+  EXPECT_EQ(std::atomic<uint32_t>{}.is_lock_free(), true);
+  EXPECT_EQ(std::atomic<size_t>{}.is_lock_free(), true);
+  EXPECT_EQ(std::atomic<uint64_t>{}.is_lock_free(), true);
+  EXPECT_EQ(sizeof(size_t), sizeof(uint64_t));
 }
 
 namespace {
@@ -214,11 +196,11 @@ auto writer_constructor_does_not_throw(const uint8_t reader_num) -> void {
     return;
   }
   DemuxSetup<L, M, Blocking> setup(reader_num);
-  ASSERT_EQ(0, setup.writer()->sequence());
+  EXPECT_EQ(0, setup.writer()->sequence());
   for (uint8_t i = 0; i < reader_num; ++i) {
-    ASSERT_EQ(0, setup.reader(i)->sequence());
-    ASSERT_EQ(0, setup.reader(i)->position());
-    ASSERT_EQ(ReaderId{i}, setup.reader(i)->id());
+    EXPECT_EQ(0, setup.reader(i)->sequence());
+    EXPECT_EQ(0, setup.reader(i)->position());
+    EXPECT_EQ(ReaderId{i}, setup.reader(i)->id());
   }
 }
 }  // namespace
@@ -242,16 +224,16 @@ auto write_empty_message() {
   // write an empty message
   const WriteResult result = writer.write({});
 
-  ASSERT_EQ(WriteResult::Error, result);
-  ASSERT_EQ(0, writer.sequence());
+  EXPECT_EQ(WriteResult::Error, result);
+  EXPECT_EQ(0, writer.sequence());
 
   const span<const uint8_t> msg0 = reader0.next();
-  ASSERT_EQ(0, msg0.size());
-  ASSERT_EQ(0, reader0.sequence());
+  EXPECT_EQ(0, msg0.size());
+  EXPECT_EQ(0, reader0.sequence());
 
   const span<const uint8_t> msg1 = reader1.next();
-  ASSERT_EQ(0, msg1.size());
-  ASSERT_EQ(0, reader1.sequence());
+  EXPECT_EQ(0, msg1.size());
+  EXPECT_EQ(0, reader1.sequence());
 }
 }  // namespace
 
@@ -272,12 +254,12 @@ auto write_invalid_large_message() -> void {
 
   array<uint8_t, L> m{1};  // this should not fit into the buffer given M + 2 requirement
   const WriteResult result = writer.write(m);
-  ASSERT_EQ(WriteResult::Error, result);
-  ASSERT_EQ(0, writer.sequence());
+  EXPECT_EQ(WriteResult::Error, result);
+  EXPECT_EQ(0, writer.sequence());
 
   const span<const uint8_t> read = reader.next();
-  ASSERT_EQ(0, read.size());
-  ASSERT_EQ(0, reader.sequence());
+  EXPECT_EQ(0, read.size());
+  EXPECT_EQ(0, reader.sequence());
 }
 }  // namespace
 
@@ -294,52 +276,52 @@ TEST(NonBlockingDemuxWriterTest, WriteWhenBufferIfFullAndGetWriteRepeatResult) {
   auto* writer = setup.writer();
   auto* reader = setup.reader(0);
 
-  ASSERT_EQ(L, 2 * M);
+  EXPECT_EQ(L, 2 * M);
 
   array<uint8_t, M> m1{1};
-  ASSERT_EQ(WriteResult::Success, writer->write(m1));
-  ASSERT_EQ(1, writer->sequence());
+  EXPECT_EQ(WriteResult::Success, writer->write(m1));
+  EXPECT_EQ(1, writer->sequence());
 
   array<uint8_t, M> m2{2};
-  ASSERT_EQ(WriteResult::Repeat, writer->write(m2));
-  ASSERT_EQ(1, writer->sequence());  // empty message isn't written yet
+  EXPECT_EQ(WriteResult::Repeat, writer->write(m2));
+  EXPECT_EQ(1, writer->sequence());  // empty message isn't written yet
 
-  assert_eq(m1, reader->next());
-  ASSERT_EQ(1, reader->sequence());
+  expect_eq(m1, reader->next());
+  EXPECT_EQ(1, reader->sequence());
 
-  ASSERT_TRUE(reader->next().empty());
-  ASSERT_EQ(1, reader->sequence());
+  EXPECT_TRUE(reader->next().empty());
+  EXPECT_EQ(1, reader->sequence());
 
-  ASSERT_EQ(WriteResult::Repeat, writer->write(m2));
-  ASSERT_EQ(2, writer->sequence());  // empty message is written
+  EXPECT_EQ(WriteResult::Repeat, writer->write(m2));
+  EXPECT_EQ(2, writer->sequence());  // empty message is written
 
-  ASSERT_EQ(WriteResult::Repeat, writer->write(m2));
-  ASSERT_EQ(2, writer->sequence());  // reader hasn't moved yet
+  EXPECT_EQ(WriteResult::Repeat, writer->write(m2));
+  EXPECT_EQ(2, writer->sequence());  // reader hasn't moved yet
 
-  ASSERT_TRUE(reader->next().empty());
-  ASSERT_EQ(2, reader->sequence());  // empty message is read
+  EXPECT_TRUE(reader->next().empty());
+  EXPECT_EQ(2, reader->sequence());  // empty message is read
 
-  ASSERT_EQ(WriteResult::Success, writer->write(m2));
-  ASSERT_EQ(3, writer->sequence());
+  EXPECT_EQ(WriteResult::Success, writer->write(m2));
+  EXPECT_EQ(3, writer->sequence());
 
-  assert_eq(m2, reader->next());
-  ASSERT_EQ(3, reader->sequence());
+  expect_eq(m2, reader->next());
+  EXPECT_EQ(3, reader->sequence());
 
   array<uint8_t, M> m3{3};
-  ASSERT_EQ(WriteResult::Repeat, writer->write(m3));
-  ASSERT_EQ(4, writer->sequence());  // empty message written
+  EXPECT_EQ(WriteResult::Repeat, writer->write(m3));
+  EXPECT_EQ(4, writer->sequence());  // empty message written
 
-  ASSERT_TRUE(reader->next().empty());
-  ASSERT_EQ(4, reader->sequence());
+  EXPECT_TRUE(reader->next().empty());
+  EXPECT_EQ(4, reader->sequence());
 
-  ASSERT_EQ(WriteResult::Success, writer->write(m3));
-  ASSERT_EQ(5, writer->sequence());  // empty message written
+  EXPECT_EQ(WriteResult::Success, writer->write(m3));
+  EXPECT_EQ(5, writer->sequence());  // empty message written
 
-  assert_eq(m3, reader->next());
-  ASSERT_EQ(5, reader->sequence());
+  expect_eq(m3, reader->next());
+  EXPECT_EQ(5, reader->sequence());
 
-  ASSERT_TRUE(reader->next().empty());
-  ASSERT_EQ(5, reader->sequence());
+  EXPECT_TRUE(reader->next().empty());
+  EXPECT_EQ(5, reader->sequence());
 }
 
 namespace {
@@ -354,13 +336,13 @@ auto write_and_read_1(TestMessage message) {
 
   const WriteResult result = writer->write(message.t);
 
-  ASSERT_EQ(WriteResult::Success, result);
-  ASSERT_EQ(1, writer->sequence());
+  EXPECT_EQ(WriteResult::Success, result);
+  EXPECT_EQ(1, writer->sequence());
 
   const span<const uint8_t> read = reader->next();
 
-  ASSERT_EQ(1, reader->sequence());
-  assert_eq(read, message.t);
+  EXPECT_EQ(1, reader->sequence());
+  expect_eq(read, message.t);
 }
 }  // namespace
 
@@ -374,39 +356,45 @@ TEST(NonBlockingDemuxWriterTest, WriteRead1) {
 
 namespace {
 template <bool Blocking>
-auto one_reader_read_x(const vector<TestMessage>& valid_messages) {
-  if (valid_messages.empty()) {
+auto one_reader_read_x(const vector<TestMessage>& messages) {
+  if (messages.empty()) {
     return;
   }
 
   using lshl::demux::util::operator<<;
-  using lshl::demux::core::operator<<;
 
-  LOG_INFO << "messages: " << valid_messages;
+  std::string str;
+  for (const auto& msg : messages) {
+    str += std::to_string(msg.t.size()) + ", ";
+  }
 
-  const size_t message_num = valid_messages.size();
+  LOG_INFO << "message number: " << messages.size();
+  LOG_INFO << "message lengths: " << str;
+  LOG_INFO << "messages: " << messages;
+
+  const size_t message_num = messages.size();
 
   DemuxSetup<L, M, false> setup(1);
   auto* writer = setup.writer();
   auto* reader = setup.reader(0);
 
   std::future<size_t> sent_count_future =
-      std::async(std::launch::async, [&valid_messages, &writer] { return write_all(valid_messages, writer); });
+      std::async(std::launch::async, [&messages, &writer] { return write_all(messages, writer); });
 
   std::future<vector<TestMessage>> received_messages_future =
       std::async(std::launch::async, [message_num, &reader] { return read_n<L, M, Blocking>(message_num, reader); });
 
   sent_count_future.wait_for(DEFAULT_WAIT);
-  ASSERT_TRUE(sent_count_future.valid());
+  EXPECT_TRUE(sent_count_future.valid());
 
   const size_t sent_count = sent_count_future.get();
-  ASSERT_EQ(message_num, sent_count);
+  EXPECT_EQ(message_num, sent_count);
 
   received_messages_future.wait_for(DEFAULT_WAIT);
-  ASSERT_TRUE(received_messages_future.valid());
+  EXPECT_TRUE(received_messages_future.valid());
 
   const auto received_messages = received_messages_future.get();
-  assert_eq(valid_messages, received_messages);
+  expect_eq(messages, received_messages);
 }
 }  // namespace
 
@@ -445,13 +433,13 @@ auto multiple_readers_read_x(const vector<TestMessage>& valid_messages) -> void 
   }
 
   future_pub_result.wait_for(DEFAULT_WAIT);
-  ASSERT_TRUE(future_pub_result.valid());
-  ASSERT_EQ(message_num, future_pub_result.get());
+  EXPECT_TRUE(future_pub_result.valid());
+  EXPECT_EQ(message_num, future_pub_result.get());
 
   for (auto& future_sub_result : future_sub_results) {
     future_sub_result.wait_for(DEFAULT_WAIT);
-    ASSERT_TRUE(future_sub_result.valid());
-    assert_eq(valid_messages, future_sub_result.get());
+    EXPECT_TRUE(future_sub_result.valid());
+    expect_eq(valid_messages, future_sub_result.get());
   }
 }
 }  // namespace
