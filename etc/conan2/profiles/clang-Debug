@@ -8,6 +8,26 @@ include(clang-Common)
 build_type=Debug
 
 [conf]
-# valgrind needs `-gdwarf-4`
-tools.build:cxxflags=["-gdwarf-4", "-O0"]
-tools.build:cflags=["-gdwarf-4", "-O0"]
+## Default settings
+#tools.build:cxxflags=["-g", "-O0", "-fno-omit-frame-pointer"]
+#tools.build:cflags=["-g", "-O0", "-fno-omit-frame-pointer"]
+#
+## ASan and MSan, performs much better and more reliably when compiled with a minimal level of optimization (-O1).
+#
+## ASan(address) + UBSan(undefined) + LSan(leak)
+tools.build:cxxflags=["-g", "-O1", "-fno-omit-frame-pointer", "-fsanitize=address,undefined,leak"]
+tools.build:cflags=["-g", "-O1", "-fno-omit-frame-pointer", "-fsanitize=address,undefined,leak"]
+tools.build:sharedlinkflags=["-fsanitize=address,undefined,leak"]
+tools.build:exelinkflags=["-fsanitize=address,undefined,leak"]
+#
+## MSan(memory) -- didn't work, looks like GTest doesn't pick up the MSan settings
+# tools.build:cxxflags=["-g", "-O1", "-fno-omit-frame-pointer", "-fsanitize=memory"]
+# tools.build:cflags=["-g", "-O1", "-fno-omit-frame-pointer", "-fsanitize=memory"]
+# tools.build:sharedlinkflags=["-fsanitize=memory"]
+# tools.build:exelinkflags=["-fsanitize=memory"]
+#
+## TSan + UBSan
+# tools.build:cxxflags=["-g", "-O1", "-fno-omit-frame-pointer", "-fsanitize=thread,undefined"]
+# tools.build:cflags=["-g", "-O1", "-fno-omit-frame-pointer", "-fsanitize=thread,undefined"]
+# tools.build:sharedlinkflags=["-fsanitize=thread,undefined"]
+# tools.build:exelinkflags=["-fsanitize=thread,undefined"]

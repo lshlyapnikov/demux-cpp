@@ -1,0 +1,108 @@
+Component configuration:
+
+    - contract                 : not building
+    - date_time                : building
+    - exception                : building
+    - graph                    : not building
+    - graph_parallel           : not building
+    - headers                  : not building
+    - log                      : building
+    - nowide                   : not building
+    - program_options          : not building
+    - regex                    : building
+    - serialization            : not building
+    - test                     : not building
+    - thread                   : building
+    - type_erasure             : not building
+    - yap                      : not building
+    - winapi                   : not building
+    - wave                     : not building
+    - variant2                 : not building
+    - variant                  : not building
+    - uuid                     : not building
+    - url                      : not building
+    - unordered                : not building
+    - type_index               : not building
+    - tuple                    : not building
+    - tokenizer                : not building
+    - timer                    : not building
+    - throw_exception          : not building
+    - system                   : building
+    - stl_interfaces           : not building
+    - stacktrace               : not building
+    - spirit                   : not building
+    - sort                     : not building
+    - smart_ptr                : not building
+    - signals2                 : not building
+    - scope                    : not building
+    - redis                    : not building
+    - rational                 : not building
+    - ratio                    : not building
+    - random                   : building
+    - python                   : not building
+    - ptr_container            : not building
+    - property_map             : not building
+    - process                  : not building
+    - predef                   : not building
+    - pool                     : not building
+    - poly_collection          : not building
+    - pfr                      : not building
+    - parameter                : not building
+    - outcome                  : not building
+    - optional                 : not building
+    - mysql                    : not building
+    - multi_index              : not building
+    - msm                      : not building
+    - mqtt5                    : not building
+    - mpl                      : not building
+    - mpi                      : not building
+    - mp11                     : not building
+    - move                     : not building
+    - math                     : not building
+    - logic                    : not building
+    - lockfree                 : not building
+    - locale                   : not building
+    - lexical_cast             : not building
+    - lambda2                  : not building
+    - json                     : not building
+    - iterator                 : not building
+    - iostreams                : not building
+    - intrusive                : not building
+    - interprocess             : not building
+    - integer                  : not building
+    - heap                     : not building
+    - hana                     : not building
+    - geometry                 : not building
+    - function_types           : not building
+    - function                 : not building
+    - format                   : not building
+    - flyweight                : not building
+    - filesystem               : building
+    - fiber                    : not building
+    - endian                   : not building
+    - dynamic_bitset           : not building
+    - dll                      : not building
+    - detail                   : not building
+    - describe                 : not building
+    - crc                      : not building
+    - coroutine2               : not building
+    - coroutine                : not building
+    - core                     : not building
+    - conversion               : not building
+    - context                  : not building
+    - container_hash           : not building
+    - container                : building
+    - concept_check            : not building
+    - compat                   : not building
+    - cobalt                   : not building
+    - chrono                   : building
+    - charconv                 : not building
+    - bind                     : not building
+    - bimap                    : not building
+    - beast                    : not building
+    - atomic                   : building
+    - assign                   : not building
+    - assert                   : not building
+    - asio                     : not building
+    - array                    : not building
+    - any                      : not building

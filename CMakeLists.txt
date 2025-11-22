@@ -70,23 +70,25 @@ target_link_libraries(${PROJECT_NAME}
   PRIVATE reader_id  # TODO(Leonid): should these two be PUBLIC, so other projects can get the automatically
 )
 
-add_executable(shm_demux
-  src/demux/example/shm_demux.cpp
-  src/demux/example/market_data.cpp
-)
-target_link_libraries(shm_demux
-  PRIVATE reader_id
-  PRIVATE hdr_histogram::hdr_histogram_static
-  PRIVATE Boost::log
-  PRIVATE Boost::stacktrace_backtrace
-  PRIVATE Boost::stacktrace_from_exception
-)
-if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    target_link_libraries(shm_demux PRIVATE profiler)
-endif()
-target_compile_options(shm_demux
-  PRIVATE ${MY_CXX_FLAGS}
-)
+##
+## TODO(Leonid): example is disabled temporarily, enable it back
+## add_executable(shm_demux
+#   src/demux/example/shm_demux.cpp
+#   src/demux/example/market_data.cpp
+# )
+# target_link_libraries(shm_demux
+#   PRIVATE reader_id
+#   PRIVATE hdr_histogram::hdr_histogram_static
+#   PRIVATE Boost::log
+#   PRIVATE Boost::stacktrace_backtrace
+#   PRIVATE Boost::stacktrace_from_exception
+# )
+# if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+#     target_link_libraries(shm_demux PRIVATE profiler)
+# endif()
+# target_compile_options(shm_demux
+#   PRIVATE ${MY_CXX_FLAGS}
+# )
 
 add_library(reader_id
   OBJECT src/demux/core/reader_id.cpp
@@ -145,22 +147,6 @@ target_compile_options(demultiplexer_test
   PRIVATE ${MY_CXX_FLAGS}
 )
 gtest_discover_tests(demultiplexer_test)
-
-add_executable(demultiplexer_allocate_test
-  src/demux/test/demultiplexer_allocate_test.cpp
-)
-target_link_libraries(demultiplexer_allocate_test
-  PRIVATE demultiplexer
-  PRIVATE reader_id
-  PRIVATE gtest::gtest
-  PRIVATE rapidcheck::rapidcheck
-  PRIVATE Boost::log
-  PRIVATE atomic
-)
-target_compile_options(demultiplexer_allocate_test
-  PRIVATE ${MY_CXX_FLAGS}
-)
-gtest_discover_tests(demultiplexer_allocate_test)
 
 add_executable(shm_util_test
   src/demux/test/shm_util_test.cpp

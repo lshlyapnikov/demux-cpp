@@ -57,4 +57,20 @@ auto operator<<(OutputStream& os, const std::array<uint8_t, M>& xs) -> OutputStr
   return operator<<(os, std::span{ys});
 }
 
+template <OutputStreamConcept OutputStream, typename T>
+auto operator<<(OutputStream& os, const std::vector<T>& xs) -> OutputStream& {
+  os << '[';
+  bool first = true;
+  for (const auto& x : xs) {
+    if (first) {
+      first = false;
+    } else {
+      os << ", ";
+    }
+    os << x;
+  }
+  os << ']';
+  return os;
+}
+
 }  // namespace lshl::demux::util

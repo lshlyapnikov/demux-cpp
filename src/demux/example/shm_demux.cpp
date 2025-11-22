@@ -25,7 +25,8 @@
 #include <span>
 #include <string>
 #include <thread>
-#include "../core/demultiplexer.h"
+#include "../core/demux_reader.h"
+#include "../core/demux_writer.h"
 #include "../core/reader_id.h"
 #include "../util/boost_log_util.h"
 #include "../util/hdr_histogram_util.h"
@@ -90,7 +91,7 @@ auto main_(const span<char*> args) noexcept(false) -> int {
   constexpr int ERROR = 200;
   constexpr size_t EXPECTED_ARG_NUM = 5;
 
-  constexpr size_t MAX_READER_NUM = 2;
+  constexpr uint8_t MAX_READER_NUM = 2;
   constexpr std::size_t BUFFER_SIZE = 16 * lshl::demux::util::LINUX_PAGE_SIZE;
   constexpr std::uint16_t MAX_MESSAGE_SIZE = 256;
 
@@ -135,17 +136,17 @@ auto init_logging() noexcept -> void {
   boost::log::core::get()->set_filter(boost::log::trivial::severity >= boost::log::trivial::info);
 }
 
-template <size_t MAX_READER_NUM, size_t BUFFER_SIZE, uint16_t MAX_MSG_SIZE>
+template <uint8_t R, size_t L, uint16_t M>
 auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool zero_copy) noexcept(false) -> void {
   (void)total_reader_num;
   (void)msg_num;
   (void)zero_copy;
-  LOG_INFO << "start_writer " << BUFFER_SHARED_MEM_NAME << ", MAX_READER_NUM: " << MAX_READER_NUM
-           << ", BUFFER_SIZE : " << BUFFER_SIZE << ", MAX_MSG_SIZE: " << MAX_MSG_SIZE
-           << ", total_reader_num: " << static_cast<int>(total_reader_num) << ", zero_copy: " << zero_copy;
+  LOG_INFO << "start_writer " << BUFFER_SHARED_MEM_NAME << ", MAX_READER_NUM: " << R << ", BUFFER_SIZE : " << L
+           << ", MAX_MSG_SIZE: " << M << ", total_reader_num: " << static_cast<int>(total_reader_num)
+           << ", zero_copy: " << zero_copy;
 
   constexpr size_t SHARED_MEMORY_SIZE = 64 * util::LINUX_PAGE_SIZE;
-  util::ShmManager<3, BUFFER_SIZE> shm_manager{bipc::create_only, BUFFER_SHARED_MEM_NAME, SHARED_MEMORY_SIZE};
+  util::ShmManager<3, L> shm_manager{bipc::create_only, BUFFER_SHARED_MEM_NAME, SHARED_MEMORY_SIZE};
   auto* primitives = shm_manager.construct_primitives();
 
   LOG_INFO << "primitives.buffer cache line aligned: "
@@ -182,7 +183,7 @@ auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool z
   atomic<uint64_t>* startup_sync = segment2.construct<atomic<uint64_t>>("startup_sync")(0);
   LOG_INFO << "startup_sync allocated, segment2.free_memory: " << segment2.get_free_memory();
 
-  DemuxWriter<L, M, false> writer(all_readers_mask, span{*buffer}, message_count_sync, wraparound_sync);
+  DemuxWriter<R, L, M, false> writer(all_readers_mask, span{*buffer}, message_count_sync, wraparound_sync);
   LOG_INFO << "DemuxWriter created, segment1.free_memory: " << segment1.get_free_memory()
            << ", segment2.free_memory: " << segment2.get_free_memory();
 
@@ -209,8 +210,8 @@ auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool z
 */
 }
 
-template <size_t L, uint16_t M>
-auto run_writer_loop(DemuxWriter<L, M, false>* writer, const uint64_t msg_num) noexcept(false) -> void {
+template <uint8_t R, size_t L, uint16_t M>
+auto run_writer_loop(DemuxWriter<R, L, M, false>* writer, const uint64_t msg_num) noexcept(false) -> void {
   LOG_INFO << "sending " << msg_num << " md updates ...";
 
   MarketDataUpdate md{};
@@ -235,8 +236,8 @@ auto run_writer_loop(DemuxWriter<L, M, false>* writer, const uint64_t msg_num) n
            << ", XXH64_hash: " << XXH64_util::format(hash.digest());
 }
 
-template <class T, size_t L, uint16_t M>
-[[nodiscard]] inline auto write(DemuxWriter<L, M, false>* writer, const T& md) noexcept -> bool {
+template <uint8_t R, size_t L, uint16_t M>
+[[nodiscard]] inline auto write(DemuxWriter<R, L, M, false>* writer, const T& md) noexcept -> bool {
   int attempt = 0;
   while (true) {
     const WriteResult result = writer->write_safe(md);
@@ -256,8 +257,8 @@ template <class T, size_t L, uint16_t M>
   }
 }
 
-template <size_t L, uint16_t M>
-auto run_writer_loop_zero_copy(DemuxWriter<L, M, false>* writer, const uint64_t msg_num) noexcept(false) -> void {
+template <uint8_t R, size_t L, uint16_t M>
+auto run_writer_loop_zero_copy(DemuxWriter<R, L, M, false>* writer, const uint64_t msg_num) noexcept(false) -> void {
   LOG_INFO << "sending " << msg_num << " md updates ...";
 
   MarketDataUpdateGenerator md_gen{};
@@ -278,10 +279,12 @@ auto run_writer_loop_zero_copy(DemuxWriter<L, M, false>* writer, const uint64_t 
            << ", XXH64_hash: " << XXH64_util::format(hash.digest());
 }
 
-template <size_t L, uint16_t M>
-[[nodiscard]] inline auto
-write_zero_copy(DemuxWriter<L, M, false>* writer, MarketDataUpdateGenerator* md_gen, XXH64_util* hash) noexcept(false)
-    -> bool {
+template <uint8_t R, size_t L, uint16_t M>
+[[nodiscard]] inline auto write_zero_copy(
+    DemuxWriter<R, L, M, false>* writer,
+    MarketDataUpdateGenerator* md_gen,
+    XXH64_util* hash
+) noexcept(false) -> bool {
   for (int attempt = 0;; ++attempt) {
     const std::optional<MarketDataUpdate*> mo = writer->template allocate<MarketDataUpdate>();
     if (mo.has_value()) {
@@ -301,7 +304,7 @@ write_zero_copy(DemuxWriter<L, M, false>* writer, MarketDataUpdateGenerator* md_
   }
 }
 
-template <size_t L, uint16_t M>
+template <uint8_t R, size_t L, uint16_t M>
 auto start_reader(const uint8_t reader_num, const uint64_t msg_num) noexcept(false) -> void {
   using lshl::demux::example::BUFFER_SHARED_MEM_NAME;
   using std::atomic;
@@ -346,7 +349,7 @@ auto start_reader(const uint8_t reader_num, const uint64_t msg_num) noexcept(fal
            << ", segment2.free_memory: " << segment2.get_free_memory();
 }
 
-template <size_t L, uint16_t M>
+template <uint8_t R, size_t L, uint16_t M>
 auto run_reader_loop(DemuxReader<L, M>* reader, const uint64_t msg_num) noexcept(false) -> void {
   XXH64_util hash{};
   HDR_histogram_util histogram{};
