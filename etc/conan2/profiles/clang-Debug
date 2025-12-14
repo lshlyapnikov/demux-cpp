@@ -15,8 +15,8 @@ build_type=Debug
 ## ASan and MSan, performs much better and more reliably when compiled with a minimal level of optimization (-O1).
 #
 ## ASan(address) + UBSan(undefined) + LSan(leak)
-tools.build:cxxflags=["-g", "-O1", "-fno-omit-frame-pointer", "-fsanitize=address,undefined,leak"]
-tools.build:cflags=["-g", "-O1", "-fno-omit-frame-pointer", "-fsanitize=address,undefined,leak"]
+tools.build:cxxflags=["-g", "-O0", "-fno-omit-frame-pointer", "-fsanitize=address,undefined,leak"]
+tools.build:cflags=["-g", "-O0", "-fno-omit-frame-pointer", "-fsanitize=address,undefined,leak"]
 tools.build:sharedlinkflags=["-fsanitize=address,undefined,leak"]
 tools.build:exelinkflags=["-fsanitize=address,undefined,leak"]
 #

@@ -40,6 +40,17 @@ enum WriteResult : std::uint8_t {
   Error,
 };
 
+inline auto operator<<(std::ostream& os, const WriteResult& result) -> std::ostream& {
+  switch (result) {
+    case WriteResult::Success:
+      return os << "Success";
+    case WriteResult::Repeat:
+      return os << "Repeat";
+    case WriteResult::Error:
+      return os << "Error";
+  }
+}
+
 /**
  * @brief Demultiplexer writer.
  * @tparam L The size of the circular buffer in bytes. When allocating the buffer in shared memory,
@@ -56,9 +67,10 @@ class DemuxWriter {
   /// @brief Circular buffer for writing messages.
   MessageBuffer<L> buffer_;
   /// @brief Writer sequence number shared with readers.
-  atomic<uint64_t>* writer_sequence_;
+  atomic<uint64_t>* atomic_sequence_;
+  uint64_t sequence_;
   /// @brief Reader positions within the circular buffer.
-  vector<atomic<size_t>*> reader_positions_;
+  vector<atomic<size_t>*> atomic_reader_positions_;
   /// @brief Writer position.
   size_t position_{0};
   /// @brief Free Space to write new messages without overwriting unread data and without a wraparound.
@@ -78,10 +90,13 @@ class DemuxWriter {
       atomic<uint64_t>* writer_sequence,
       vector<atomic<size_t>*> reader_positions
   ) noexcept
-      : buffer_(buffer), writer_sequence_(writer_sequence), reader_positions_(std::move(reader_positions)) {
+      : buffer_(buffer),
+        atomic_sequence_(writer_sequence),
+        sequence_(writer_sequence->load(std::memory_order_relaxed)),
+        atomic_reader_positions_(std::move(reader_positions)) {
     LOG_INFO << "[DemuxWriter::constructor] L: " << L << ", M: " << M << ", B: " << B << " " << *this;
-    for (const auto& x : this->reader_positions_) {
-      LOG_DEBUG << "\treader_position: " << x->load();
+    for (const auto& x : this->atomic_reader_positions_) {
+      LOG_DEBUG << "\treader_position: " << x->load(std::memory_order_relaxed);
     }
   }
 
@@ -94,7 +109,7 @@ class DemuxWriter {
   template <size_t L0, uint16_t M0, bool B0>
   friend auto operator<<(std::ostream& os, const DemuxWriter<L0, M0, B0>& writer) -> std::ostream&;
 
-  [[nodiscard]] auto sequence() const noexcept -> uint64_t { return this->writer_sequence_->load(); }
+  [[nodiscard]] auto sequence() const noexcept -> uint64_t { return this->sequence_; }
 
   /**
    * @brief Writes/copies the `source` into the buffer.
@@ -160,6 +175,8 @@ auto DemuxWriter<L, M, B>::write_(const span<uint8_t>& source) noexcept -> Write
   assert(n > 0 && n <= M);
   const size_t required = sizeof(message_length_t) + n;
 
+  LOG_DEBUG << "[DemuxWriter::write_] state0: " << *this << ", required: " << required;
+
   if (this->ensure_buffer_space(required) == WriteResult::Repeat) {
     return WriteResult::Repeat;
   }
@@ -172,6 +189,8 @@ auto DemuxWriter<L, M, B>::write_(const span<uint8_t>& source) noexcept -> Write
 
   this->commit_(written);
 
+  LOG_DEBUG << "[DemuxWriter::write_] state1: " << *this;
+
   return WriteResult::Success;
 }
 
@@ -181,13 +200,13 @@ auto DemuxWriter<L, M, B>::ensure_buffer_space(const size_t required) noexcept -
   if constexpr (B) {
     // busy-spin waiting for the remaining space to increase
     while (this->remaining_ < required) {
-      calculate_remaining(required);
+      this->calculate_remaining(required);
     }
     return WriteResult::Success;
   } else {
     // non-blocking implementation return WriteResult::Repeat when the write operation has to be repeated
     if (this->remaining_ < required) {
-      calculate_remaining(required);
+      this->calculate_remaining(required);
       if (this->remaining_ < required) {
         return WriteResult::Repeat;
       } else {
@@ -208,7 +227,8 @@ auto DemuxWriter<L, M, B>::commit_(const size_t written) -> void {
   this->remaining_ -= written;
 
   // increment sequence to let readers know there is another message to read
-  this->writer_sequence_->fetch_add(1);
+  this->sequence_ += 1;
+  this->atomic_sequence_->store(this->sequence_, std::memory_order_release);
 
   LOG_DEBUG << "[DemuxWriter::commit_] state: " << *this;
   assert(this->position_ <= L);
@@ -223,16 +243,19 @@ auto DemuxWriter<L, M, B>::calculate_remaining(const size_t required) noexcept -
   // should calculate_remaining only when not enough space for required
   assert(required > this->remaining_);
 
+  LOG_DEBUG << "[DemuxWriter::calculate_remaining] state0: " << *this << ", required: " << required;
+
   size_t slowest_reader_position = L;
   size_t min_reader_position = L;
 
-  for (const auto& reader_position : this->reader_positions_) {
-    const uint64_t x = reader_position->load();
+  for (const auto& atomic_reader_position : this->atomic_reader_positions_) {
+    const uint64_t x = atomic_reader_position->load(std::memory_order_relaxed);
     if (x > this->position_ && x < slowest_reader_position) {
       slowest_reader_position = x;
     }
     min_reader_position = std::min(x, min_reader_position);
   }
+  std::atomic_thread_fence(std::memory_order_acquire);
 
   if (slowest_reader_position == L) {
     // all readers are able to keep up with the writer, the rest of the buffer is available for writing
@@ -246,16 +269,18 @@ auto DemuxWriter<L, M, B>::calculate_remaining(const size_t required) noexcept -
     this->remaining_ = slowest_reader_position - 1 - this->position_;
   }
 
-  LOG_DEBUG << "[DemuxWriter::calculate_remaining] state: " << *this
-            << ", slowest_reader_position: " << slowest_reader_position;
+  LOG_DEBUG << "[DemuxWriter::calculate_remaining] state1: " << *this
+            << ", slowest_reader_position: " << slowest_reader_position
+            << ", min_reader_position: " << min_reader_position;
   assert(this->remaining_ <= L);
 }
 
 template <size_t L, uint16_t M, bool B>
   requires(L >= M + 2 && M > 0)
 inline auto DemuxWriter<L, M, B>::wraparound_(const size_t min_reader_position) noexcept -> void {
+  LOG_DEBUG << "[DemuxWriter::wraparound_] state0: " << *this << ", min_reader_position: " << min_reader_position;
   if (0 == min_reader_position) {
-    // can't wraparound at this moment, wait for the reader to move, keep the current writer position
+    LOG_DEBUG << "[DemuxWriter::wraparound_] cannot wraparound yet";
   } else {
     if (this->remaining_ >= sizeof(message_length_t)) {
       // write wraparound marker (empty message)
@@ -267,16 +292,17 @@ inline auto DemuxWriter<L, M, B>::wraparound_(const size_t min_reader_position) 
     // -1 is to avoid stepping on the slowest reader position
     this->remaining_ = min_reader_position - 1;
     // increment sequence to let readers know there is another message to read
-    this->writer_sequence_->fetch_add(1);
+    this->sequence_ += 1;
+    this->atomic_sequence_->store(this->sequence_, std::memory_order_release);
   }
+  LOG_DEBUG << "[DemuxWriter::wraparound_] state1: " << *this;
 
-  LOG_DEBUG << "[DemuxWriter::wraparound_] state: " << *this << ", min_reader_position: " << min_reader_position;
   assert(this->remaining_ <= L);
 }
 
 template <size_t L, uint16_t M, bool B>
 auto operator<<(std::ostream& os, const DemuxWriter<L, M, B>& writer) -> std::ostream& {
-  os << "DemuxWriter{sequence: " << writer.sequence() << ", position: " << writer.position_
+  os << "DemuxWriter{sequence: " << writer.sequence_ << ", position: " << writer.position_
      << ", remaining: " << writer.remaining_ << "}";
   return os;
 }
