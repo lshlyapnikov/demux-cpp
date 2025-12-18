@@ -1,7 +1,7 @@
 // Copyright 2024 Leonid Shlyapnikov.
 // SPDX-License-Identifier: Apache-2.0
 
-// NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner, readability-magic-numbers)
+// NOLINTBEGIN(readability-function-cognitive-complexity, misc-include-cleaner, readability-magic-numbers, cppcoreguidelines-avoid-magic-numbers)
 
 #define UNIT_TEST
 #undef NDEBUG  // for assert to work in release build
@@ -487,15 +487,13 @@ namespace {
   }
 }
 
-[[nodiscard]] auto read_all_expect_eq(DemuxReader<L, M>* reader, TestMessage expected) -> bool {
+auto read_all_assert_eq(DemuxReader<L, M>* reader, TestMessage expected) -> void {
   while (true) {
     const span<const uint8_t> read = reader->next();
     if (read.empty()) {
-      return true;
+      break;
     }
-    if (!expect_eq(expected.t, read)) {
-      return false;
-    }
+    ASSERT_TRUE(expect_eq(expected.t, read));
   }
 }
 
@@ -538,22 +536,54 @@ auto slow_reader(TestMessage message) -> void {
   LOG_DEBUG << "message: " << message << ", size: " << message.t.size();
 
   DemuxSetup<L, M, false> setup(1);
+  auto* writer = setup.writer();
+  auto* reader = setup.reader(0);
 
-  const size_t messages_written = fill_up_buffer(setup.writer(), message);
-  const size_t expected_messages_written = (L / (message.t.size() + sizeof(lshl::demux::core::message_length_t)));
-  ASSERT_EQ(expected_messages_written, messages_written);
+  const size_t messages_to_fill_buffer = (L / (message.t.size() + sizeof(lshl::demux::core::message_length_t)));
 
-  // the buffer is full, can't write into it
-  ASSERT_EQ(WriteResult::Repeat, setup.writer()->write(message.t));
+  ASSERT_EQ(messages_to_fill_buffer, fill_up_buffer(writer, message));
+  ASSERT_EQ(messages_to_fill_buffer, writer->sequence());
 
-  ASSERT_TRUE(read_all_expect_eq(setup.reader(0), message));
+  // the buffer is full, can't write anymore messages
+  ASSERT_EQ(WriteResult::Repeat, writer->write(message.t));
+  ASSERT_EQ(messages_to_fill_buffer, writer->sequence());
 
-  span<const uint8_t> must_be_empty = setup.reader(0)->next();
-  ASSERT_TRUE(must_be_empty.empty());
+  // read all messages, to catup with the writer
+  read_all_assert_eq(reader, message);
+  ASSERT_EQ(writer->sequence(), reader->sequence());
 
-  // all readers caught up, can write again
-  const WriteResult actual = setup.writer()->write(message.t);
-  ASSERT_EQ(WriteResult::Success, actual);
+  // make sure no more messages are available to read
+  ASSERT_EQ(reader->next().empty(), true);
+  ASSERT_EQ(writer->sequence(), reader->sequence());
+
+  // wraparound marker is written at this point
+  switch (writer->write(message.t)) {
+    case WriteResult::Success:
+      // wraparound + 1 message written
+      ASSERT_EQ(messages_to_fill_buffer + 2, writer->sequence());
+      break;
+    case WriteResult::Repeat:
+      // only wraparound marker is written
+      ASSERT_EQ(messages_to_fill_buffer + 1, writer->sequence());
+      // read the wraparound marker
+      ASSERT_TRUE(reader->next().empty());
+      ASSERT_EQ(writer->sequence(), reader->sequence());
+      // no we should be able to write the message
+      ASSERT_EQ(WriteResult::Success, writer->write(message.t));
+      ASSERT_EQ(messages_to_fill_buffer + 2, writer->sequence());
+      break;
+    case WriteResult::Error:
+      FAIL() << "Unexpected WriteResult::Error when writing message after reading all messages: " << message;
+  }
+
+  read_all_assert_eq(reader, message);
+  ASSERT_TRUE(reader->next().empty());
+
+  ASSERT_EQ(writer->sequence(), reader->sequence());
+  // ASSERT_EQ(reader->next().empty(), true);
+  // ASSERT_EQ(writer->sequence(), reader->sequence());
+
+  // ASSERT_EQ(WriteResult::Success, writer->write(message.t));
 }
 }  // namespace
 
@@ -570,10 +600,19 @@ TEST(NonBlockingDemuxTest, SlowReader1) {
   slow_reader(TestMessage(m));
 }
 
+TEST(NonBlockingDemuxTest, SlowReader2) {
+  vector<uint8_t> m{0x77, 0x2b, 0xdb, 0x58, 0xb9, 0x21, 0xca, 0xfe, 0xca, 0x64, 0xf6, 0x8e, 0x55, 0xc4,
+                    0x06, 0x69, 0x83, 0x72, 0x05, 0x32, 0x61, 0x7e, 0x6b, 0x54, 0x56, 0x40, 0x2f, 0x4d,
+                    0xaf, 0x0a, 0x1f, 0x72, 0x68, 0x85, 0x25, 0x35, 0x28, 0x54, 0x6d, 0xee, 0x89, 0x88,
+                    0xab, 0x71, 0x8a, 0xae, 0x1d, 0x3b, 0xbf, 0x20, 0xab, 0x0f, 0x83, 0x6d, 0x24, 0x65};
+  ASSERT_EQ(m.size(), 56);
+  slow_reader(TestMessage(m));
+}
+
 auto main(int argc, char** argv) -> int {
   namespace logging = boost::log;
   logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::debug);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
-// NOLINTEND(readability-function-cognitive-complexity, misc-include-cleaner, readability-magic-numbers)
+// NOLINTEND(readability-function-cognitive-complexity, misc-include-cleaner, readability-magic-numbers, cppcoreguidelines-avoid-magic-numbers)

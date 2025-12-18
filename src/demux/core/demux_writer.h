@@ -245,19 +245,19 @@ auto DemuxWriter<L, M, B>::calculate_remaining(const size_t required) noexcept -
 
   LOG_DEBUG << "[DemuxWriter::calculate_remaining] state0: " << *this << ", required: " << required;
 
-  size_t slowest_reader_position = L;
+  size_t slowest_lagging_reader_position = L;
   size_t min_reader_position = L;
 
   for (const auto& atomic_reader_position : this->atomic_reader_positions_) {
     const uint64_t x = atomic_reader_position->load(std::memory_order_relaxed);
-    if (x > this->position_ && x < slowest_reader_position) {
-      slowest_reader_position = x;
+    if (x > this->position_) {
+      slowest_lagging_reader_position = std::min(x, slowest_lagging_reader_position);
     }
     min_reader_position = std::min(x, min_reader_position);
   }
   std::atomic_thread_fence(std::memory_order_acquire);
 
-  if (slowest_reader_position == L) {
+  if (slowest_lagging_reader_position == L) {
     // all readers are able to keep up with the writer, the rest of the buffer is available for writing
     this->remaining_ = L - this->position_;
     if (this->remaining_ < required) {
@@ -265,12 +265,13 @@ auto DemuxWriter<L, M, B>::calculate_remaining(const size_t required) noexcept -
       this->wraparound_(min_reader_position);
     }
   } else {
-    // -1 is to avoid stepping on the slowest reader position
-    this->remaining_ = slowest_reader_position - 1 - this->position_;
+    // -1 is to avoid stepping on the slowest reader position,
+    // and to differentiate slow reader from the case when all readers are caught up
+    this->remaining_ = slowest_lagging_reader_position - 1 - this->position_;
   }
 
   LOG_DEBUG << "[DemuxWriter::calculate_remaining] state1: " << *this
-            << ", slowest_reader_position: " << slowest_reader_position
+            << ", slowest_reader_position: " << slowest_lagging_reader_position
             << ", min_reader_position: " << min_reader_position;
   assert(this->remaining_ <= L);
 }
