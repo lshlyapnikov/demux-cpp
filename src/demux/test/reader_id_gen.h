@@ -12,13 +12,10 @@ namespace rc {
 template <>
 struct Arbitrary<lshl::demux::core::ReaderId> {
   static auto arbitrary() -> Gen<lshl::demux::core::ReaderId> {
-    using lshl::demux::core::is_valid_reader_id;
-    using lshl::demux::core::MAX_READER_NUM;
     using lshl::demux::core::ReaderId;
 
-    const Gen<uint8_t> range = gen::inRange(static_cast<uint8_t>(1), MAX_READER_NUM);
-    const Gen<uint8_t> filtered = gen::suchThat(range, is_valid_reader_id);
-    return gen::map(filtered, [](uint8_t x) { return ReaderId(x); });
+    const Gen<uint8_t> range = gen::inRange(static_cast<uint8_t>(1), static_cast<uint8_t>(32));
+    return gen::map(range, [](uint8_t x) { return ReaderId(x); });
   }
 };
 

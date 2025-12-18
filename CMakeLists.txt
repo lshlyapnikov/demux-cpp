@@ -68,24 +68,27 @@ add_library(${PROJECT_NAME}
 )
 target_link_libraries(${PROJECT_NAME}
   PRIVATE reader_id  # TODO(Leonid): should these two be PUBLIC, so other projects can get the automatically
-  PRIVATE demultiplexer
 )
 
-add_executable(shm_demux
-  src/demux/example/shm_demux.cpp
-  src/demux/example/market_data.cpp
-)
-target_link_libraries(shm_demux
-  PRIVATE reader_id
-  PRIVATE hdr_histogram::hdr_histogram_static
-  PRIVATE Boost::log
-)
-if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    target_link_libraries(shm_demux PRIVATE profiler)
-endif()
-target_compile_options(shm_demux
-  PRIVATE ${MY_CXX_FLAGS}
-)
+##
+## TODO(Leonid): example is disabled temporarily, enable it back
+## add_executable(shm_demux
+#   src/demux/example/shm_demux.cpp
+#   src/demux/example/market_data.cpp
+# )
+# target_link_libraries(shm_demux
+#   PRIVATE reader_id
+#   PRIVATE hdr_histogram::hdr_histogram_static
+#   PRIVATE Boost::log
+#   PRIVATE Boost::stacktrace_backtrace
+#   PRIVATE Boost::stacktrace_from_exception
+# )
+# if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+#     target_link_libraries(shm_demux PRIVATE profiler)
+# endif()
+# target_compile_options(shm_demux
+#   PRIVATE ${MY_CXX_FLAGS}
+# )
 
 add_library(reader_id
   OBJECT src/demux/core/reader_id.cpp
@@ -94,10 +97,17 @@ target_compile_options(reader_id
   PRIVATE ${MY_CXX_FLAGS}
 )
 
-add_library(demultiplexer
-  OBJECT src/demux/core/demultiplexer.cpp
+add_library(operators
+  OBJECT src/demux/util/operators.cpp
 )
-target_compile_options(demultiplexer
+target_compile_options(operators
+  PRIVATE ${MY_CXX_FLAGS}
+)
+
+add_library(test_message
+  OBJECT src/demux/test/test_message.cpp
+)
+target_compile_options(test_message
   PRIVATE ${MY_CXX_FLAGS}
 )
 
@@ -134,7 +144,8 @@ add_executable(demultiplexer_test
   src/demux/test/demultiplexer_test.cpp
 )
 target_link_libraries(demultiplexer_test
-  PRIVATE demultiplexer
+  PRIVATE operators
+  PRIVATE test_message
   PRIVATE reader_id
   PRIVATE gtest::gtest
   PRIVATE rapidcheck::rapidcheck
@@ -146,33 +157,18 @@ target_compile_options(demultiplexer_test
 )
 gtest_discover_tests(demultiplexer_test)
 
-add_executable(demultiplexer_allocate_test
-  src/demux/test/demultiplexer_allocate_test.cpp
+add_executable(shm_manager_test
+  src/demux/test/shm_manager_test.cpp
 )
-target_link_libraries(demultiplexer_allocate_test
-  PRIVATE demultiplexer
+target_link_libraries(shm_manager_test
+  PRIVATE operators
   PRIVATE reader_id
   PRIVATE gtest::gtest
   PRIVATE rapidcheck::rapidcheck
   PRIVATE Boost::log
   PRIVATE atomic
 )
-target_compile_options(demultiplexer_allocate_test
+target_compile_options(shm_manager_test
   PRIVATE ${MY_CXX_FLAGS}
 )
-gtest_discover_tests(demultiplexer_allocate_test)
-
-add_executable(shm_util_test
-  src/demux/test/shm_util_test.cpp
-)
-target_link_libraries(shm_util_test
-  PRIVATE reader_id
-  PRIVATE gtest::gtest
-  PRIVATE rapidcheck::rapidcheck
-  PRIVATE Boost::log
-  PRIVATE atomic
-)
-target_compile_options(shm_util_test
-  PRIVATE ${MY_CXX_FLAGS}
-)
-gtest_discover_tests(shm_util_test)
+gtest_discover_tests(shm_manager_test)

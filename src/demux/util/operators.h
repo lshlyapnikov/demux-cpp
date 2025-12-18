@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <array>
+#include <boost/interprocess/managed_shared_memory.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <iomanip>
@@ -13,29 +13,6 @@
 #include <vector>
 
 namespace lshl::demux::util {
-
-// names take up some space in the managed_shared_memory
-constexpr std::size_t BOOST_IPC_INTERNAL_METADATA_SIZE = 512;
-
-// Linux memory page size
-constexpr std::size_t LINUX_PAGE_SIZE = 4096;
-
-constexpr auto calculate_required_shared_mem_size(
-    const std::size_t data_size,
-    const std::size_t metadata_size,
-    const std::size_t page_size
-) noexcept -> std::size_t {
-  // names take some space in the managed_shared_memory, this is why BOOST_IPC_INTERNAL_METADATA_SIZE is added
-  // total shared memory size, should be  a multiple of the page size (4kB on Linux). Because the operating system
-  // performs mapping operations over whole pages. So, you don't waste memory.
-  const std::size_t quotient = (data_size + metadata_size) / page_size;
-  const std::size_t reminder = (data_size + metadata_size) % page_size;
-  if (reminder > 0) {
-    return (quotient + 1) * page_size;
-  } else {
-    return quotient * page_size;
-  }
-}
 
 template <typename T>
 concept OutputStreamConcept = requires(T os) {
@@ -78,6 +55,22 @@ template <OutputStreamConcept OutputStream, size_t M>
 auto operator<<(OutputStream& os, const std::array<uint8_t, M>& xs) -> OutputStream& {
   std::array<uint8_t, M> ys{xs};
   return operator<<(os, std::span{ys});
+}
+
+template <OutputStreamConcept OutputStream, typename T>
+auto operator<<(OutputStream& os, const std::vector<T>& xs) -> OutputStream& {
+  os << '[';
+  bool first = true;
+  for (const auto& x : xs) {
+    if (first) {
+      first = false;
+    } else {
+      os << ", ";
+    }
+    os << x;
+  }
+  os << ']';
+  return os;
 }
 
 }  // namespace lshl::demux::util
