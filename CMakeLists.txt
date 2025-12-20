@@ -111,6 +111,13 @@ target_compile_options(test_message
   PRIVATE ${MY_CXX_FLAGS}
 )
 
+add_library(market_event
+  src/demux/example/market_event.cpp
+)
+target_compile_options(market_event
+  PRIVATE ${MY_CXX_FLAGS}
+)
+
 enable_testing()
 include(GoogleTest)
 
@@ -172,3 +179,34 @@ target_compile_options(shm_manager_test
   PRIVATE ${MY_CXX_FLAGS}
 )
 gtest_discover_tests(shm_manager_test)
+
+add_executable(emplace_variant_test
+  src/demux/test/emplace_variant_test.cpp
+)
+target_link_libraries(emplace_variant_test
+  PRIVATE market_event
+  PRIVATE operators
+  PRIVATE gtest::gtest
+  PRIVATE rapidcheck::rapidcheck
+  PRIVATE Boost::log
+)
+target_compile_options(emplace_variant_test
+  PRIVATE ${MY_CXX_FLAGS}
+)
+gtest_discover_tests(emplace_variant_test)
+
+# add_executable(${xyz}_test
+#   src/demux/test/${xyz}_test.cpp
+# )
+# target_link_libraries(${xyz}_test
+#   PRIVATE operators
+#   PRIVATE reader_id
+#   PRIVATE gtest::gtest
+#   PRIVATE rapidcheck::rapidcheck
+#   PRIVATE Boost::log
+#   PRIVATE atomic
+# )
+# target_compile_options(${xyz}_test
+#   PRIVATE ${MY_CXX_FLAGS}
+# )
+# gtest_discover_tests(${xyz}_test)
