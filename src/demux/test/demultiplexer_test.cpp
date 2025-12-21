@@ -124,14 +124,18 @@ using std::vector;
 template <bool Blocking>
 auto writer_constructor_does_not_throw(const uint8_t reader_num) -> void {
   if (reader_num == 0) {
-    return;
-  }
-  DemuxSetup<MarketDataUpdate, 16, Blocking> setup(reader_num);
-  ASSERT_EQ(0, setup.writer()->tail());
-  for (uint8_t i = 0; i < reader_num; ++i) {
-    ASSERT_EQ(0, setup.reader(i)->tail());
-    ASSERT_EQ(0, setup.reader(i)->head());
-    ASSERT_EQ(ReaderId{i}, setup.reader(i)->id());
+    ASSERT_THROW((DemuxSetup<MarketDataUpdate, 16, Blocking>(reader_num)), std::invalid_argument);
+  } else if (reader_num > 64) {
+    ASSERT_THROW((DemuxSetup<MarketDataUpdate, 16, Blocking>(reader_num)), std::invalid_argument);
+  } else {
+    DemuxSetup<MarketDataUpdate, 16, Blocking> setup(reader_num);
+    ASSERT_EQ(0, setup.writer()->tail());
+    for (uint8_t i = 0; i < reader_num; ++i) {
+      ASSERT_EQ(true, setup.is_active_reader(i));
+      ASSERT_EQ(0, setup.reader(i)->tail());
+      ASSERT_EQ(0, setup.reader(i)->head());
+      ASSERT_EQ(ReaderId{i}, setup.reader(i)->id());
+    }
   }
 }
 }  // namespace

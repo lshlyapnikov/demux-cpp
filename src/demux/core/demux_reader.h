@@ -50,7 +50,8 @@ class DemuxReader {
  public:
   DemuxReader(const ReaderId& reader_id, array<M, N>* buffer, const atomic<size_t>* tail, atomic<size_t>* head) noexcept
       : id_(reader_id), buffer_(buffer), tail_(tail), head_(head) {
-    LOG_INFO << "[DemuxReader::constructor] M: " << typeid(M).name() << ", N: " << N;
+    LOG_INFO << "[DemuxReader::constructor] M: " << typeid(M).name() << ", N: " << N << ", B: " << B
+             << ", state: " << *this;
   }
 
   ~DemuxReader() = default;

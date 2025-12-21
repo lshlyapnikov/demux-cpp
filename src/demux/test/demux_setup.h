@@ -30,22 +30,25 @@ class DemuxSetup {
  public:
   explicit DemuxSetup(const uint8_t reader_num)
       : reader_positions_(reader_num),
-        reader_active_flags_(reader_num),
+        reader_active_flags_(create_active_readers(reader_num)),
         writer_{&buffer_, &writer_position_, to_ptrs(&reader_positions_), to_ptrs(&reader_active_flags_)} {
     for (uint8_t i = 0; i < reader_num; ++i) {
-      assert(0 == reader_positions_[i].load(std::memory_order_relaxed));
-      // create and store a reader
       this->readers_.emplace_back(
           std::make_shared<DemuxReader<M, N, B>>(ReaderId{i}, &buffer_, &writer_position_, &reader_positions_[i])
       );
-      // activate the reader by default
-      reader_active_flags_.at(i).store(true, std::memory_order_relaxed);
     }
+    assert(reader_num == this->readers_.size());
+    assert(reader_num == this->reader_positions_.size());
+    assert(reader_num == this->reader_active_flags_.size());
   }
 
   auto writer() -> DemuxWriter<M, N, B>* { return &writer_; }
 
   auto reader(const size_t index) -> DemuxReader<M, N, B>* { return readers_.at(index).get(); }
+
+  [[nodiscard]] auto is_active_reader(const size_t index) const -> bool {
+    return reader_active_flags_.at(index).load(std::memory_order_relaxed);
+  }
 
  private:
   template <class A>
@@ -54,6 +57,14 @@ class DemuxSetup {
     result.reserve(as->size());
     for (auto& a : *as) {
       result.push_back(&a);
+    }
+    return result;
+  }
+
+  static auto create_active_readers(const uint8_t reader_num) -> vector<atomic<bool>> {
+    vector<atomic<bool>> result(reader_num);
+    for (auto& x : result) {
+      x.store(true, std::memory_order_relaxed);
     }
     return result;
   }

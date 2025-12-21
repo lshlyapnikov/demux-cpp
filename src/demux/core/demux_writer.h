@@ -62,7 +62,7 @@ class DemuxWriter {
   vector<const atomic<size_t>*> heads_;
 
   /// @brief Reader active heads, indicates whether each reader is active. Const because Writer does not modify them.
-  vector<const atomic<bool>*> active_heads_;
+  vector<const atomic<bool>*> active_readers_;
 
   size_t next_tail_{UNSET_TAIL};
 
@@ -80,20 +80,20 @@ class DemuxWriter {
       array<M, N>* buffer,
       atomic<size_t>* tail,
       vector<const atomic<size_t>*> heads,
-      vector<const atomic<bool>*> active_heads
+      vector<const atomic<bool>*> active_readers_
   )
-      : buffer_(buffer), tail_(tail), heads_(std::move(heads)), active_heads_(std::move(active_heads)) {
+      : buffer_(buffer), tail_(tail), heads_(std::move(heads)), active_readers_(std::move(active_readers_)) {
+    if (this->heads_.size() == 0) {
+      throw std::invalid_argument("At least one reader required");
+    }
     if (this->heads_.size() > MAX_READERS) {
-      throw std::invalid_argument("Too many reader heads, maximum is " + std::to_string(MAX_READERS));
+      throw std::invalid_argument("Too many readers, maximum is " + std::to_string(MAX_READERS));
     }
-    if (this->heads_.size() != this->active_heads_.size()) {
-      throw std::invalid_argument("Heads and active heads size mismatch");
+    if (this->heads_.size() != this->active_readers_.size()) {
+      throw std::invalid_argument("Heads and active readers size mismatch");
     }
-    LOG_INFO << "[DemuxWriter::constructor] M: " << typeid(M).name() << ", N: " << N << ", B: " << B << " " << *this;
-    for (size_t i = 0; i < this->heads_.size(); ++i) {
-      LOG_INFO << "\t " << "Reader: " << i << ", head: " << this->heads_[i]->load(std::memory_order_relaxed)
-               << ", active: " << this->active_heads_[i]->load(std::memory_order_relaxed);
-    }
+    LOG_INFO << "[DemuxWriter::constructor] M: " << typeid(M).name() << ", N: " << N << ", B: " << B
+             << ", state: " << *this;
   }
 
   ~DemuxWriter() = default;
@@ -160,8 +160,8 @@ auto DemuxWriter<M, N, B>::next_() noexcept -> std::optional<M*> {
 
   // TODO(Leonid): find a way to avoid checking all readers every time, cache the slowest reader position?
   // Check every active reader's head
-  for (int i = 0; i < active_heads_.size(); ++i) {
-    if (active_heads_[i]->load(std::memory_order_relaxed)) {
+  for (int i = 0; i < active_readers_.size(); ++i) {
+    if (active_readers_[i]->load(std::memory_order_relaxed)) {
       // If the next tail catches up to ANY head, the buffer is full for that reader
       if (next_tail == heads_[i]->load(std::memory_order_acquire)) {
         return std::nullopt;
@@ -200,7 +200,7 @@ auto operator<<(std::ostream& os, const DemuxWriter<M, N, B>& writer) -> std::os
       os << ", ";
     }
     os << writer.heads_[i]->load(std::memory_order_relaxed)
-       << (writer.active_heads_[i]->load(std::memory_order_relaxed) ? ":A" : ":I");
+       << (writer.active_readers_[i]->load(std::memory_order_relaxed) ? ":Y" : ":N");
   }
   os << "]}";
   return os;
