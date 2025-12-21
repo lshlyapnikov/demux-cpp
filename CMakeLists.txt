@@ -107,6 +107,9 @@ target_compile_options(operators
 add_library(test_message
   OBJECT src/demux/test/test_message.cpp
 )
+target_link_libraries(test_message
+  PRIVATE rapidcheck::rapidcheck
+)
 target_compile_options(test_message
   PRIVATE ${MY_CXX_FLAGS}
 )

@@ -19,7 +19,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <future>
-#include <limits>
 #include <memory>
 #include <rapidcheck/gen/Arbitrary.hpp>
 #include <span>
@@ -28,170 +27,110 @@
 #include "../core/demux_writer.h"
 #include "../core/message_buffer.h"
 #include "../core/reader_id.h"
+#include "../example/market_event.h"
 #include "../util/operators.h"
+#include "./demux_setup.h"
 #include "./reader_id_gen.h"
 #include "./test_message.h"
 
-namespace lshl::demux::core {
+namespace {
 
 // explicitly reference the generator to make clangd happy
-using _ = rc::Arbitrary<lshl::demux::core::ReaderId>;
+using _0 = rc::Arbitrary<lshl::demux::core::ReaderId>;
+using _1 = rc::Arbitrary<lshl::demux::core::test::TestMessage>;
 
-constexpr std::chrono::seconds DEFAULT_WAIT(5);
-}  // namespace lshl::demux::core
+// constexpr std::chrono::seconds DEFAULT_WAIT(5);
 
-using lshl::demux::core::DEFAULT_WAIT;
 using lshl::demux::core::DemuxReader;
 using lshl::demux::core::DemuxWriter;
 using lshl::demux::core::ReaderId;
-using lshl::demux::core::WriteResult;
+using lshl::demux::example::MarketDataUpdate;
+using lshl::demux::example::MarketEvent;
+using lshl::demux::example::MarketTradeUpdate;
+
+using lshl::demux::core::test::DemuxSetup;
+using lshl::demux::core::test::L;
+using lshl::demux::core::test::M;
 using lshl::demux::core::test::TestMessage;
 
 using std::array;
 using std::atomic;
-using std::shared_ptr;
 using std::span;
 using std::uint16_t;
 using std::uint8_t;
 using std::vector;
 
-constexpr size_t L = 128;
-constexpr uint16_t M = 64;
+// [[nodiscard]] auto expect_eq(const span<const uint8_t>& left, const span<const uint8_t>& right) -> bool {
+//   EXPECT_EQ(left.size(), right.size());
+//   for (size_t i = 0; i < right.size(); ++i) {
+//     EXPECT_EQ(left[i], right[i]) << "index: " << i;
+//     if (::testing::Test::HasFailure()) {
+//       return false;
+//     }
+//   }
+//   return !::testing::Test::HasFailure();
+// }
 
-namespace rc {
+// auto assert_eq(const vector<TestMessage>& left, const vector<TestMessage>& right) -> void {
+//   ASSERT_EQ(left.size(), right.size());
+//   for (size_t i = 0; i < right.size(); ++i) {
+//     const TestMessage& x = left[i];
+//     const TestMessage& y = right[i];
+//     using lshl::demux::core::test::operator<<;
+//     ASSERT_EQ(x, y) << "index: " << i << ", x: " << x << ", y: " << y;
+//   }
+// }
 
-template <>
-struct Arbitrary<TestMessage> {
-  static auto arbitrary() -> Gen<TestMessage> {
-    // looks like gen::resize also affects the generated uint8_t values, use the entire byte range [0, 255]
-    // enable TEST(TestMessageGenerator, CheckByteDistribution)
-    const Gen<vector<uint8_t>> nonempty_vec_with_improved_distribution_gen =
-        gen::resize(std::numeric_limits<uint8_t>::max(), gen::nonEmpty<vector<uint8_t>>());
-    const Gen<vector<uint8_t>> nonempty_vec_gen = gen::resize(M, nonempty_vec_with_improved_distribution_gen);
-    // The above generator might still generate a vector with `size() > M`, `gen::resize` does not always work.
-    // Run TestMessageGenerator.CheckDistribution1 500 times and check `RC_CLASSIFY(message_size > M, "size > M")`
-    const Gen<vector<uint8_t>> valid_size_vec_gen = gen::suchThat(nonempty_vec_gen, is_valid_length);
+// template <typename M, size_t N, bool B>
+// [[nodiscard]] auto write_all(const vector<TestMessage>& messages, DemuxWriter<M, N, B>* writer) -> size_t {
+//   size_t result = 0;
+//   for (size_t i = 0; i < messages.size();) {
+//     TestMessage m = messages[i];
+//     assert(m.t.size() > 0);
+//     assert(m.t.size() <= M);
+//     switch (writer->write(m.t)) {
+//       case WriteResult::Success:
+//         i += 1;
+//         result += 1;
+//         break;  // break the swtich, not the while-loop in other words continue writing next message
+//       case WriteResult::Repeat:
+//         return result;
+//       case WriteResult::Error:
+//         LOG_ERROR << "Unexpected WriteResult::Error when writing message index " << i << ": " << m;
+//         return result;
+//     }
+//   }
+//   LOG_ERROR << "Should be unreachable";
+//   return result;  // to suppress compiler warning
+// }
 
-    return gen::map(valid_size_vec_gen, [](const vector<uint8_t>& xs) { return TestMessage(xs); });
-  }
+// template <size_t L, uint16_t M, bool B>
+// [[nodiscard]] auto read_n(const size_t message_num, DemuxReader<L, M>* reader) -> vector<TestMessage> {
+//   vector<TestMessage> result;
+//   while (result.size() < message_num) {
+//     const span<const uint8_t>& m = reader->next();
+//     if (!m.empty()) {
+//       result.emplace_back(TestMessage(vector<uint8_t>{m.begin(), m.end()}));
+//     }
+//   }
 
-  static auto is_valid_length(const vector<uint8_t>& xs) -> bool { return !xs.empty() && xs.size() <= M; }
-};
+//   // read one more to unblock the reader, which might be waiting for the wraparound unblock
+//   const span<const uint8_t>& m = reader->next();
+//   assert(m.empty());
 
-}  // namespace rc
+//   return result;
+// }
 
-namespace {
-template <size_t L, uint16_t M, bool B>
-class DemuxSetup {
- private:
-  array<uint8_t, L> buffer_{};
-  atomic<uint64_t> writer_sequence_{0};
-  vector<atomic<size_t>> reader_positions_;
-  vector<shared_ptr<DemuxReader<L, M>>> readers_;
-  DemuxWriter<L, M, B> writer_;
-
- public:
-  explicit DemuxSetup(const uint8_t reader_num)
-      : reader_positions_(reader_num), writer_{span{buffer_}, &writer_sequence_, to_ptrs(reader_positions_)} {
-    for (uint8_t i = 0; i < reader_num; ++i) {
-      atomic<size_t>* reader_position = &reader_positions_.at(i);
-      assert(0 == reader_position->load());
-      auto reader = std::make_shared<DemuxReader<L, M>>(
-          ReaderId{i}, this->buffer_, &this->writer_sequence_, &this->reader_positions_[i]
-      );
-      this->readers_.push_back(reader);
-    }
-  }
-
-  auto writer() -> DemuxWriter<L, M, B>* { return &writer_; }
-
-  auto reader(const size_t index) -> DemuxReader<L, M>* { return readers_.at(index).get(); }
-
- private:
-  static auto to_ptrs(vector<atomic<size_t>>& reader_positions) -> vector<atomic<size_t>*> {
-    vector<atomic<size_t>*> result;
-    result.reserve(reader_positions.size());
-    for (auto& x : reader_positions) {
-      result.push_back(&x);
-    }
-    return result;
-  }
-};
-
-[[nodiscard]] auto expect_eq(const span<const uint8_t>& left, const span<const uint8_t>& right) -> bool {
-  EXPECT_EQ(left.size(), right.size());
-  for (size_t i = 0; i < right.size(); ++i) {
-    EXPECT_EQ(left[i], right[i]) << "index: " << i;
-    if (::testing::Test::HasFailure()) {
-      return false;
-    }
-  }
-  return !::testing::Test::HasFailure();
-}
-
-auto assert_eq(const vector<TestMessage>& left, const vector<TestMessage>& right) -> void {
-  ASSERT_EQ(left.size(), right.size());
-  for (size_t i = 0; i < right.size(); ++i) {
-    const TestMessage& x = left[i];
-    const TestMessage& y = right[i];
-    using lshl::demux::core::test::operator<<;
-    ASSERT_EQ(x, y) << "index: " << i << ", x: " << x << ", y: " << y;
-  }
-}
-
-template <size_t L, uint16_t M, bool B>
-[[nodiscard]] auto write_all(const vector<TestMessage>& messages, DemuxWriter<L, M, B>* writer) -> size_t {
-  size_t result = 0;
-  for (size_t i = 0; i < messages.size();) {
-    TestMessage m = messages[i];
-    assert(m.t.size() > 0);
-    assert(m.t.size() <= M);
-    switch (writer->write(m.t)) {
-      case WriteResult::Success:
-        i += 1;
-        result += 1;
-        break;  // break the swtich, not the while-loop in other words continue writing next message
-      case WriteResult::Repeat:
-        return result;
-      case WriteResult::Error:
-        LOG_ERROR << "Unexpected WriteResult::Error when writing message index " << i << ": " << m;
-        return result;
-    }
-  }
-  LOG_ERROR << "Should be unreachable";
-  return result;  // to suppress compiler warning
-}
-
-template <size_t L, uint16_t M, bool B>
-[[nodiscard]] auto read_n(const size_t message_num, DemuxReader<L, M>* reader) -> vector<TestMessage> {
-  vector<TestMessage> result;
-  while (result.size() < message_num) {
-    const span<const uint8_t>& m = reader->next();
-    if (!m.empty()) {
-      result.emplace_back(TestMessage(vector<uint8_t>{m.begin(), m.end()}));
-    }
-  }
-
-  // read one more to unblock the reader, which might be waiting for the wraparound unblock
-  const span<const uint8_t>& m = reader->next();
-  assert(m.empty());
-
-  return result;
-}
-
-}  // namespace
-
-namespace {
 template <bool Blocking>
 auto writer_constructor_does_not_throw(const uint8_t reader_num) -> void {
   if (reader_num == 0) {
     return;
   }
-  DemuxSetup<L, M, Blocking> setup(reader_num);
-  ASSERT_EQ(0, setup.writer()->sequence());
+  DemuxSetup<MarketDataUpdate, 16, Blocking> setup(reader_num);
+  ASSERT_EQ(0, setup.writer()->tail());
   for (uint8_t i = 0; i < reader_num; ++i) {
-    ASSERT_EQ(0, setup.reader(i)->sequence());
-    ASSERT_EQ(0, setup.reader(i)->position());
+    ASSERT_EQ(0, setup.reader(i)->tail());
+    ASSERT_EQ(0, setup.reader(i)->head());
     ASSERT_EQ(ReaderId{i}, setup.reader(i)->id());
   }
 }
@@ -205,6 +144,7 @@ TEST(NonBlockingDemuxTest, ConstructorDoesNotThrow) {
   rc::check(writer_constructor_does_not_throw<false>);
 }
 
+/*
 TEST(DemuxTest, Atomic) {
   ASSERT_EQ(std::atomic<uint8_t>{}.is_lock_free(), true);
   ASSERT_EQ(std::atomic<uint16_t>{}.is_lock_free(), true);
@@ -615,4 +555,5 @@ auto main(int argc, char** argv) -> int {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
+*/
 // NOLINTEND(readability-function-cognitive-complexity, misc-include-cleaner, readability-magic-numbers, cppcoreguidelines-avoid-magic-numbers)

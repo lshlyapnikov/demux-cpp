@@ -25,16 +25,16 @@ auto operator<<(std::ostream& os, const Side& side) -> std::ostream& {
 }
 
 auto operator<<(std::ostream& os, const MarketDataUpdate& md) -> std::ostream& {
-  os << "MarketDataUpdate{instrument_id: " << md.instrument_id() << ", side: " << md.side() << ", price: " << md.price()
-     << ", size: " << md.size() << ", level: " << static_cast<uint32_t>(md.level())
-     << ", exchange_timestamp: " << md.exchange_timestamp() << "}";
+  os << "MarketDataUpdate{instrument_id: " << md.instrument_id << ", side: " << md.side << ", price: " << md.price
+     << ", size: " << md.size << ", level: " << static_cast<uint32_t>(md.level)
+     << ", exchange_timestamp: " << md.exchange_timestamp << "}";
   return os;
 }
 
 auto operator<<(std::ostream& os, const MarketTradeUpdate& md) -> std::ostream& {
-  os << "MarketTradeUpdate{instrument_id: " << md.instrument_id() << ", side: " << md.side()
-     << ", price: " << md.price() << ", size: " << md.size() << ", trade_id: " << md.trade_id()
-     << ", exchange_timestamp: " << md.exchange_timestamp() << "}";
+  os << "MarketTradeUpdate{instrument_id: " << md.instrument_id << ", side: " << md.side << ", price: " << md.price
+     << ", size: " << md.size << ", trade_id: " << md.trade_id << ", exchange_timestamp: " << md.exchange_timestamp
+     << "}";
   return os;
 }
 

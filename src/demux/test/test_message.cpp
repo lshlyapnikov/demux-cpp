@@ -1,4 +1,5 @@
 #include "./test_message.h"
+#include <iostream>
 #include "../util/operators.h"
 
 namespace lshl::demux::core::test {

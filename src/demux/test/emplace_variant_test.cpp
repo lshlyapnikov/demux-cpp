@@ -29,8 +29,32 @@ TEST(EmplaceVariantTest, MarketEvent) {
   namespace example = lshl::demux::example;
 
   std::vector<example::MarketEvent> events;
-  events.emplace_back(example::MarketDataUpdate{1L, example::Side::Bid, 1000, 10, 1, 123456789});
-  events.emplace_back(example::MarketTradeUpdate{2L, example::Side::Ask, 1010, 5, 11223344, 987654321});
+
+  events.emplace_back(example::MarketDataUpdate{});
+
+  events.emplace_back(
+      example::MarketDataUpdate{
+          .instrument_id = 1L,
+          .side = example::Side::Bid,
+          .price = 1000,
+          .size = 10,
+          .level = 1,
+          .exchange_timestamp = 123456789
+      }
+  );
+
+  events.emplace_back(example::MarketTradeUpdate{});
+
+  events.emplace_back(
+      example::MarketTradeUpdate{
+          .instrument_id = 2L,
+          .side = example::Side::Ask,
+          .price = 1010,
+          .size = 5,
+          .trade_id = 11223344,
+          .exchange_timestamp = 987654321
+      }
+  );
 
   for (const auto& event : events) {
     std::cout << event << "\n";
