@@ -160,6 +160,37 @@ TEST(DemuxTest, Atomic) {
 }
 
 namespace {
+template <bool Blocking>
+auto write_and_read_1(MarketEvent message) {
+  DemuxSetup<MarketEvent, 2, Blocking> setup(1);
+  auto* writer = setup.writer();
+  auto* reader = setup.reader(0);
+
+  ASSERT_TRUE(writer->emplace(message)) << "writer: " << *writer;
+  ASSERT_EQ(0, writer->tail()) << "writer: " << *writer;
+  ASSERT_TRUE(writer->commit()) << "writer: " << *writer;
+
+  ASSERT_EQ(1, writer->tail()) << "writer: " << *writer;
+  ASSERT_EQ(0, reader->head()) << "reader: " << *reader;
+
+  const std::optional<const MarketEvent*> read = reader->next();
+  ASSERT_TRUE(read.has_value()) << "reader: " << *reader;
+  ASSERT_EQ(message, *(read.value())) << "reader: " << *reader;
+
+  ASSERT_EQ(1, writer->tail()) << "writer: " << *writer;
+  ASSERT_EQ(1, reader->head()) << "reader: " << *reader;
+}
+}  // namespace
+
+TEST(BlockingDemuxTest, WriteRead1) {
+  rc::check(write_and_read_1<true>);
+}
+
+TEST(NonBlockingDemuxTest, WriteRead1) {
+  rc::check(write_and_read_1<false>);
+}
+
+namespace {
 template <size_t N>
 auto nonBlockingWriteWhenBufferIsFull(array<MarketEvent, N> events) -> void {
   ASSERT_EQ(N, events.size());
@@ -285,36 +316,6 @@ TEST(NonBlockingDemuxTest, WriteWhenBufferIsFull16) {
 }
 
 /*
-namespace {
-template <bool Blocking>
-auto write_and_read_1(TestMessage message) {
-  if (message.t.size() > M) {
-    return;
-  }
-  DemuxSetup<L, M, false> setup(1);
-  auto* writer = setup.writer();
-  auto* reader = setup.reader(0);
-
-  const WriteResult result = writer->write(message.t);
-
-  ASSERT_EQ(WriteResult::Success, result);
-  ASSERT_EQ(1, writer->sequence());
-
-  const span<const uint8_t> read = reader->next();
-
-  ASSERT_EQ(1, reader->sequence());
-  ASSERT_TRUE(expect_eq(read, message.t));
-}
-}  // namespace
-
-TEST(BlockingDemuxTest, WriteRead1) {
-  rc::check(write_and_read_1<true>);
-}
-
-TEST(NonBlockingDemuxTest, WriteRead1) {
-  rc::check(write_and_read_1<false>);
-}
-
 namespace {
 template <bool Blocking>
 auto one_reader_read_x(const vector<TestMessage>& messages) {

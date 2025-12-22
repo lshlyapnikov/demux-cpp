@@ -8,6 +8,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <optional>
 #include <ostream>
 #include <span>
@@ -109,7 +110,7 @@ class DemuxWriter {
   [[nodiscard]] auto next() noexcept -> std::optional<M*>;
 
   template <class... Args>
-  [[nodiscard]] auto emplace_next(Args&&... args) noexcept -> std::optional<M*>;
+  [[nodiscard]] auto emplace(Args&&... args) noexcept -> bool;
 
   [[nodiscard]] auto commit() noexcept -> bool;
 
@@ -136,14 +137,15 @@ auto DemuxWriter<M, N, B>::next() noexcept -> std::optional<M*> {
 
 template <typename M, size_t N, bool B>
 template <class... Args>
-auto DemuxWriter<M, N, B>::emplace_next(Args&&... args) noexcept -> std::optional<M*> {
+auto DemuxWriter<M, N, B>::emplace(Args&&... args) noexcept -> bool {
   std::optional<M*> ptr = this->next();
-
   if (ptr) {
+    std::destroy_at(*ptr);
     std::construct_at(*ptr, std::forward<Args>(args)...);
+    return true;
+  } else {
+    return false;
   }
-
-  return ptr;
 }
 
 template <typename M, size_t N, bool B>
