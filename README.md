@@ -221,7 +221,17 @@ $ conan create . -s build_type=Debug
 conan remove --confirm demux-cpp/*
 ```
 
-## 13. Links
+## 13. Generate coredump file in the current directory
+
+```
+$ cat /proc/sys/kernel/core_pattern
+
+$ sudo sysctl -w kernel.core_pattern="core.%e.%p"
+
+$ ulimit -c unlimited
+```
+
+## 14. Links
 
 - [LLVM Debian/Ubuntu nightly packages](https://apt.llvm.org/)
 - Conan C/C++ Package Manager

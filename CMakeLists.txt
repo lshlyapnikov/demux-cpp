@@ -150,11 +150,12 @@ target_compile_options(message_buffer_test
 )
 gtest_discover_tests(message_buffer_test)
 
-add_executable(demultiplexer_test
-  src/demux/test/demultiplexer_test.cpp
+add_executable(demux_test
+  src/demux/test/demux_test.cpp
 )
-target_link_libraries(demultiplexer_test
+target_link_libraries(demux_test
   PRIVATE operators
+  PRIVATE market_event
   PRIVATE test_message
   PRIVATE reader_id
   PRIVATE gtest::gtest
@@ -162,10 +163,10 @@ target_link_libraries(demultiplexer_test
   PRIVATE Boost::log
   PRIVATE atomic
 )
-target_compile_options(demultiplexer_test
+target_compile_options(demux_test
   PRIVATE ${MY_CXX_FLAGS}
 )
-gtest_discover_tests(demultiplexer_test)
+gtest_discover_tests(demux_test)
 
 add_executable(shm_manager_test
   src/demux/test/shm_manager_test.cpp

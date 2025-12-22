@@ -32,6 +32,8 @@ struct MarketDataUpdate {
   uint32_t size;
   uint8_t level;
   uint64_t exchange_timestamp;
+
+  auto operator<=>(const MarketDataUpdate&) const = default;
 };
 // NOLINTEND(misc-non-private-member-variables-in-classes)
 
@@ -45,6 +47,8 @@ struct MarketTradeUpdate {
   uint32_t size;
   uint64_t trade_id;
   uint64_t exchange_timestamp;
+
+  auto operator<=>(const MarketTradeUpdate&) const = default;
 };
 // NOLINTEND(misc-non-private-member-variables-in-classes)
 

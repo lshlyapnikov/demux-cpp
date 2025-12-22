@@ -30,16 +30,18 @@
 #include "../example/market_event.h"
 #include "../util/operators.h"
 #include "./demux_setup.h"
+#include "./market_event_gen.h"
 #include "./reader_id_gen.h"
 #include "./test_message.h"
-
 namespace {
 
 // explicitly reference the generator to make clangd happy
 using _0 = rc::Arbitrary<lshl::demux::core::ReaderId>;
 using _1 = rc::Arbitrary<lshl::demux::core::test::TestMessage>;
+using _2 = rc::Arbitrary<lshl::demux::example::MarketEvent>;
 
 // constexpr std::chrono::seconds DEFAULT_WAIT(5);
+// constexpr size_t N = 16;  // buffer size
 
 using lshl::demux::core::DemuxReader;
 using lshl::demux::core::DemuxWriter;
@@ -148,7 +150,6 @@ TEST(NonBlockingDemuxTest, ConstructorDoesNotThrow) {
   rc::check(writer_constructor_does_not_throw<false>);
 }
 
-/*
 TEST(DemuxTest, Atomic) {
   ASSERT_EQ(std::atomic<uint8_t>{}.is_lock_free(), true);
   ASSERT_EQ(std::atomic<uint16_t>{}.is_lock_free(), true);
@@ -159,116 +160,131 @@ TEST(DemuxTest, Atomic) {
 }
 
 namespace {
-template <bool Blocking>
-auto write_empty_message() {
-  DemuxSetup<L, M, Blocking> setup(2);
-  auto& writer = *(setup.writer());
-  auto& reader0 = *(setup.reader(0));
-  auto& reader1 = *(setup.reader(1));
+template <size_t N>
+auto nonBlockingWriteWhenBufferIsFull(array<MarketEvent, N> events) -> void {
+  ASSERT_EQ(N, events.size());
 
-  // write an empty message
-  const WriteResult result = writer.write({});
-
-  ASSERT_EQ(WriteResult::Error, result);
-  ASSERT_EQ(0, writer.sequence());
-
-  const span<const uint8_t> msg0 = reader0.next();
-  ASSERT_EQ(0, msg0.size());
-  ASSERT_EQ(0, reader0.sequence());
-
-  const span<const uint8_t> msg1 = reader1.next();
-  ASSERT_EQ(0, msg1.size());
-  ASSERT_EQ(0, reader1.sequence());
-}
-}  // namespace
-
-TEST(BlockingDemuxTest, WriteEmptyMessage) {
-  write_empty_message<true>();
-}
-
-TEST(NonBlockingDemuxTest, WriteEmptyMessage) {
-  write_empty_message<false>();
-}
-
-namespace {
-template <bool Blocking>
-auto write_invalid_large_message() -> void {
-  DemuxSetup<L, M, Blocking> setup(1);
-  auto& writer = *(setup.writer());
-  auto& reader = *(setup.reader(0));
-
-  array<uint8_t, L> m{1};  // this should not fit into the buffer given M + 2 requirement
-  const WriteResult result = writer.write(m);
-  ASSERT_EQ(WriteResult::Error, result);
-  ASSERT_EQ(0, writer.sequence());
-
-  const span<const uint8_t> read = reader.next();
-  ASSERT_EQ(0, read.size());
-  ASSERT_EQ(0, reader.sequence());
-}
-}  // namespace
-
-TEST(BlockingDemuxTest, WriteInvalidLargeMessage) {
-  write_invalid_large_message<true>();
-}
-
-TEST(NonBlockingDemuxTest, WriteInvalidLargeMessage) {
-  write_invalid_large_message<false>();
-}
-
-TEST(NonBlockingDemuxTest, WriteWhenBufferIfFullAndGetWriteRepeatResult) {
-  DemuxSetup<L, M, false> setup(1);
+  DemuxSetup<MarketEvent, N, false> setup(2);
   auto* writer = setup.writer();
-  auto* reader = setup.reader(0);
+  auto* reader0 = setup.reader(0);
+  auto* reader1 = setup.reader(1);
 
-  ASSERT_EQ(L, 2 * M);
+  ASSERT_EQ(0, writer->tail());
+  ASSERT_EQ(0, reader0->tail());
+  ASSERT_EQ(0, reader1->tail());
+  ASSERT_EQ(0, reader0->head());
+  ASSERT_EQ(0, reader1->head());
 
-  array<uint8_t, M> m1{1};
-  ASSERT_EQ(WriteResult::Success, writer->write(m1));
-  ASSERT_EQ(1, writer->sequence());
+  // write N - 1 messages;
+  // you can't write the last element and wrap around if at least one reader is at position 0.
+  for (size_t i = 0; i < N - 1; ++i) {
+    std::optional<MarketEvent*> ptr = writer->next();
+    ASSERT_TRUE(ptr.has_value()) << "i: " << i << ", writer: " << *writer;
+    *(ptr.value()) = events.at(i);
 
-  array<uint8_t, M> m2{2};
-  ASSERT_EQ(WriteResult::Repeat, writer->write(m2));
-  ASSERT_EQ(1, writer->sequence());  // empty message isn't written yet
+    ASSERT_EQ(i, writer->tail());
+    ASSERT_TRUE(writer->commit());
+    ASSERT_EQ(i + 1, writer->tail());
+  }
 
-  ASSERT_TRUE(expect_eq(m1, reader->next()));
-  ASSERT_EQ(1, reader->sequence());
+  ASSERT_EQ(N - 1, writer->tail());
+  ASSERT_EQ(N - 1, reader0->tail());
+  ASSERT_EQ(N - 1, reader1->tail());
+  ASSERT_EQ(0, reader0->head());
+  ASSERT_EQ(0, reader1->head());
 
-  ASSERT_TRUE(reader->next().empty());
-  ASSERT_EQ(1, reader->sequence());
+  // readers read the first message at position 0.
+  for (size_t r = 0; r < 2; ++r) {
+    DemuxReader<MarketEvent, N, false>* reader = setup.reader(r);
+    const std::optional<const MarketEvent*> read = reader->next();
+    ASSERT_TRUE(read.has_value());
+    const MarketEvent& expected = events.at(0);
+    const MarketEvent& actual = *(read.value());
+    ASSERT_EQ(expected, actual) << "r: " << r << ", reader: " << reader;
+  }
 
-  ASSERT_EQ(WriteResult::Repeat, writer->write(m2));
-  ASSERT_EQ(2, writer->sequence());  // empty message is written
+  ASSERT_EQ(N - 1, writer->tail());
+  ASSERT_EQ(N - 1, reader0->tail());
+  ASSERT_EQ(N - 1, reader1->tail());
+  ASSERT_EQ(1, reader0->head());
+  ASSERT_EQ(1, reader1->head());
 
-  ASSERT_EQ(WriteResult::Repeat, writer->write(m2));
-  ASSERT_EQ(2, writer->sequence());  // reader hasn't moved yet
+  // now writer can write the last message and wrap around.
+  {
+    std::optional<MarketEvent*> ptr = writer->next();
+    ASSERT_TRUE(ptr.has_value()) << "writer: " << *writer;
+    *(ptr.value()) = events.at(N - 1);
+    ASSERT_TRUE(writer->commit());
+  }
 
-  ASSERT_TRUE(reader->next().empty());
-  ASSERT_EQ(2, reader->sequence());  // empty message is read
+  ASSERT_EQ(0, writer->tail());
+  ASSERT_EQ(0, reader0->tail());
+  ASSERT_EQ(0, reader1->tail());
+  ASSERT_EQ(1, reader0->head());
+  ASSERT_EQ(1, reader1->head());
 
-  ASSERT_EQ(WriteResult::Success, writer->write(m2));
-  ASSERT_EQ(3, writer->sequence());
+  // buffer is full, can't write any more.
+  ASSERT_FALSE(writer->next().has_value());
 
-  ASSERT_TRUE(expect_eq(m2, reader->next()));
-  ASSERT_EQ(3, reader->sequence());
+  ASSERT_EQ(0, writer->tail());
+  ASSERT_EQ(0, reader0->tail());
+  ASSERT_EQ(0, reader1->tail());
+  ASSERT_EQ(1, reader0->head());
+  ASSERT_EQ(1, reader1->head());
 
-  array<uint8_t, M> m3{3};
-  ASSERT_EQ(WriteResult::Repeat, writer->write(m3));
-  ASSERT_EQ(4, writer->sequence());  // empty message written
+  // readers read remaining messages, starting from index 1; the first message at position 0, has already been read.
+  for (size_t i = 1; i < N; ++i) {
+    for (size_t r = 0; r < 2; ++r) {
+      DemuxReader<MarketEvent, N, false>* reader = setup.reader(r);
+      const std::optional<const MarketEvent*> read = reader->next();
+      ASSERT_TRUE(read.has_value());
+      const MarketEvent& expected = events.at(i);
+      const MarketEvent& actual = *(read.value());
+      ASSERT_EQ(expected, actual) << "i: " << i << ", r: " << r << ", reader: " << reader;
+      ASSERT_EQ(0, reader->tail());
+      ASSERT_EQ((i + 1) % N, reader->head());
+    }
+  }
 
-  ASSERT_TRUE(reader->next().empty());
-  ASSERT_EQ(4, reader->sequence());
+  ASSERT_EQ(0, writer->tail());
+  ASSERT_EQ(0, reader0->tail());
+  ASSERT_EQ(0, reader1->tail());
+  ASSERT_EQ(0, reader0->head());
+  ASSERT_EQ(0, reader1->head());
 
-  ASSERT_EQ(WriteResult::Success, writer->write(m3));
-  ASSERT_EQ(5, writer->sequence());
+  // can write again after readers have read all messages
+  {
+    std::optional<MarketEvent*> ptr = writer->next();
+    ASSERT_TRUE(ptr.has_value());
+    *(ptr.value()) = events.at(0);
+    ASSERT_TRUE(writer->commit());
+  }
 
-  ASSERT_TRUE(expect_eq(m3, reader->next()));
-  ASSERT_EQ(5, reader->sequence());
+  ASSERT_EQ(1, writer->tail());
+  ASSERT_EQ(1, reader0->tail());
+  ASSERT_EQ(1, reader1->tail());
+  ASSERT_EQ(0, reader0->head());
+  ASSERT_EQ(0, reader1->head());
+}
+}  // namespace
 
-  ASSERT_TRUE(reader->next().empty());
-  ASSERT_EQ(5, reader->sequence());
+TEST(NonBlockingDemuxTest, WriteWhenBufferIsFull2) {
+  rc::check(nonBlockingWriteWhenBufferIsFull<2>);
 }
 
+TEST(NonBlockingDemuxTest, WriteWhenBufferIsFull4) {
+  rc::check(nonBlockingWriteWhenBufferIsFull<4>);
+}
+
+TEST(NonBlockingDemuxTest, WriteWhenBufferIsFull8) {
+  rc::check(nonBlockingWriteWhenBufferIsFull<8>);
+}
+
+TEST(NonBlockingDemuxTest, WriteWhenBufferIsFull16) {
+  rc::check(nonBlockingWriteWhenBufferIsFull<16>);
+}
+
+/*
 namespace {
 template <bool Blocking>
 auto write_and_read_1(TestMessage message) {
@@ -552,12 +568,13 @@ TEST(NonBlockingDemuxTest, SlowReader2) {
   ASSERT_EQ(m.size(), 56);
   slow_reader(TestMessage(m));
 }
+*/
 
 auto main(int argc, char** argv) -> int {
   namespace logging = boost::log;
-  logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::debug);
+  logging::core::get()->set_filter(logging::trivial::severity >= logging::trivial::warning);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
-*/
+
 // NOLINTEND(readability-function-cognitive-complexity, misc-include-cleaner, readability-magic-numbers, cppcoreguidelines-avoid-magic-numbers)

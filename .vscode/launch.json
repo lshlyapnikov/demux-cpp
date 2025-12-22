@@ -5,14 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(gdb) demultiplexer_test",
+            "name": "(gdb) demux_test",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/demultiplexer_test",
+            "program": "${workspaceFolder}/build/demux_test",
             //"coreDumpPath": "${workspaceFolder}/core.latest",
             "args": [
                 "--gtest_break_on_failure",
-                "--gtest_filter=NonBlockingDemuxTest.SlowReader2"
+                "--gtest_filter=NonBlockingDemuxTest.WriteWhenBufferIfFullAndReadersAreLagging"
             ],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",

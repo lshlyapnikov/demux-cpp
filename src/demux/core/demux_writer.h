@@ -160,7 +160,7 @@ auto DemuxWriter<M, N, B>::next_() noexcept -> std::optional<M*> {
 
   // TODO(Leonid): find a way to avoid checking all readers every time, cache the slowest reader position?
   // Check every active reader's head
-  for (int i = 0; i < active_readers_.size(); ++i) {
+  for (size_t i = 0; i < active_readers_.size(); ++i) {
     if (active_readers_[i]->load(std::memory_order_relaxed)) {
       // If the next tail catches up to ANY head, the buffer is full for that reader
       if (next_tail == heads_[i]->load(std::memory_order_acquire)) {
@@ -177,7 +177,7 @@ auto DemuxWriter<M, N, B>::next_() noexcept -> std::optional<M*> {
 template <typename M, size_t N, bool B>
 auto DemuxWriter<M, N, B>::commit() noexcept -> bool {
   if (this->next_tail_ == UNSET_TAIL) {
-    LOG_WARNING << "[DemuxWriter::commit] no uncommited write to commit";
+    LOG_WARNING << "[DemuxWriter::commit] there is nothing to commit";
     return false;
   } else {
     this->tail_->store(this->next_tail_, std::memory_order_release);
@@ -188,7 +188,7 @@ auto DemuxWriter<M, N, B>::commit() noexcept -> bool {
 
 template <typename M, size_t N, bool B>
 auto operator<<(std::ostream& os, const DemuxWriter<M, N, B>& writer) -> std::ostream& {
-  os << "DemuxWriter{tail:" << writer.tail_->load(std::memory_order_relaxed) << ", next_tail:";
+  os << "DemuxWriter{N: " << N << ", tail:" << writer.tail_->load(std::memory_order_relaxed) << ", next_tail:";
   if (writer.next_tail_ == DemuxWriter<M, N, B>::UNSET_TAIL) {
     os << "UNSET";
   } else {
