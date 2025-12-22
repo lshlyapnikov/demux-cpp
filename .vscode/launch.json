@@ -12,7 +12,7 @@
             //"coreDumpPath": "${workspaceFolder}/core.latest",
             "args": [
                 "--gtest_break_on_failure",
-                "--gtest_filter=NonBlockingDemuxTest.WriteWhenBufferIfFullAndReadersAreLagging"
+                "--gtest_filter=BlockingDemuxTest.MultipleReaders1"
             ],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",

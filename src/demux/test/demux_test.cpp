@@ -40,8 +40,7 @@ using _0 = rc::Arbitrary<lshl::demux::core::ReaderId>;
 using _1 = rc::Arbitrary<lshl::demux::core::test::TestMessage>;
 using _2 = rc::Arbitrary<lshl::demux::example::MarketEvent>;
 
-// constexpr std::chrono::seconds DEFAULT_WAIT(5);
-// constexpr size_t N = 16;  // buffer size
+constexpr std::chrono::seconds DEFAULT_WAIT(5);
 
 using lshl::demux::core::DemuxReader;
 using lshl::demux::core::DemuxWriter;
@@ -83,45 +82,54 @@ using std::vector;
 //   }
 // }
 
-// template <typename M, size_t N, bool B>
-// [[nodiscard]] auto write_all(const vector<TestMessage>& messages, DemuxWriter<M, N, B>* writer) -> size_t {
-//   size_t result = 0;
-//   for (size_t i = 0; i < messages.size();) {
-//     TestMessage m = messages[i];
-//     assert(m.t.size() > 0);
-//     assert(m.t.size() <= M);
-//     switch (writer->write(m.t)) {
-//       case WriteResult::Success:
-//         i += 1;
-//         result += 1;
-//         break;  // break the swtich, not the while-loop in other words continue writing next message
-//       case WriteResult::Repeat:
-//         return result;
-//       case WriteResult::Error:
-//         LOG_ERROR << "Unexpected WriteResult::Error when writing message index " << i << ": " << m;
-//         return result;
-//     }
-//   }
-//   LOG_ERROR << "Should be unreachable";
-//   return result;  // to suppress compiler warning
-// }
+template <typename M, size_t N, bool B>
+[[nodiscard]] auto write_all(const vector<M>& messages, DemuxWriter<M, N, B>* writer) -> size_t {
+  size_t result = 0;
 
-// template <size_t L, uint16_t M, bool B>
-// [[nodiscard]] auto read_n(const size_t message_num, DemuxReader<L, M>* reader) -> vector<TestMessage> {
-//   vector<TestMessage> result;
-//   while (result.size() < message_num) {
-//     const span<const uint8_t>& m = reader->next();
-//     if (!m.empty()) {
-//       result.emplace_back(TestMessage(vector<uint8_t>{m.begin(), m.end()}));
-//     }
-//   }
+  for (size_t i = 0; i < messages.size(); i++) {
+    const M& m = messages[i];
+    while (!writer->emplace(m)) {
+      // busy-wait
+    }
+    EXPECT_TRUE(writer->commit());
+    if (::testing::Test::HasFailure()) {
+      return result;
+    }
+    result += 1;
+  }
 
-//   // read one more to unblock the reader, which might be waiting for the wraparound unblock
-//   const span<const uint8_t>& m = reader->next();
-//   assert(m.empty());
+  EXPECT_EQ(messages.size(), result) << "writer: " << *writer;
+  EXPECT_EQ(messages.size() % N, writer->tail()) << "writer: " << *writer;
+  if (::testing::Test::HasFailure()) {
+    return 0;
+  }
 
-//   return result;
-// }
+  return result;
+}
+
+template <typename M, size_t N, bool B>
+[[nodiscard]] auto read_n(const size_t message_num, DemuxReader<M, N, B>* reader) -> vector<M> {
+  vector<M> result;
+  result.reserve(message_num);
+  while (result.size() < message_num) {
+    const std::optional<const M*> ptr = reader->next();
+    if (ptr.has_value()) {
+      const M* m = ptr.value();
+      result.emplace_back(*m);
+    }
+  }
+
+  // assert no more messages are available if non-blocking reader, else it will block
+  if constexpr (!B) {
+    EXPECT_FALSE(reader->next().has_value()) << "reader: " << *reader;
+  }
+
+  if (::testing::Test::HasFailure()) {
+    return vector<M>{};
+  }
+
+  return result;
+}
 
 template <bool Blocking>
 auto writer_constructor_does_not_throw(const uint8_t reader_num) -> void {
@@ -139,6 +147,8 @@ auto writer_constructor_does_not_throw(const uint8_t reader_num) -> void {
       ASSERT_EQ(ReaderId{i}, setup.reader(i)->id());
     }
   }
+
+  ASSERT_FALSE(::testing::Test::HasFailure());
 }
 }  // namespace
 
@@ -179,6 +189,8 @@ auto write_and_read_1(MarketEvent message) {
 
   ASSERT_EQ(1, writer->tail()) << "writer: " << *writer;
   ASSERT_EQ(1, reader->head()) << "reader: " << *reader;
+
+  ASSERT_FALSE(::testing::Test::HasFailure());
 }
 }  // namespace
 
@@ -296,6 +308,8 @@ auto nonBlockingWriteWhenBufferIsFull(array<MarketEvent, N> events) -> void {
   ASSERT_EQ(1, reader1->tail());
   ASSERT_EQ(0, reader0->head());
   ASSERT_EQ(0, reader1->head());
+
+  ASSERT_FALSE(::testing::Test::HasFailure());
 }
 }  // namespace
 
@@ -315,105 +329,69 @@ TEST(NonBlockingDemuxTest, WriteWhenBufferIsFull16) {
   rc::check(nonBlockingWriteWhenBufferIsFull<16>);
 }
 
-/*
 namespace {
-template <bool Blocking>
-auto one_reader_read_x(const vector<TestMessage>& messages) {
+template <typename M, size_t N, bool B, size_t ReaderNum>
+auto multiple_readers(const vector<M>& messages) -> void {
   if (messages.empty()) {
     return;
   }
 
-  using lshl::demux::util::operator<<;
-
-  std::string str;
-  for (const auto& msg : messages) {
-    str += std::to_string(msg.t.size()) + ", ";
-  }
-
-  LOG_DEBUG << "message number: " << messages.size();
-  LOG_DEBUG << "message lengths: " << str;
-  LOG_DEBUG << "messages: " << messages;
-
   const size_t message_num = messages.size();
 
-  DemuxSetup<L, M, Blocking> setup(1);
-  auto* writer = setup.writer();
-  auto* reader = setup.reader(0);
+  DemuxSetup<M, N, B> setup(ReaderNum);
+  DemuxWriter<M, N, B>* writer = setup.writer();
 
-  std::future<size_t> sent_count_future =
+  std::future<size_t> future_writer_result =
       std::async(std::launch::async, [&messages, &writer] { return write_all(messages, writer); });
 
-  std::future<vector<TestMessage>> received_messages_future =
-      std::async(std::launch::async, [message_num, &reader] { return read_n<L, M, Blocking>(message_num, reader); });
-
-  sent_count_future.wait_for(DEFAULT_WAIT);
-  ASSERT_TRUE(sent_count_future.valid());
-
-  const size_t sent_count = sent_count_future.get();
-  ASSERT_EQ(message_num, sent_count);
-
-  received_messages_future.wait_for(DEFAULT_WAIT);
-  ASSERT_TRUE(received_messages_future.valid());
-
-  const auto received_messages = received_messages_future.get();
-  assert_eq(messages, received_messages);
-}
-}  // namespace
-
-TEST(BlockingDemuxTest, OneReaderReadX) {
-  rc::check(one_reader_read_x<true>);
-}
-
-TEST(NonBlockingDemuxTest, OneReaderReadX) {
-  rc::check(one_reader_read_x<false>);
-}
-
-namespace {
-template <bool Blocking>
-auto multiple_readers_read_x(const vector<TestMessage>& valid_messages) -> void {
-  if (valid_messages.empty()) {
-    return;
-  }
-
-  constexpr uint8_t READER_NUM = 7;
-
-  const size_t message_num = valid_messages.size();
-
-  DemuxSetup<L, M, false> setup(READER_NUM);
-  DemuxWriter<L, M, false>* writer = setup.writer();
-
-  std::future<size_t> future_pub_result =
-      std::async(std::launch::async, [&valid_messages, &writer] { return write_all(valid_messages, writer); });
-
-  vector<std::future<vector<TestMessage>>> future_sub_results{};
-  future_sub_results.reserve(READER_NUM);
-  for (uint8_t i = 0; i < READER_NUM; ++i) {
-    DemuxReader<L, M>* reader = setup.reader(i);
-    future_sub_results.emplace_back(std::async(std::launch::async, [message_num, reader] {
-      return read_n<L, M, Blocking>(message_num, reader);
+  vector<std::future<vector<M>>> future_reader_results{};
+  future_reader_results.reserve(ReaderNum);
+  for (size_t i = 0; i < ReaderNum; ++i) {
+    auto* reader = setup.reader(i);
+    future_reader_results.emplace_back(std::async(std::launch::async, [message_num, reader] {
+      return read_n(message_num, reader);
     }));
   }
 
-  future_pub_result.wait_for(DEFAULT_WAIT);
-  ASSERT_TRUE(future_pub_result.valid());
-  ASSERT_EQ(message_num, future_pub_result.get());
+  future_writer_result.wait_for(DEFAULT_WAIT);
+  ASSERT_TRUE(future_writer_result.valid());
+  ASSERT_EQ(message_num, future_writer_result.get());
 
-  for (auto& future_sub_result : future_sub_results) {
-    future_sub_result.wait_for(DEFAULT_WAIT);
-    ASSERT_TRUE(future_sub_result.valid());
-    assert_eq(valid_messages, future_sub_result.get());
+  for (auto& x : future_reader_results) {
+    x.wait_for(DEFAULT_WAIT);
+    ASSERT_TRUE(x.valid());
+    ASSERT_EQ(messages, x.get());
   }
+
+  ASSERT_FALSE(::testing::Test::HasFailure());
 }
 }  // namespace
 
-TEST(BlockingDemuxTest, MultipleReadersReadX) {
-  rc::check(multiple_readers_read_x<true>);
+TEST(NonBlockingDemuxTest, MultipleReaders1) {
+  rc::check(multiple_readers<MarketEvent, 16, false, 1>);
 }
 
-TEST(NonBlockingDemuxTest, MultipleReadersReadX) {
-  rc::check(multiple_readers_read_x<false>);
+TEST(NonBlockingDemuxTest, MultipleReaders2) {
+  rc::check(multiple_readers<MarketEvent, 16, false, 2>);
 }
 
+TEST(NonBlockingDemuxTest, MultipleReaders7) {
+  rc::check(multiple_readers<MarketEvent, 16, false, 7>);
+}
+
+TEST(BlockingDemuxTest, MultipleReaders1) {
+  rc::check(multiple_readers<MarketEvent, 16, true, 1>);
+}
+
+TEST(BlockingDemuxTest, MultipleReaders2) {
+  rc::check(multiple_readers<MarketEvent, 16, true, 2>);
+}
+
+TEST(BlockingDemuxTest, MultipleReaders7) {
+  rc::check(multiple_readers<MarketEvent, 16, true, 7>);
+}
+
+/*
 TEST(TestMessageGenerator, CheckLengthDistribution) {
   GTEST_SKIP();
   rc::check([](const TestMessage& message) {
