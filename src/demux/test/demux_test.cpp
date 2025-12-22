@@ -7,80 +7,45 @@
 #undef NDEBUG  // for assert to work in release build
 
 #include <gtest/gtest.h>
-#include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
+#include <rapidcheck.h>
 #include <rapidcheck/Check.h>
 #include <array>
 #include <atomic>
-#include <boost/log/core.hpp>         // NOLINT(misc-include-cleaner)
-#include <boost/log/expressions.hpp>  // NOLINT(misc-include-cleaner)
+#include <boost/log/core.hpp>
+#include <boost/log/expressions.hpp>
 #include <boost/log/trivial.hpp>
 #include <cassert>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <future>
-#include <memory>
 #include <rapidcheck/gen/Arbitrary.hpp>
-#include <span>
 #include <vector>
 #include "../core/demux_reader.h"
 #include "../core/demux_writer.h"
-#include "../core/message_buffer.h"
 #include "../core/reader_id.h"
 #include "../example/market_event.h"
-#include "../util/operators.h"
 #include "./demux_setup.h"
 #include "./market_event_gen.h"
-#include "./reader_id_gen.h"
-#include "./test_message.h"
+
 namespace {
 
 // explicitly reference the generator to make clangd happy
-using _0 = rc::Arbitrary<lshl::demux::core::ReaderId>;
-using _1 = rc::Arbitrary<lshl::demux::core::test::TestMessage>;
-using _2 = rc::Arbitrary<lshl::demux::example::MarketEvent>;
+using _0 = rc::Arbitrary<lshl::demux::example::MarketEvent>;
 
 constexpr std::chrono::seconds DEFAULT_WAIT(5);
 
 using lshl::demux::core::DemuxReader;
 using lshl::demux::core::DemuxWriter;
 using lshl::demux::core::ReaderId;
+using lshl::demux::core::test::DemuxSetup;
 using lshl::demux::example::MarketDataUpdate;
 using lshl::demux::example::MarketEvent;
-using lshl::demux::example::MarketTradeUpdate;
-
-using lshl::demux::core::test::DemuxSetup;
-using lshl::demux::core::test::L;
-using lshl::demux::core::test::M;
-using lshl::demux::core::test::TestMessage;
-
 using std::array;
 using std::atomic;
-using std::span;
 using std::uint16_t;
 using std::uint8_t;
 using std::vector;
-
-// [[nodiscard]] auto expect_eq(const span<const uint8_t>& left, const span<const uint8_t>& right) -> bool {
-//   EXPECT_EQ(left.size(), right.size());
-//   for (size_t i = 0; i < right.size(); ++i) {
-//     EXPECT_EQ(left[i], right[i]) << "index: " << i;
-//     if (::testing::Test::HasFailure()) {
-//       return false;
-//     }
-//   }
-//   return !::testing::Test::HasFailure();
-// }
-
-// auto assert_eq(const vector<TestMessage>& left, const vector<TestMessage>& right) -> void {
-//   ASSERT_EQ(left.size(), right.size());
-//   for (size_t i = 0; i < right.size(); ++i) {
-//     const TestMessage& x = left[i];
-//     const TestMessage& y = right[i];
-//     using lshl::demux::core::test::operator<<;
-//     ASSERT_EQ(x, y) << "index: " << i << ", x: " << x << ", y: " << y;
-//   }
-// }
 
 template <typename M, size_t N, bool B>
 [[nodiscard]] auto write_all(const vector<M>& messages, DemuxWriter<M, N, B>* writer) -> size_t {
@@ -184,8 +149,11 @@ auto write_and_read_1(MarketEvent message) {
   ASSERT_EQ(0, reader->head()) << "reader: " << *reader;
 
   const std::optional<const MarketEvent*> read = reader->next();
-  ASSERT_TRUE(read.has_value()) << "reader: " << *reader;
-  ASSERT_EQ(message, *(read.value())) << "reader: " << *reader;
+  if (read.has_value()) {
+    ASSERT_EQ(message, *(read.value())) << "reader: " << *reader;
+  } else {
+    FAIL() << "expected value, but got none, reader: " << *reader;
+  }
 
   ASSERT_EQ(1, writer->tail()) << "writer: " << *writer;
   ASSERT_EQ(1, reader->head()) << "reader: " << *reader;
@@ -222,9 +190,11 @@ auto nonBlockingWriteWhenBufferIsFull(array<MarketEvent, N> events) -> void {
   // you can't write the last element and wrap around if at least one reader is at position 0.
   for (size_t i = 0; i < N - 1; ++i) {
     std::optional<MarketEvent*> ptr = writer->next();
-    ASSERT_TRUE(ptr.has_value()) << "i: " << i << ", writer: " << *writer;
-    *(ptr.value()) = events.at(i);
-
+    if (ptr.has_value()) {
+      *(ptr.value()) = events.at(i);
+    } else {
+      FAIL() << "expected value, but got none, i: " << i << ", writer: " << *writer;
+    }
     ASSERT_EQ(i, writer->tail());
     ASSERT_TRUE(writer->commit());
     ASSERT_EQ(i + 1, writer->tail());
@@ -240,10 +210,13 @@ auto nonBlockingWriteWhenBufferIsFull(array<MarketEvent, N> events) -> void {
   for (size_t r = 0; r < 2; ++r) {
     DemuxReader<MarketEvent, N, false>* reader = setup.reader(r);
     const std::optional<const MarketEvent*> read = reader->next();
-    ASSERT_TRUE(read.has_value());
-    const MarketEvent& expected = events.at(0);
-    const MarketEvent& actual = *(read.value());
-    ASSERT_EQ(expected, actual) << "r: " << r << ", reader: " << reader;
+    if (read.has_value()) {
+      const MarketEvent& expected = events.at(0);
+      const MarketEvent& actual = *(read.value());
+      ASSERT_EQ(expected, actual) << "r: " << r << ", reader: " << reader;
+    } else {
+      FAIL() << "expected value, but got none, r: " << r << ", reader: " << reader;
+    }
   }
 
   ASSERT_EQ(N - 1, writer->tail());
@@ -255,8 +228,11 @@ auto nonBlockingWriteWhenBufferIsFull(array<MarketEvent, N> events) -> void {
   // now writer can write the last message and wrap around.
   {
     std::optional<MarketEvent*> ptr = writer->next();
-    ASSERT_TRUE(ptr.has_value()) << "writer: " << *writer;
-    *(ptr.value()) = events.at(N - 1);
+    if (ptr.has_value()) {
+      *(ptr.value()) = events.at(N - 1);
+    } else {
+      FAIL() << "expected value, but got none, writer: " << *writer;
+    }
     ASSERT_TRUE(writer->commit());
   }
 
@@ -280,10 +256,13 @@ auto nonBlockingWriteWhenBufferIsFull(array<MarketEvent, N> events) -> void {
     for (size_t r = 0; r < 2; ++r) {
       DemuxReader<MarketEvent, N, false>* reader = setup.reader(r);
       const std::optional<const MarketEvent*> read = reader->next();
-      ASSERT_TRUE(read.has_value());
-      const MarketEvent& expected = events.at(i);
-      const MarketEvent& actual = *(read.value());
-      ASSERT_EQ(expected, actual) << "i: " << i << ", r: " << r << ", reader: " << reader;
+      if (read.has_value()) {
+        const MarketEvent& expected = events.at(i);
+        const MarketEvent& actual = *(read.value());
+        ASSERT_EQ(expected, actual) << "i: " << i << ", r: " << r << ", reader: " << reader;
+      } else {
+        FAIL() << "expected value, but got none, i: " << i << ", r: " << r << ", reader: " << reader;
+      }
       ASSERT_EQ(0, reader->tail());
       ASSERT_EQ((i + 1) % N, reader->head());
     }
@@ -298,8 +277,11 @@ auto nonBlockingWriteWhenBufferIsFull(array<MarketEvent, N> events) -> void {
   // can write again after readers have read all messages
   {
     std::optional<MarketEvent*> ptr = writer->next();
-    ASSERT_TRUE(ptr.has_value());
-    *(ptr.value()) = events.at(0);
+    if (ptr.has_value()) {
+      *(ptr.value()) = events.at(0);
+    } else {
+      FAIL() << "expected value, but got none, writer: " << *writer;
+    }
     ASSERT_TRUE(writer->commit());
   }
 
@@ -407,145 +389,6 @@ TEST(TestMessageGenerator, CheckByteDistribution) {
       RC_TAG(x);
     }
   });
-}
-
-namespace {
-[[nodiscard]] auto fill_up_buffer(DemuxWriter<L, M, false>* writer, TestMessage message) -> size_t {
-  size_t result = 0;
-  while (true) {
-    switch (writer->write(message.t)) {
-      case WriteResult::Success:
-        result += 1;
-        continue;
-      case WriteResult::Repeat:
-        return result;  // the buffer is full
-      case WriteResult::Error:
-        LOG_ERROR << "Unexpected WriteResult::Error when writing message, number of messages written: " << result;
-        return 0;
-    }
-  }
-}
-
-auto read_all_assert_eq(DemuxReader<L, M>* reader, TestMessage expected) -> void {
-  while (true) {
-    const span<const uint8_t> read = reader->next();
-    if (read.empty()) {
-      break;
-    }
-    ASSERT_TRUE(expect_eq(expected.t, read));
-  }
-}
-
-TEST(NonBlockingDemuxTest, Wraparound) {
-  ASSERT_EQ(L, 2 * M);
-
-  DemuxSetup<L, M, false> setup(1);
-  DemuxWriter<L, M, false>* writer = setup.writer();
-  DemuxReader<L, M>* reader = setup.reader(0);
-
-  array<uint8_t, M> m1{1};
-  ASSERT_EQ(WriteResult::Success, writer->write(m1));
-  ASSERT_EQ(1, writer->sequence());
-
-  array<uint8_t, M> m2{2};
-  ASSERT_EQ(WriteResult::Repeat, writer->write(m2));
-  ASSERT_EQ(1, writer->sequence());  // empty message isn't written yet, reader hasn't moved
-
-  ASSERT_EQ(WriteResult::Repeat, writer->write(m2));
-  ASSERT_EQ(1, writer->sequence());  // empty message isn't written yet, reader hasn't moved
-
-  ASSERT_TRUE(expect_eq(m1, reader->next()));
-  ASSERT_EQ(1, reader->sequence());
-
-  ASSERT_EQ(WriteResult::Repeat, writer->write(m2));
-  ASSERT_EQ(2, writer->sequence());  // empty message is written, reader moved
-
-  ASSERT_TRUE(expect_eq({}, reader->next()));
-  ASSERT_EQ(2, reader->sequence());
-
-  ASSERT_EQ(WriteResult::Success, writer->write(m2));
-  ASSERT_EQ(3, writer->sequence());
-
-  ASSERT_TRUE(expect_eq(m2, reader->next()));
-  ASSERT_EQ(3, reader->sequence());
-}
-
-auto slow_reader(TestMessage message) -> void {
-  LOG_DEBUG << "---------------";
-  LOG_DEBUG << "message: " << message << ", size: " << message.t.size();
-
-  DemuxSetup<L, M, false> setup(1);
-  auto* writer = setup.writer();
-  auto* reader = setup.reader(0);
-
-  const size_t messages_to_fill_buffer = (L / (message.t.size() + sizeof(lshl::demux::core::message_length_t)));
-
-  ASSERT_EQ(messages_to_fill_buffer, fill_up_buffer(writer, message));
-  ASSERT_EQ(messages_to_fill_buffer, writer->sequence());
-
-  // the buffer is full, can't write anymore messages
-  ASSERT_EQ(WriteResult::Repeat, writer->write(message.t));
-  ASSERT_EQ(messages_to_fill_buffer, writer->sequence());
-
-  // read all messages, to catup with the writer
-  read_all_assert_eq(reader, message);
-  ASSERT_EQ(writer->sequence(), reader->sequence());
-
-  // make sure no more messages are available to read
-  ASSERT_EQ(reader->next().empty(), true);
-  ASSERT_EQ(writer->sequence(), reader->sequence());
-
-  // wraparound marker is written at this point
-  switch (writer->write(message.t)) {
-    case WriteResult::Success:
-      // wraparound + 1 message written
-      ASSERT_EQ(messages_to_fill_buffer + 2, writer->sequence());
-      break;
-    case WriteResult::Repeat:
-      // only wraparound marker is written
-      ASSERT_EQ(messages_to_fill_buffer + 1, writer->sequence());
-      // read the wraparound marker
-      ASSERT_TRUE(reader->next().empty());
-      ASSERT_EQ(writer->sequence(), reader->sequence());
-      // no we should be able to write the message
-      ASSERT_EQ(WriteResult::Success, writer->write(message.t));
-      ASSERT_EQ(messages_to_fill_buffer + 2, writer->sequence());
-      break;
-    case WriteResult::Error:
-      FAIL() << "Unexpected WriteResult::Error when writing message after reading all messages: " << message;
-  }
-
-  read_all_assert_eq(reader, message);
-  ASSERT_TRUE(reader->next().empty());
-
-  ASSERT_EQ(writer->sequence(), reader->sequence());
-  // ASSERT_EQ(reader->next().empty(), true);
-  // ASSERT_EQ(writer->sequence(), reader->sequence());
-
-  // ASSERT_EQ(WriteResult::Success, writer->write(message.t));
-}
-}  // namespace
-
-TEST(NonBlockingDemuxTest, SlowReader) {
-  rc::check(slow_reader);
-}
-
-TEST(NonBlockingDemuxTest, SlowReader1) {
-  vector<uint8_t> m{0xde, 0x4a, 0xf5, 0x86, 0xd1, 0xea, 0xf7, 0x55, 0xa0, 0xc0, 0xcf, 0x07, 0x48, 0xbf, 0x37, 0xc5,
-                    0x6a, 0xb7, 0xbc, 0x01, 0x92, 0xa0, 0xea, 0xdd, 0x93, 0x6d, 0xc3, 0x62, 0xa3, 0xba, 0x97, 0xe2,
-                    0x68, 0x04, 0x74, 0xe0, 0x9e, 0x32, 0x04, 0xc3, 0x3e, 0x8b, 0xfd, 0xcd, 0x3b, 0x4e, 0x21, 0x7e,
-                    0xca, 0x2b, 0x07, 0xdd, 0x19, 0x4d, 0x76, 0x0d, 0xb7, 0xb7, 0x1c, 0x7a, 0x54, 0x71, 0x57, 0x38};
-  ASSERT_EQ(m.size(), 64);
-  slow_reader(TestMessage(m));
-}
-
-TEST(NonBlockingDemuxTest, SlowReader2) {
-  vector<uint8_t> m{0x77, 0x2b, 0xdb, 0x58, 0xb9, 0x21, 0xca, 0xfe, 0xca, 0x64, 0xf6, 0x8e, 0x55, 0xc4,
-                    0x06, 0x69, 0x83, 0x72, 0x05, 0x32, 0x61, 0x7e, 0x6b, 0x54, 0x56, 0x40, 0x2f, 0x4d,
-                    0xaf, 0x0a, 0x1f, 0x72, 0x68, 0x85, 0x25, 0x35, 0x28, 0x54, 0x6d, 0xee, 0x89, 0x88,
-                    0xab, 0x71, 0x8a, 0xae, 0x1d, 0x3b, 0xbf, 0x20, 0xab, 0x0f, 0x83, 0x6d, 0x24, 0x65};
-  ASSERT_EQ(m.size(), 56);
-  slow_reader(TestMessage(m));
 }
 */
 
