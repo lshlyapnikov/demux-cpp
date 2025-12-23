@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "./market_event.h"
+#include <chrono>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <variant>
 
 namespace lshl::demux::example {

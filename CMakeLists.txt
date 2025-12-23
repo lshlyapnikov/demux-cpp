@@ -70,23 +70,23 @@ target_link_libraries(${PROJECT_NAME}
   PRIVATE reader_id  # TODO(Leonid): should these two be PUBLIC, so other projects can get the automatically
 )
 
-# add_executable(shm_demux
-#   src/demux/example/shm_demux.cpp
-# )
-# target_link_libraries(shm_demux
-#   PRIVATE market_event
-#   PRIVATE reader_id
-#   PRIVATE hdr_histogram::hdr_histogram_static
-#   PRIVATE Boost::log
-#   # PRIVATE Boost::stacktrace_backtrace
-#   # PRIVATE Boost::stacktrace_from_exception
-# )
-# if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-#     target_link_libraries(shm_demux PRIVATE profiler)
-# endif()
-# target_compile_options(shm_demux
-#   PRIVATE ${MY_CXX_FLAGS}
-# )
+add_executable(shm_demux
+  src/demux/example/shm_demux.cpp
+)
+target_link_libraries(shm_demux
+  PRIVATE market_event
+  PRIVATE reader_id
+  PRIVATE hdr_histogram::hdr_histogram_static
+  PRIVATE Boost::log
+  # PRIVATE Boost::stacktrace_backtrace
+  # PRIVATE Boost::stacktrace_from_exception
+)
+if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+    target_link_libraries(shm_demux PRIVATE profiler)
+endif()
+target_compile_options(shm_demux
+  PRIVATE ${MY_CXX_FLAGS}
+)
 
 add_library(reader_id
   OBJECT src/demux/core/reader_id.cpp

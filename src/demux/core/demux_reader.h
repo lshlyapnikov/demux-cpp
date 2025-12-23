@@ -47,6 +47,8 @@ class DemuxReader {
   /// @brief Reader's head, the positions of the last read message.
   atomic<size_t>* head_;
 
+  uint64_t message_count_{0};
+
  public:
   DemuxReader(const ReaderId& reader_id, array<M, N>* buffer, const atomic<size_t>* tail, atomic<size_t>* head) noexcept
       : id_(reader_id), buffer_(buffer), tail_(tail), head_(head) {
@@ -67,6 +69,8 @@ class DemuxReader {
   [[nodiscard]] auto tail() const noexcept -> size_t { return this->tail_->load(std::memory_order_relaxed); }
 
   [[nodiscard]] auto head() const noexcept -> size_t { return this->head_->load(std::memory_order_relaxed); }
+
+  [[nodiscard]] auto message_count() const noexcept -> uint64_t { return this->message_count_; }
 
   /**
    * @brief Returns an `optional` pointing to the object in the circular buffer.
@@ -99,6 +103,7 @@ auto DemuxReader<M, N, B>::next() noexcept -> optional<const M*> {
   const M* ptr = &(*buffer_)[head];
   const size_t next_head = (head + 1) & (N - 1);
   this->head_->store(next_head, std::memory_order_release);
+  this->message_count_ += 1;
 
   return ptr;
 }

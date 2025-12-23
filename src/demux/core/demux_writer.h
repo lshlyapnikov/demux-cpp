@@ -68,6 +68,8 @@ class DemuxWriter {
 
   size_t next_tail_{UNSET_TAIL};
 
+  uint64_t message_count_{0};
+
  public:
   /**
    * @brief Constructs a DemuxWriter seq seq for allocating or deallocating the provided pointers.
@@ -109,6 +111,8 @@ class DemuxWriter {
   [[nodiscard]] auto tail() const noexcept -> size_t { return this->tail_->load(std::memory_order_relaxed); }
 
   [[nodiscard]] auto next() noexcept -> std::optional<M*>;
+
+  [[nodiscard]] auto message_count() const noexcept -> uint64_t { return this->message_count_; }
 
   template <class... Args>
   [[nodiscard]] auto emplace(Args&&... args) noexcept -> bool;
@@ -185,6 +189,7 @@ auto DemuxWriter<M, N, B>::commit() noexcept -> bool {
   } else {
     this->tail_->store(this->next_tail_, std::memory_order_release);
     this->next_tail_ = UNSET_TAIL;
+    this->message_count_ += 1;
     return true;
   }
 }

@@ -8,7 +8,6 @@
 #include <span>
 #include "../core/demux_reader.h"
 #include "../core/demux_writer.h"
-#include "../util/xxhash_util.h"
 #include "./market_event.h"
 
 namespace lshl::demux::example {
@@ -24,28 +23,22 @@ auto init_logging() noexcept -> void;
 
 auto main_(std::span<char*> args) noexcept(false) -> int;
 
+auto wait_for_readers(const std::atomic<size_t>* startup_reader_counter, const uint8_t total_reader_num) -> void;
+
 template <typename M, size_t N>
 auto start_writer(uint8_t total_reader_num, uint64_t msg_num, bool emplace) noexcept(false) -> void;
 
-template <typename M, size_t N>
-auto run_writer_loop(DemuxWriter<M, N, false>* writer, uint64_t msg_num, std::invocable<M*> auto md_gen) noexcept(false)
-    -> void;
+template <typename M, size_t N, typename WriteFn>
+auto run_writer_loop(DemuxWriter<M, N, false>* writer, uint64_t msg_num, WriteFn write_fn) noexcept(false) -> void;
 
 template <typename M, size_t N>
 [[nodiscard]] inline auto write(DemuxWriter<M, N, false>* writer, const M& md) noexcept -> bool;
 
 template <typename M, size_t N>
-auto run_writer_loop_zero_copy(DemuxWriter<M, N, false>* writer, uint64_t msg_num) noexcept(false) -> void;
+[[nodiscard]] inline auto write_with_emplace(DemuxWriter<M, N, false>* writer, const M& md) noexcept -> bool;
 
 template <typename M, size_t N>
-[[nodiscard]] inline auto write_with_emplace(
-    DemuxWriter<M, N, false>* writer,
-    MarketDataUpdateGenerator* md_gen,
-    lshl::demux::util::XXH64_util* hash
-) noexcept(false) -> bool;
-
-template <typename M, size_t N>
-auto start_reader(uint8_t reader_num, uint64_t msg_num) noexcept(false) -> void;
+auto start_reader(const core::ReaderId& reader_id, uint64_t msg_num) noexcept(false) -> void;
 
 template <typename M, size_t N>
 auto run_reader_loop(DemuxReader<M, N, false>* reader, uint64_t msg_num) noexcept(false) -> void;
