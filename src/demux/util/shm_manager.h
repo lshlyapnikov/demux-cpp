@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <new>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include "./boost_log_util.h"
 #include "./shm_remover.h"
@@ -84,8 +85,11 @@ class ShmManager {
   ShmManager(ShmManager&&) noexcept = delete;                     // move constructor
   auto operator=(ShmManager&&) noexcept -> ShmManager& = delete;  // move assignment
 
-  [[nodiscard]] auto construct_buffer() noexcept -> std::array<M, N>* {
+  [[nodiscard]] auto construct_buffer() noexcept(false) -> std::array<M, N>* {
     auto* result = segment_.template construct<CacheLinePaddedArray<M, N>>("buffer")();
+    if (result == nullptr) {
+      throw std::runtime_error("can't construct in shared memory: buffer");
+    }
     LOG_INFO << "[construct_buffer] buffer allocated, segment.free_memory: " << this->segment_.get_free_memory()
              << " cache line aligned: " << is_cache_line_aligned(result);
     return &result->value;
@@ -113,17 +117,19 @@ class ShmManager {
     return construct_atomic<uint64_t>("startup_reader_counter");
   }
 
-  [[nodiscard]] auto find_buffer() noexcept -> std::array<M, N>* {
+  [[nodiscard]] auto find_buffer() noexcept(false) -> std::array<M, N>* {
     auto* result = segment_.template find<CacheLinePaddedArray<M, N>>("buffer").first;
-    LOG_INFO << "[find_buffer] buffer found, segment.free_memory: " << this->segment_.get_free_memory()
-             << " cache line aligned: " << is_cache_line_aligned(result);
+    if (result == nullptr) {
+      throw std::runtime_error("can't find in shared memory: buffer");
+    }
+    LOG_INFO << "[find_buffer] buffer found" << ", cache line aligned: " << is_cache_line_aligned(result);
     return &result->value;
   }
 
-  [[nodiscard]] auto find_writer_tail() noexcept -> atomic<size_t>* { return find_atomic<size_t>("writer_sequence"); }
+  [[nodiscard]] auto find_writer_tail() noexcept -> atomic<size_t>* { return find_atomic<size_t>("writer_tail"); }
 
   [[nodiscard]] auto find_reader_head(uint8_t reader_id) noexcept -> atomic<size_t>* {
-    const std::string name = "reader_sequence_" + std::to_string(reader_id);
+    const std::string name = "reader_head_" + std::to_string(reader_id);
     return find_atomic<size_t>(name);
   }
 
@@ -135,18 +141,25 @@ class ShmManager {
 
  private:
   template <typename T>
-  [[nodiscard]] auto construct_atomic(const std::string& name) noexcept -> atomic<T>* {
+  [[nodiscard]] auto construct_atomic(const std::string& name) noexcept(false) -> atomic<T>* {
+    LOG_INFO << "[construct_atomic] " << name << " ...";
     auto* result = segment_.template construct<CacheLinePaddedAtomic<T>>(name.c_str())();
+    if (result == nullptr) {
+      throw std::runtime_error("can't construct in shared memory:" + name);
+    }
     LOG_INFO << "[construct_atomic] " << name << " allocated, segment.free_memory: " << this->segment_.get_free_memory()
              << " cache line aligned: " << is_cache_line_aligned(result);
     return &result->value;
   }
 
   template <typename T>
-  [[nodiscard]] auto find_atomic(const std::string& name) noexcept -> atomic<T>* {
+  [[nodiscard]] auto find_atomic(const std::string& name) noexcept(false) -> atomic<T>* {
+    LOG_INFO << "[find_atomic] " << name << " ...";
     auto* result = segment_.template find<CacheLinePaddedAtomic<T>>(name.c_str()).first;
-    LOG_INFO << "[find_atomic] " << name << " found, segment.free_memory: " << this->segment_.get_free_memory()
-             << " cache line aligned: " << is_cache_line_aligned(result);
+    if (result == nullptr) {
+      throw std::runtime_error("can't find in shared memory:" + name);
+    }
+    LOG_INFO << "[find_atomic] " << name << " success, cache line aligned: " << is_cache_line_aligned(result);
     return &result->value;
   }
 };

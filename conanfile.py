@@ -68,7 +68,7 @@ class DemuxCppRecipe(ConanFile):
         boost_options.without_throw_exception = True
         boost_options.without_system = False # required for log
         boost_options.without_stl_interfaces = True
-        boost_options.without_stacktrace = True
+        boost_options.without_stacktrace = False
         boost_options.without_spirit = True
         boost_options.without_sort = True
         boost_options.without_smart_ptr = True

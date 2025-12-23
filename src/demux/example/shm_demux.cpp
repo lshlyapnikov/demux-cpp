@@ -9,7 +9,8 @@
 #include <boost/interprocess/creation_tags.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/log/expressions.hpp>  // NOLINT(misc-include-cleaner)
-#include <boost/stacktrace.hpp>       // NOLINT(misc-include-cleaner)
+#define BOOST_STACKTRACE_USE_ADDR2LINE
+#include <boost/stacktrace.hpp>  // NOLINT(misc-include-cleaner)
 #include <cassert>
 #include <cerrno>
 #include <chrono>
@@ -44,7 +45,7 @@ auto print_usage(const char* prog) -> void {
             << static_cast<int>(MAX_READER_NUM) << "]\n"
             << "    <number-of-messages> is within the interval [1, " << std::numeric_limits<uint64_t>::max()
             << "] (uint64_t)\n"
-            << "    <zero-copy> true/false\n";
+            << "    <use-emplace> true/false\n";
 }
 
 auto shutdown_handler() -> void {
@@ -100,7 +101,7 @@ auto main_(const span<char*> args) noexcept(false) -> int {
 
   const std::string command(args[1]);
   const auto num16 = boost::lexical_cast<uint16_t>(args[2]);
-  if (num16 < 1 || num16 > MAX_READER_NUM) {
+  if (num16 > MAX_READER_NUM) {
     print_usage(args[0]);
     return ERROR;
   }
@@ -148,9 +149,6 @@ auto wait_for_readers(const std::atomic<size_t>* startup_reader_counter, const u
 
 template <typename M, size_t N>
 auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool emplace) noexcept(false) -> void {
-  assert(msg_num > 0);
-  assert(emplace);
-
   constexpr size_t SHARED_MEMORY_SIZE = 64 * util::LINUX_PAGE_SIZE;
   util::ShmManager<M, N> shm_manager{bipc::create_only, BUFFER_SHARED_MEM_NAME, SHARED_MEMORY_SIZE, total_reader_num};
   const std::atomic<size_t>* startup_reader_counter = shm_manager.construct_startup_reader_counter();
@@ -169,7 +167,8 @@ auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool e
   } else {
     run_writer_loop(&writer, msg_num, write<M, N>);
   }
-  LOG_INFO << "DemuxWriter completed, shm_manager.free_memory: " << shm_manager.get_free_memory();
+  LOG_INFO << "DemuxWriter completed, shm_manager.free_memory: " << shm_manager.get_free_memory()
+           << ", writer.msg_count: " << writer.message_count();
 }
 
 template <typename M, size_t N, typename WriteFn>
@@ -252,7 +251,8 @@ auto start_reader(const ReaderId& reader_id, const uint64_t msg_num) noexcept(fa
 
   run_reader_loop(&reader, msg_num);
 
-  LOG_INFO << "DemuxReader completed, shm_manager.free_memory: " << shm_manager.get_free_memory();
+  LOG_INFO << "DemuxReader completed, shm_manager.free_memory: " << shm_manager.get_free_memory()
+           << ", reader.msg_count: " << reader.message_count();
 }
 
 template <typename M, size_t N>
