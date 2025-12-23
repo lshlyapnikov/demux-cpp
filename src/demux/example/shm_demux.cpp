@@ -90,7 +90,7 @@ auto main_(const span<char*> args) noexcept(false) -> int {
 
   constexpr int ERROR = 200;
   constexpr size_t EXPECTED_ARG_NUM = 5;
-  constexpr size_t BUFFER_SIZE = 32;
+  constexpr size_t BUFFER_SIZE = 512;
 
   init_logging();
 
