@@ -28,6 +28,9 @@ using std::uint64_t;
 using std::uint8_t;
 using std::vector;
 
+/// There is no specific reason for this limit, other then number of CPU cores available on typical systems.
+constexpr size_t MAX_READER_NUM = 64;
+
 /**
  * @brief Demultiplexer writer.
  *
@@ -38,8 +41,6 @@ using std::vector;
  */
 template <typename M, size_t N, bool B>
 class DemuxWriter {
-  /// There is no specific reason for this limit, other then number of CPU cores available on typical systems.
-  static constexpr size_t MAX_READERS = 64;
   /// Special value indicating that tail is not set.
   static constexpr size_t UNSET_TAIL = std::numeric_limits<size_t>::max();
 
@@ -63,7 +64,7 @@ class DemuxWriter {
   vector<const atomic<size_t>*> heads_;
 
   /// @brief Reader active heads, indicates whether each reader is active. Const because Writer does not modify them.
-  vector<const atomic<bool>*> active_readers_;
+  vector<bool> active_readers_;
 
   size_t next_tail_{UNSET_TAIL};
 
@@ -81,14 +82,14 @@ class DemuxWriter {
       array<M, N>* buffer,
       atomic<size_t>* tail,
       vector<const atomic<size_t>*> heads,
-      vector<const atomic<bool>*> active_readers_
+      vector<bool> active_readers_
   )
       : buffer_(buffer), tail_(tail), heads_(std::move(heads)), active_readers_(std::move(active_readers_)) {
     if (this->heads_.size() == 0) {
       throw std::invalid_argument("At least one reader required");
     }
-    if (this->heads_.size() > MAX_READERS) {
-      throw std::invalid_argument("Too many readers, maximum is " + std::to_string(MAX_READERS));
+    if (this->heads_.size() > MAX_READER_NUM) {
+      throw std::invalid_argument("Too many readers, maximum is " + std::to_string(MAX_READER_NUM));
     }
     if (this->heads_.size() != this->active_readers_.size()) {
       throw std::invalid_argument("Heads and active readers size mismatch");
@@ -163,7 +164,7 @@ auto DemuxWriter<M, N, B>::next_() noexcept -> std::optional<M*> {
   // TODO(Leonid): find a way to avoid checking all readers every time, cache the slowest reader position?
   // Check every active reader's head
   for (size_t i = 0; i < active_readers_.size(); ++i) {
-    if (active_readers_[i]->load(std::memory_order_relaxed)) {
+    if (active_readers_[i]) {
       // If the next tail catches up to ANY head, the buffer is full for that reader
       if (next_tail == heads_[i]->load(std::memory_order_acquire)) {
         return std::nullopt;
@@ -201,8 +202,7 @@ auto operator<<(std::ostream& os, const DemuxWriter<M, N, B>& writer) -> std::os
     if (i > 0) {
       os << ", ";
     }
-    os << writer.heads_[i]->load(std::memory_order_relaxed)
-       << (writer.active_readers_[i]->load(std::memory_order_relaxed) ? ":Y" : ":N");
+    os << writer.heads_[i]->load(std::memory_order_relaxed) << (writer.active_readers_[i] ? ":Y" : ":N");
   }
   os << "]}";
   return os;

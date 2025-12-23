@@ -70,18 +70,16 @@ target_link_libraries(${PROJECT_NAME}
   PRIVATE reader_id  # TODO(Leonid): should these two be PUBLIC, so other projects can get the automatically
 )
 
-##
-## TODO(Leonid): example is disabled temporarily, enable it back
-## add_executable(shm_demux
+# add_executable(shm_demux
 #   src/demux/example/shm_demux.cpp
-#   src/demux/example/market_data.cpp
 # )
 # target_link_libraries(shm_demux
+#   PRIVATE market_event
 #   PRIVATE reader_id
 #   PRIVATE hdr_histogram::hdr_histogram_static
 #   PRIVATE Boost::log
-#   PRIVATE Boost::stacktrace_backtrace
-#   PRIVATE Boost::stacktrace_from_exception
+#   # PRIVATE Boost::stacktrace_backtrace
+#   # PRIVATE Boost::stacktrace_from_exception
 # )
 # if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
 #     target_link_libraries(shm_demux PRIVATE profiler)

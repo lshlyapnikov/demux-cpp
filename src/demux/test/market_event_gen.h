@@ -26,7 +26,7 @@ struct Arbitrary<MarketDataUpdate> {
         gen::set(&MarketDataUpdate::price),
         gen::set(&MarketDataUpdate::size),
         gen::set(&MarketDataUpdate::level),
-        gen::set(&MarketDataUpdate::exchange_timestamp)
+        gen::set(&MarketDataUpdate::timestamp)
     );
   }
 };
@@ -40,7 +40,7 @@ struct Arbitrary<MarketTradeUpdate> {
         gen::set(&MarketTradeUpdate::price),
         gen::set(&MarketTradeUpdate::size),
         gen::set(&MarketTradeUpdate::trade_id),
-        gen::set(&MarketTradeUpdate::exchange_timestamp)
+        gen::set(&MarketTradeUpdate::timestamp)
     );
   }
 };

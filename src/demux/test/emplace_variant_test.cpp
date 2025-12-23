@@ -34,12 +34,7 @@ TEST(EmplaceVariantTest, MarketEvent) {
 
   events.emplace_back(
       example::MarketDataUpdate{
-          .instrument_id = 1L,
-          .side = example::Side::Bid,
-          .price = 1000,
-          .size = 10,
-          .level = 1,
-          .exchange_timestamp = 123456789
+          .instrument_id = 1L, .side = example::Side::Bid, .price = 1000, .size = 10, .level = 1, .timestamp = 123456789
       }
   );
 
@@ -52,7 +47,7 @@ TEST(EmplaceVariantTest, MarketEvent) {
           .price = 1010,
           .size = 5,
           .trade_id = 11223344,
-          .exchange_timestamp = 987654321
+          .timestamp = 987654321
       }
   );
 

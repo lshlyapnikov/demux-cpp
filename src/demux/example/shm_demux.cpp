@@ -32,15 +32,16 @@
 #include "../util/hdr_histogram_util.h"
 #include "../util/shm_manager.h"
 #include "../util/xxhash_util.h"
-#include "./market_data.h"
+#include "./market_event.h"
 
 namespace {
 auto print_usage(const char* prog) -> void {
+  using lshl::demux::core::MAX_READER_NUM;
   std::cerr << "Usage: " << prog << " [writer <number-of-readers> <number-of-messages> <zero-copy>]"
             << " | [reader <unique-reader-number> <number-of-messages> <zero-copy>]\n"
             << "  where\n"
             << "    <number-of-readers> and <unique-reader-number> are within the interval [1, "
-            << static_cast<int>(lshl::demux::core::MAX_READER_NUM) << "]\n"
+            << static_cast<int>(MAX_READER_NUM) << "]\n"
             << "    <number-of-messages> is within the interval [1, " << std::numeric_limits<uint64_t>::max()
             << "] (uint64_t)\n"
             << "    <zero-copy> true/false\n";
@@ -78,7 +79,6 @@ namespace bipc = boost::interprocess;
 using lshl::demux::core::DemuxReader;
 using lshl::demux::core::DemuxWriter;
 using lshl::demux::core::ReaderId;
-using lshl::demux::core::WriteResult;
 using lshl::demux::util::HDR_histogram_util;
 using lshl::demux::util::XXH64_util;
 using std::array;
@@ -88,12 +88,11 @@ using std::span;
 using std::uint16_t;
 
 auto main_(const span<char*> args) noexcept(false) -> int {
+  using lshl::demux::core::MAX_READER_NUM;
+
   constexpr int ERROR = 200;
   constexpr size_t EXPECTED_ARG_NUM = 5;
-
-  constexpr uint8_t MAX_READER_NUM = 2;
-  constexpr std::size_t BUFFER_SIZE = 16 * lshl::demux::util::LINUX_PAGE_SIZE;
-  constexpr std::uint16_t MAX_MESSAGE_SIZE = 256;
+  constexpr std::size_t BUFFER_SIZE = 32;
 
   init_logging();
 
@@ -110,7 +109,7 @@ auto main_(const span<char*> args) noexcept(false) -> int {
   }
   const auto total_reader_num = static_cast<uint8_t>(num16);
   const auto msg_num = boost::lexical_cast<uint64_t>(args[3]);
-  const auto zero_copy = std::string("true") == args[4];
+  const auto emplace = std::string("true") == args[4];
 
   if (total_reader_num > MAX_READER_NUM) {
     LOG_ERROR << "the requested number of readers: " << static_cast<int>(total_reader_num)
@@ -120,9 +119,9 @@ auto main_(const span<char*> args) noexcept(false) -> int {
   }
 
   if (command == "writer") {
-    start_writer<MAX_READER_NUM, BUFFER_SIZE, MAX_MESSAGE_SIZE>(total_reader_num, msg_num, zero_copy);
+    start_writer<MarketDataUpdate, BUFFER_SIZE>(total_reader_num, msg_num, emplace);
   } else if (command == "reader") {
-    start_reader<BUFFER_SIZE, MAX_MESSAGE_SIZE>(total_reader_num, msg_num);
+    start_reader<MarketDataUpdate, BUFFER_SIZE>(total_reader_num, msg_num);
   } else {
     print_usage(args[0]);
     return ERROR;
@@ -210,16 +209,17 @@ auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool z
 */
 }
 
-template <uint8_t R, size_t L, uint16_t M>
-auto run_writer_loop(DemuxWriter<R, L, M, false>* writer, const uint64_t msg_num) noexcept(false) -> void {
+template <typename M, size_t N>
+auto run_writer_loop(DemuxWriter<M, N, false>* writer, const uint64_t msg_num, std::invocable<M*> auto md_gen) noexcept(
+    false
+) -> void {
   LOG_INFO << "sending " << msg_num << " md updates ...";
 
-  MarketDataUpdate md{};
-  MarketDataUpdateGenerator md_gen{};
+  M md{};
   XXH64_util hash{};
 
   for (uint64_t i = 1; i <= msg_num; ++i) {
-    md_gen.generate_market_data_update(&md);
+    md_gen(&md);
     LOG_DEBUG << md;
     const bool ok = write(writer, md);
     if (!ok) {
@@ -236,36 +236,34 @@ auto run_writer_loop(DemuxWriter<R, L, M, false>* writer, const uint64_t msg_num
            << ", XXH64_hash: " << XXH64_util::format(hash.digest());
 }
 
-template <uint8_t R, size_t L, uint16_t M>
-[[nodiscard]] inline auto write(DemuxWriter<R, L, M, false>* writer, const T& md) noexcept -> bool {
+template <typename M, size_t N>
+[[nodiscard]] inline auto write(DemuxWriter<M, N, false>* writer, const M& md) noexcept -> bool {
   int attempt = 0;
+
   while (true) {
-    const WriteResult result = writer->write_safe(md);
-    switch (result) {
-      case WriteResult::Success:
-        return true;
-      case WriteResult::Error:
-        return false;
-      case WriteResult::Repeat:
-        attempt += 1;
-        if (attempt % REPORT_PROGRESS == 0) {
-          LOG_WARNING << "one or more readers are lagging, wraparound is blocked, write attempt: " << attempt
-                      << ", writer sequence: " << writer->message_count();
-        }
-        continue;
+    std::optional<M*> ptr = writer->next();
+    if (ptr.has_value()) {
+      *(ptr.value()) = md;
+      writer->commit();
+      return true;
+    }
+    attempt += 1;
+    if (attempt % REPORT_PROGRESS == 0) {
+      LOG_WARNING << "one or more readers are lagging, wraparound is blocked, write attempt: " << attempt
+                  << ", writer tail: " << writer->tail();
     }
   }
 }
 
-template <uint8_t R, size_t L, uint16_t M>
-auto run_writer_loop_zero_copy(DemuxWriter<R, L, M, false>* writer, const uint64_t msg_num) noexcept(false) -> void {
+template <typename M, size_t N>
+auto run_writer_loop_with_emplace(DemuxWriter<M, N, false>* writer, const uint64_t msg_num) noexcept(false) -> void {
   LOG_INFO << "sending " << msg_num << " md updates ...";
 
   MarketDataUpdateGenerator md_gen{};
   XXH64_util hash{};
 
   for (uint64_t i = 1; i <= msg_num; ++i) {
-    const bool ok = write_zero_copy(writer, &md_gen, &hash);
+    const bool ok = write_with_emplace(writer, &md_gen, &hash);
     if (!ok) {
       LOG_ERROR << "dropped one message, could not write";
       continue;
@@ -278,10 +276,10 @@ auto run_writer_loop_zero_copy(DemuxWriter<R, L, M, false>* writer, const uint64
   LOG_INFO << "writer sequence number: " << writer->message_count()
            << ", XXH64_hash: " << XXH64_util::format(hash.digest());
 }
-
-template <uint8_t R, size_t L, uint16_t M>
+/*
+template <size_t N>
 [[nodiscard]] inline auto write_zero_copy(
-    DemuxWriter<R, L, M, false>* writer,
+    DemuxWriter<MarketDataUpdate, N, false>* writer,
     MarketDataUpdateGenerator* md_gen,
     XXH64_util* hash
 ) noexcept(false) -> bool {
@@ -303,13 +301,13 @@ template <uint8_t R, size_t L, uint16_t M>
     }
   }
 }
-
-template <uint8_t R, size_t L, uint16_t M>
+*/
+template <typename M, size_t N>
 auto start_reader(const uint8_t reader_num, const uint64_t msg_num) noexcept(false) -> void {
   using lshl::demux::example::BUFFER_SHARED_MEM_NAME;
   using std::atomic;
 
-  LOG_INFO << "reader BUFFER_SHARED_MEM_NAME: " << BUFFER_SHARED_MEM_NAME << ", L: " << L << ", M: " << M
+  LOG_INFO << "reader BUFFER_SHARED_MEM_NAME: " << BUFFER_SHARED_MEM_NAME
            << ", reader_num: " << static_cast<int>(reader_num);
 
   // read-only segment for the circular buffer and message counter
@@ -349,17 +347,17 @@ auto start_reader(const uint8_t reader_num, const uint64_t msg_num) noexcept(fal
            << ", segment2.free_memory: " << segment2.get_free_memory();
 }
 
-template <uint8_t R, size_t L, uint16_t M>
-auto run_reader_loop(DemuxReader<L, M>* reader, const uint64_t msg_num) noexcept(false) -> void {
+template <typename M, size_t N>
+auto run_reader_loop(DemuxReader<M, N, false>* reader, const uint64_t msg_num) noexcept(false) -> void {
   XXH64_util hash{};
   HDR_histogram_util histogram{};
 
   // consume the expected number of messages
   for (uint64_t i = 0; i < msg_num;) {
-    const std::optional<const MarketDataUpdate*> read = reader->template next_unsafe<MarketDataUpdate>();
+    const std::optional<const M*> read = reader->template next_unsafe<M>();
     if (read.has_value()) {
       i += 1;
-      const MarketDataUpdate* md = read.value();
+      const M* md = read.value();
       // track the latency
       histogram.record_value(calculate_latency(md->timestamp));
       LOG_DEBUG << *md;
@@ -368,7 +366,7 @@ auto run_reader_loop(DemuxReader<L, M>* reader, const uint64_t msg_num) noexcept
         LOG_INFO << "number of messages received: " << i;
       }
       // calculate the hash
-      hash.update(md, sizeof(MarketDataUpdate));
+      hash.update(md, sizeof(M));
     }
   }
 

@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <iostream>
+#include <random>
 #include <variant>
 
 namespace lshl::demux::example {
@@ -31,7 +32,7 @@ struct MarketDataUpdate {
   uint64_t price;
   uint32_t size;
   uint8_t level;
-  uint64_t exchange_timestamp;
+  uint64_t timestamp;
 
   auto operator<=>(const MarketDataUpdate&) const = default;
 };
@@ -46,7 +47,7 @@ struct MarketTradeUpdate {
   uint64_t price;
   uint32_t size;
   uint64_t trade_id;
-  uint64_t exchange_timestamp;
+  uint64_t timestamp;
 
   auto operator<=>(const MarketTradeUpdate&) const = default;
 };
@@ -57,5 +58,23 @@ auto operator<<(std::ostream& os, const MarketTradeUpdate& md) -> std::ostream&;
 using MarketEvent = std::variant<MarketDataUpdate, MarketTradeUpdate>;
 
 auto operator<<(std::ostream& os, const MarketEvent& md) -> std::ostream&;
+
+class MarketDataUpdateGenerator {
+ public:
+  auto generate_market_data_update(MarketDataUpdate* output) noexcept -> void;
+
+  static constexpr uint64_t PRICE_MULTIPLIER = 1000000000;
+  static constexpr uint32_t SIZE_MULTIPLIER = 100;
+
+ private:
+  auto generate_side_() noexcept -> Side;
+  auto generate_level_() noexcept -> uint8_t;
+  auto generate_price_() noexcept -> uint64_t;
+  auto generate_size_() noexcept -> uint32_t;
+
+  std::mt19937 engine_;
+  std::uniform_int_distribution<uint32_t> distU32_;
+  std::uniform_int_distribution<uint8_t> distU8_;
+};
 
 }  // namespace lshl::demux::example
