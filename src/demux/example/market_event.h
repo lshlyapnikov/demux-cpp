@@ -59,6 +59,26 @@ using MarketEvent = std::variant<MarketDataUpdate, MarketTradeUpdate>;
 
 auto operator<<(std::ostream& os, const MarketEvent& md) -> std::ostream&;
 
+struct FastRng {
+ public:
+  using result_type = uint64_t;
+
+  static constexpr auto min() noexcept -> uint64_t { return 0; }
+  static constexpr auto max() noexcept -> uint64_t { return UINT64_MAX; }
+
+  auto operator()() noexcept -> uint64_t {
+    // NOLINTBEGIN(readability-magic-numbers, cppcoreguidelines-avoid-magic-numbers)
+    state ^= state << 13;
+    state ^= state >> 7;
+    state ^= state << 17;
+    // NOLINTEND(readability-magic-numbers, cppcoreguidelines-avoid-magic-numbers)
+    return state;
+  }
+
+ private:
+  uint64_t state;
+};
+
 class MarketDataUpdateGenerator {
  public:
   auto generate_market_data_update(MarketDataUpdate* output) noexcept -> void;
@@ -72,7 +92,7 @@ class MarketDataUpdateGenerator {
   auto generate_price_() noexcept -> uint64_t;
   auto generate_size_() noexcept -> uint32_t;
 
-  std::mt19937 engine_;
+  FastRng engine_{};
   std::uniform_int_distribution<uint32_t> distU32_;
   std::uniform_int_distribution<uint8_t> distU8_;
 };
