@@ -16,7 +16,7 @@ msg_num=${1:-10000000}
 use_emplace=${2:-"false"}
 
 # start writer expecting 2 readers
-#CPUPROFILE=shm_demux_writer.prof CPUPROFILE_FREQUENCY=1000 \
+CPUPROFILE=example-writer.prof CPUPROFILE_FREQUENCY=1000 \
 ./build/shm_demux writer 2 "${msg_num}" "${use_emplace}" > ./example-writer.log 2>&1 &
 writer_pid="$!"
 
@@ -25,7 +25,10 @@ sleep 2s
 
 # start 2 readers
 
+CPUPROFILE=example-reader-0.prof CPUPROFILE_FREQUENCY=1000 \
 ./build/shm_demux reader 0 "${msg_num}" "${use_emplace}" &> ./example-reader-0.log &
+
+#CPUPROFILE=example-reader-1.prof CPUPROFILE_FREQUENCY=1000 \
 ./build/shm_demux reader 1 "${msg_num}" "${use_emplace}" &> ./example-reader-1.log &
 
 # report the state

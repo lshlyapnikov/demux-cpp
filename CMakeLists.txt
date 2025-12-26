@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24)
 project(demux-cpp LANGUAGES CXX)
 
 set(CMAKE_VERBOSE_MAKEFILE ON) # verbose CMake output
@@ -20,10 +20,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # generate a compile_commands.json file, n
 #set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wconversion -Wsign-conversion -Werror")
 set(MY_CXX_FLAGS -Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wconversion -Wsign-conversion -Werror)
 
-# set in conan profile
-#set(CMAKE_CXX_FLAGS_DEBUG "-gdwarf-4 -O0") # valgrind needs `-gdwarf-4`
-#set(CMAKE_CXX_FLAGS_DEBUG "-g -gdwarf-4 -O3 -DNDEBUG") # `-03 -DNDEBUG` for gperftools
-
 #
 # tools
 #
@@ -40,6 +36,7 @@ endif()
 
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost REQUIRED COMPONENTS log)
+find_package(Boost REQUIRED COMPONENTS stacktrace)
 
 # example uses this to compute hash digest of sent and received messages
 find_package(xxHash REQUIRED)
@@ -82,7 +79,11 @@ target_link_libraries(shm_demux
   PRIVATE Boost::stacktrace_from_exception
 )
 if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    target_link_libraries(shm_demux PRIVATE profiler)
+    message(STATUS "gperftools is being linked!")
+    find_package(gperftools REQUIRED)
+    target_link_libraries(shm_demux PRIVATE gperftools::profiler)
+    # require ProfilerStart and IsHeapProfilerRunning, so linker does not optimize it out
+    target_link_options(shm_demux PRIVATE "LINKER:-u,ProfilerStart")
 endif()
 target_compile_options(shm_demux
   PRIVATE ${MY_CXX_FLAGS}

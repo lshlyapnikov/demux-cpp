@@ -27,6 +27,8 @@ class DemuxCppRecipe(ConanFile):
     exports_sources = "CMakeLists.txt", "src/*", "include/*", "test/*"
 
     def requirements(self):
+        if self.settings.build_type == "RelWithDebInfo":
+            self.requires("gperftools/2.17.2")
         self.requires("boost/1.88.0")
         self.requires("xxhash/0.8.3")
         self.requires("hdrhistogram-c/0.11.8")
@@ -37,8 +39,12 @@ class DemuxCppRecipe(ConanFile):
         if self.options.shared:
             self.options.rm_safe("fPIC")
 
-        boost_options = self.options["boost"]
+        if self.settings.build_type == "RelWithDebInfo":
+            self.options["gperftools"].build_cpu_profiler = True
+            self.options["gperftools"].build_heap_profiler = True
 
+        boost_options = self.options["boost"]
+        # see https://github.com/conan-io/conan-center-index/blob/master/recipes/boost/all/conanfile.py
         boost_options.without_contract = True
         boost_options.without_date_time = False # required for log
         boost_options.without_exception = False # required for log
