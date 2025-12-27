@@ -77,16 +77,16 @@ template <typename M, size_t N, bool B>
   vector<M> result;
   result.reserve(message_num);
   while (result.size() < message_num) {
-    const std::optional<const M*> ptr = reader->next();
-    if (ptr.has_value()) {
-      const M* m = ptr.value();
+    const M* const ptr = reader->next();
+    if (ptr) {
+      const M* m = ptr;
       result.emplace_back(*m);
     }
   }
 
   // assert no more messages are available if non-blocking reader, else it will block
   if constexpr (!B) {
-    EXPECT_FALSE(reader->next().has_value()) << "reader: " << *reader;
+    EXPECT_EQ(nullptr, reader->next()) << "reader: " << *reader;
   }
 
   if (::testing::Test::HasFailure()) {
@@ -148,9 +148,9 @@ auto write_and_read_1(MarketEvent message) {
   ASSERT_EQ(1, writer->tail()) << "writer: " << *writer;
   ASSERT_EQ(0, reader->head()) << "reader: " << *reader;
 
-  const std::optional<const MarketEvent*> read = reader->next();
-  if (read.has_value()) {
-    ASSERT_EQ(message, *(read.value())) << "reader: " << *reader;
+  const MarketEvent* read = reader->next();
+  if (read) {
+    ASSERT_EQ(message, *read) << "reader: " << *reader;
   } else {
     FAIL() << "expected value, but got none, reader: " << *reader;
   }
@@ -189,9 +189,9 @@ auto nonBlockingWriteWhenBufferIsFull(array<MarketEvent, N> events) -> void {
   // write N - 1 messages;
   // you can't write the last element and wrap around if at least one reader is at position 0.
   for (size_t i = 0; i < N - 1; ++i) {
-    std::optional<MarketEvent*> ptr = writer->next();
-    if (ptr.has_value()) {
-      *(ptr.value()) = events.at(i);
+    MarketEvent* ptr = writer->next();
+    if (ptr) {
+      *ptr = events.at(i);
     } else {
       FAIL() << "expected value, but got none, i: " << i << ", writer: " << *writer;
     }
@@ -209,10 +209,10 @@ auto nonBlockingWriteWhenBufferIsFull(array<MarketEvent, N> events) -> void {
   // readers read the first message at position 0.
   for (size_t r = 0; r < 2; ++r) {
     DemuxReader<MarketEvent, N, false>* reader = setup.reader(r);
-    const std::optional<const MarketEvent*> read = reader->next();
-    if (read.has_value()) {
+    const MarketEvent* read = reader->next();
+    if (read) {
       const MarketEvent& expected = events.at(0);
-      const MarketEvent& actual = *(read.value());
+      const MarketEvent& actual = *read;
       ASSERT_EQ(expected, actual) << "r: " << r << ", reader: " << reader;
     } else {
       FAIL() << "expected value, but got none, r: " << r << ", reader: " << reader;
@@ -227,9 +227,9 @@ auto nonBlockingWriteWhenBufferIsFull(array<MarketEvent, N> events) -> void {
 
   // now writer can write the last message and wrap around.
   {
-    std::optional<MarketEvent*> ptr = writer->next();
-    if (ptr.has_value()) {
-      *(ptr.value()) = events.at(N - 1);
+    MarketEvent* ptr = writer->next();
+    if (ptr) {
+      *ptr = events.at(N - 1);
     } else {
       FAIL() << "expected value, but got none, writer: " << *writer;
     }
@@ -243,7 +243,7 @@ auto nonBlockingWriteWhenBufferIsFull(array<MarketEvent, N> events) -> void {
   ASSERT_EQ(1, reader1->head());
 
   // buffer is full, can't write any more.
-  ASSERT_FALSE(writer->next().has_value());
+  ASSERT_EQ(nullptr, writer->next());
 
   ASSERT_EQ(0, writer->tail());
   ASSERT_EQ(0, reader0->tail());
@@ -255,10 +255,10 @@ auto nonBlockingWriteWhenBufferIsFull(array<MarketEvent, N> events) -> void {
   for (size_t i = 1; i < N; ++i) {
     for (size_t r = 0; r < 2; ++r) {
       DemuxReader<MarketEvent, N, false>* reader = setup.reader(r);
-      const std::optional<const MarketEvent*> read = reader->next();
-      if (read.has_value()) {
+      const MarketEvent* const read = reader->next();
+      if (read) {
         const MarketEvent& expected = events.at(i);
-        const MarketEvent& actual = *(read.value());
+        const MarketEvent& actual = *read;
         ASSERT_EQ(expected, actual) << "i: " << i << ", r: " << r << ", reader: " << reader;
       } else {
         FAIL() << "expected value, but got none, i: " << i << ", r: " << r << ", reader: " << reader;
@@ -276,9 +276,9 @@ auto nonBlockingWriteWhenBufferIsFull(array<MarketEvent, N> events) -> void {
 
   // can write again after readers have read all messages
   {
-    std::optional<MarketEvent*> ptr = writer->next();
-    if (ptr.has_value()) {
-      *(ptr.value()) = events.at(0);
+    MarketEvent* ptr = writer->next();
+    if (ptr) {
+      *ptr = events.at(0);
     } else {
       FAIL() << "expected value, but got none, writer: " << *writer;
     }

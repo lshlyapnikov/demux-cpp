@@ -21,7 +21,6 @@
 #include <exception>
 #include <iostream>
 #include <limits>
-#include <optional>
 #include <span>
 #include <string>
 #include <thread>
@@ -203,9 +202,9 @@ template <typename M, size_t N>
   int attempt = 0;
 
   while (true) {
-    std::optional<M*> ptr = writer->next();
-    if (ptr.has_value()) {
-      *(ptr.value()) = md;
+    M* ptr = writer->next();
+    if (ptr) {
+      *ptr = md;
       return writer->commit();
     }
     attempt += 1;
@@ -262,10 +261,9 @@ auto run_reader_loop(DemuxReader<M, N, false>* reader, const uint64_t msg_num) n
 
   // consume the expected number of messages
   for (uint64_t i = 0; i < msg_num;) {
-    const std::optional<const M*> read = reader->next();
-    if (read.has_value()) {
+    const M* const md = reader->next();
+    if (md) {
       i += 1;
-      const M* md = read.value();
       // track the latency
       histogram.record_value(calculate_latency(md->timestamp));
       LOG_DEBUG << *md;

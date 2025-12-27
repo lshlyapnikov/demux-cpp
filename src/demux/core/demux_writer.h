@@ -8,10 +8,9 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <memory>
-#include <optional>
 #include <ostream>
-#include <span>
 #include <vector>
 #include "../util/boost_log_util.h"
 #include "./message_buffer.h"
@@ -21,9 +20,7 @@ namespace lshl::demux::core {
 
 using std::array;
 using std::atomic;
-using std::optional;
 using std::size_t;
-using std::span;
 using std::uint64_t;
 using std::uint8_t;
 using std::vector;
@@ -108,9 +105,11 @@ class DemuxWriter {
   DemuxWriter(DemuxWriter&&) = default;
   auto operator=(DemuxWriter&&) -> DemuxWriter& = delete;
 
+  [[nodiscard]] static auto fast_modulo_N(const size_t x) -> size_t { return x & (N - 1); }
+
   [[nodiscard]] auto tail() const noexcept -> size_t { return this->tail_->load(std::memory_order_relaxed); }
 
-  [[nodiscard]] auto next() noexcept -> std::optional<M*>;
+  [[nodiscard]] auto next() noexcept -> M*;
 
   [[nodiscard]] auto message_count() const noexcept -> uint64_t { return this->message_count_; }
 
@@ -123,16 +122,16 @@ class DemuxWriter {
   friend auto operator<<(std::ostream& os, const DemuxWriter<M0, N0, B0>& writer) -> std::ostream&;
 
  private:
-  [[nodiscard]] auto next_() noexcept -> std::optional<M*>;
+  [[nodiscard]] auto next_() noexcept -> M*;
 };
 
 template <typename M, size_t N, bool B>
-auto DemuxWriter<M, N, B>::next() noexcept -> std::optional<M*> {
-  std::optional<M*> ptr = this->next_();
+auto DemuxWriter<M, N, B>::next() noexcept -> M* {
+  M* ptr = this->next_();
 
   // If blocking mode is enabled, keep trying until we get a valid pointer
   if constexpr (B) {
-    while (!ptr) {
+    while (ptr == nullptr) {
       ptr = this->next_();
     }
   }
@@ -143,10 +142,10 @@ auto DemuxWriter<M, N, B>::next() noexcept -> std::optional<M*> {
 template <typename M, size_t N, bool B>
 template <class... Args>
 auto DemuxWriter<M, N, B>::emplace(Args&&... args) noexcept -> bool {
-  std::optional<M*> ptr = this->next();
+  M* ptr = this->next();
   if (ptr) {
-    std::destroy_at(*ptr);
-    std::construct_at(*ptr, std::forward<Args>(args)...);
+    std::destroy_at(ptr);
+    std::construct_at(ptr, std::forward<Args>(args)...);
     return true;
   } else {
     return false;
@@ -154,15 +153,15 @@ auto DemuxWriter<M, N, B>::emplace(Args&&... args) noexcept -> bool {
 }
 
 template <typename M, size_t N, bool B>
-auto DemuxWriter<M, N, B>::next_() noexcept -> std::optional<M*> {
+auto DemuxWriter<M, N, B>::next_() noexcept -> M* {
   const size_t current_tail = this->tail_->load(std::memory_order_relaxed);
-  const size_t next_tail = (current_tail + 1) & (N - 1);  // wrap-around optimization for modulo N
+  const size_t next_tail = fast_modulo_N(current_tail + 1);
 
   LOG_DEBUG << "[DemuxWriter::next] current_tail: " << current_tail << ", next_tail: " << next_tail;
 
   if (UNSET_TAIL != this->next_tail_) {
     LOG_WARNING << "[DemuxWriter::next] there is uncommited write at tail: " << current_tail;
-    return std::nullopt;
+    return nullptr;
   }
 
   // TODO(Leonid): find a way to avoid checking all readers every time, cache the slowest reader position?
@@ -171,7 +170,7 @@ auto DemuxWriter<M, N, B>::next_() noexcept -> std::optional<M*> {
     if (active_readers_[i]) {
       // If the next tail catches up to ANY head, the buffer is full for that reader
       if (next_tail == heads_[i]->load(std::memory_order_acquire)) {
-        return std::nullopt;
+        return nullptr;
       }
     }
   }

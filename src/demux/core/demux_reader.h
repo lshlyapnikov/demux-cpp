@@ -8,7 +8,6 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
-#include <optional>
 #include <ostream>
 #include <span>
 #include "../util/boost_log_util.h"
@@ -19,7 +18,6 @@ namespace lshl::demux::core {
 
 using std::array;
 using std::atomic;
-using std::optional;
 using std::size_t;
 using std::span;
 using std::uint64_t;
@@ -79,14 +77,14 @@ class DemuxReader {
    *    reference.
    * @return `optional` message.
    */
-  [[nodiscard]] auto next() noexcept -> optional<const M*>;
+  [[nodiscard]] auto next() noexcept -> const M*;
 
   template <typename M0, size_t N0, bool B0>
   friend auto operator<<(std::ostream& os, const DemuxReader<M0, N0, B0>& reader) -> std::ostream&;
 };
 
 template <typename M, size_t N, bool B>
-auto DemuxReader<M, N, B>::next() noexcept -> optional<const M*> {
+auto DemuxReader<M, N, B>::next() noexcept -> const M* {
   size_t head = this->head_->load(std::memory_order_relaxed);
   size_t tail = this->tail_->load(std::memory_order_acquire);
 
@@ -96,7 +94,7 @@ auto DemuxReader<M, N, B>::next() noexcept -> optional<const M*> {
         tail = this->tail_->load(std::memory_order_acquire);
       }
     } else {
-      return std::nullopt;
+      return nullptr;
     }
   }
 

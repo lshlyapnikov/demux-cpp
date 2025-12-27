@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <random>
 #include <variant>
 
@@ -64,7 +65,7 @@ struct FastRng {
   using result_type = uint64_t;
 
   static constexpr auto min() noexcept -> uint64_t { return 0; }
-  static constexpr auto max() noexcept -> uint64_t { return UINT64_MAX; }
+  static constexpr auto max() noexcept -> uint64_t { return std::numeric_limits<uint64_t>::max(); }
 
   auto operator()() noexcept -> uint64_t {
     // NOLINTBEGIN(readability-magic-numbers, cppcoreguidelines-avoid-magic-numbers)
