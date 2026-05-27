@@ -1,3 +1,5 @@
+# cspell:disable
+
 cmake_minimum_required(VERSION 3.24)
 project(demux-cpp LANGUAGES CXX)
 
@@ -24,11 +26,13 @@ set(MY_CXX_FLAGS -Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wconversio
 # tools
 #
 
-find_program(CCACHE_PROGRAM ccache)
-if(CCACHE_PROGRAM)
-    message("Found ccache: ${CCACHE_PROGRAM}")
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
-endif()
+# disabled, I think it didn't recompile some of my perf tuning, I had call `ccache -C` every time.
+#
+# find_program(CCACHE_PROGRAM ccache)
+# if(CCACHE_PROGRAM)
+#     message("Found ccache: ${CCACHE_PROGRAM}")
+#     set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+# endif()
 
 #
 # dependencies
@@ -197,6 +201,19 @@ target_compile_options(emplace_variant_test
   PRIVATE ${MY_CXX_FLAGS}
 )
 gtest_discover_tests(emplace_variant_test)
+
+add_executable(util_test
+  src/demux/test/util_test.cpp
+)
+target_link_libraries(util_test
+  PRIVATE gtest::gtest
+  PRIVATE rapidcheck::rapidcheck
+  PRIVATE Boost::log
+)
+target_compile_options(util_test
+  PRIVATE ${MY_CXX_FLAGS}
+)
+gtest_discover_tests(util_test)
 
 # add_executable(${xyz}_test
 #   src/demux/test/${xyz}_test.cpp

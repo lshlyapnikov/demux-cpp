@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "./market_event.h"
-#include <chrono>
 #include <cstdint>
 #include <iostream>
 #include <limits>
 #include <variant>
+#include "../util/timestamp_util.h"
 
 namespace lshl::demux::example {
 
@@ -56,11 +56,7 @@ auto MarketDataUpdateGenerator::generate_market_data_update(MarketDataUpdate* ou
   output->level = generate_level_();
   output->price = generate_price_();
   output->size = generate_size_();
-
-  const std::chrono::time_point<std::chrono::steady_clock, std::chrono::nanoseconds> now =
-      std::chrono::steady_clock::now();
-  const uint64_t x = static_cast<uint64_t>(now.time_since_epoch().count());
-  output->timestamp = x;
+  output->timestamp = util::timestamp_counter();
 }
 
 inline auto MarketDataUpdateGenerator::generate_side_() noexcept -> Side {

@@ -62,13 +62,13 @@ jobs:
         working-directory: ${{github.workspace}}
         run: cmake --build ./build --target test
 
-      - name: Run Example use_emplace=false
+      - name: Run Example msg_num=10000000, use_emplace=false, calculate_hash=true
         working-directory: ${{github.workspace}}
-        run: ./bin/run-example.sh 10000000 false
+        run: ./bin/run-example.sh 10000000 false true
 
-      - name: Run Example use_emplace=true
+      - name: Run Example msg_num=10000000, use_emplace=true, calculate_hash=true
         working-directory: ${{github.workspace}}
-        run: ./bin/run-example.sh 10000000 true
+        run: ./bin/run-example.sh 10000000 true true
 
       - name: Run clang-tidy Checks
         working-directory: ${{github.workspace}}

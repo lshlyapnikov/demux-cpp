@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <immintrin.h>
 #include <array>
 #include <atomic>
 #include <cassert>
@@ -11,6 +12,7 @@
 #include <ostream>
 #include <span>
 #include "../util/boost_log_util.h"
+#include "../util/fast_math.h"
 #include "./message_buffer.h"
 #include "./reader_id.h"
 
@@ -42,6 +44,8 @@ class DemuxReader {
   /// write.
   const atomic<size_t>* tail_;
 
+  size_t last_tail_;
+
   /// @brief Reader's head, the positions of the last read message.
   atomic<size_t>* head_;
 
@@ -49,7 +53,7 @@ class DemuxReader {
 
  public:
   DemuxReader(const ReaderId& reader_id, array<M, N>* buffer, const atomic<size_t>* tail, atomic<size_t>* head) noexcept
-      : id_(reader_id), buffer_(buffer), tail_(tail), head_(head) {
+      : id_(reader_id), buffer_(buffer), tail_(tail), last_tail_(tail_->load(std::memory_order_relaxed)), head_(head) {
     LOG_INFO << "[DemuxReader::constructor] M: " << typeid(M).name() << ", N: " << N << ", B: " << B
              << ", state: " << *this;
   }
@@ -83,6 +87,7 @@ class DemuxReader {
   friend auto operator<<(std::ostream& os, const DemuxReader<M0, N0, B0>& reader) -> std::ostream&;
 };
 
+/*
 template <typename M, size_t N, bool B>
 auto DemuxReader<M, N, B>::next() noexcept -> const M* {
   size_t head = this->head_->load(std::memory_order_relaxed);
@@ -91,9 +96,11 @@ auto DemuxReader<M, N, B>::next() noexcept -> const M* {
   if (head == tail) {
     if constexpr (B) {
       while (head == tail) {
+        _mm_pause();
         tail = this->tail_->load(std::memory_order_acquire);
       }
     } else {
+      _mm_pause();
       return nullptr;
     }
   }
@@ -105,11 +112,49 @@ auto DemuxReader<M, N, B>::next() noexcept -> const M* {
 
   return ptr;
 }
+*/
+
+template <typename M, size_t N, bool B>
+auto DemuxReader<M, N, B>::next() noexcept -> const M* {
+  size_t head = this->head_->load(std::memory_order_relaxed);
+  // size_t tail = this->tail_->load(std::memory_order_acquire);
+
+  bool empty = (head == last_tail_);
+
+  if constexpr (B) {
+    while (empty) {
+      // busy-spin
+      _mm_pause();
+      last_tail_ = this->tail_->load(std::memory_order_acquire);
+      empty = (head == last_tail_);
+    }
+  } else {
+    if (empty) {
+      last_tail_ = this->tail_->load(std::memory_order_acquire);
+      empty = (head == last_tail_);
+    }
+  }
+
+  // branchless optimization
+
+  const bool has_data = !empty;
+
+  const M* ptr = this->buffer_->data() + head;
+  const size_t next_head = util::fast_modulo<N>(head + static_cast<size_t>(has_data));  // (head + 1) % N
+  this->head_->store(next_head, std::memory_order_release);
+  this->message_count_ += static_cast<uint64_t>(has_data);  // += 1
+
+  if (!has_data) {
+    _mm_pause();
+  }
+
+  return has_data ? ptr : nullptr;
+}
 
 template <typename M, size_t N, bool B>
 auto operator<<(std::ostream& os, const DemuxReader<M, N, B>& reader) -> std::ostream& {
   os << "DemuxReader{id:" << reader.id_ << ", head:" << reader.head_->load(std::memory_order_relaxed)
-     << ", tail:" << reader.tail_->load(std::memory_order_relaxed) << "}";
+     << ", tail:" << reader.tail_->load(std::memory_order_relaxed) << ", last_tail_:" << reader.last_tail_ << "}";
   return os;
 }
 

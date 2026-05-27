@@ -16,6 +16,8 @@ using std::uint32_t;
 using std::uint64_t;
 using std::variant;
 
+constexpr size_t CACHE_LINE_SIZE = std::hardware_destructive_interference_size;
+
 // helper type for the visitor, see std::visit documentation
 template <class... Ts>
 struct VisitorOverloads : Ts... {
@@ -27,7 +29,7 @@ enum class Side : std::uint8_t { Bid, Ask };
 auto operator<<(std::ostream& os, const Side& side) -> std::ostream&;
 
 // NOLINTBEGIN(misc-non-private-member-variables-in-classes)
-struct MarketDataUpdate {
+struct alignas(CACHE_LINE_SIZE) MarketDataUpdate {
   uint32_t instrument_id;
   Side side;
   uint64_t price;
@@ -42,7 +44,7 @@ struct MarketDataUpdate {
 auto operator<<(std::ostream& os, const MarketDataUpdate& md) -> std::ostream&;
 
 // NOLINTBEGIN(misc-non-private-member-variables-in-classes)
-struct MarketTradeUpdate {
+struct alignas(CACHE_LINE_SIZE) MarketTradeUpdate {
   uint32_t instrument_id;
   Side side;
   uint64_t price;

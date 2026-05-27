@@ -13,6 +13,7 @@
 #include <ostream>
 #include <vector>
 #include "../util/boost_log_util.h"
+#include "../util/fast_math.h"
 #include "./message_buffer.h"
 #include "./reader_id.h"
 
@@ -41,7 +42,7 @@ class DemuxWriter {
   /// Special value indicating that tail is not set.
   static constexpr size_t UNSET_TAIL = std::numeric_limits<size_t>::max();
 
-  static_assert((N & (N - 1)) == 0, "N must be a power of 2 for optimization");
+  static_assert(N % 2 == 0, "N must be a power of 2 for optimization");
   static_assert(N > 0, "N must be greater than 0");
   static_assert(N < UNSET_TAIL, "numeric_limits<size_t>::max() used for UNSET_TAIL");
 
@@ -105,8 +106,6 @@ class DemuxWriter {
   DemuxWriter(DemuxWriter&&) = default;
   auto operator=(DemuxWriter&&) -> DemuxWriter& = delete;
 
-  [[nodiscard]] static auto fast_modulo_N(const size_t x) -> size_t { return x & (N - 1); }
-
   [[nodiscard]] auto tail() const noexcept -> size_t { return this->tail_->load(std::memory_order_relaxed); }
 
   [[nodiscard]] auto next() noexcept -> M*;
@@ -155,7 +154,7 @@ auto DemuxWriter<M, N, B>::emplace(Args&&... args) noexcept -> bool {
 template <typename M, size_t N, bool B>
 auto DemuxWriter<M, N, B>::next_() noexcept -> M* {
   const size_t current_tail = this->tail_->load(std::memory_order_relaxed);
-  const size_t next_tail = fast_modulo_N(current_tail + 1);
+  const size_t next_tail = util::fast_modulo<N>(current_tail + 1);
 
   LOG_DEBUG << "[DemuxWriter::next] current_tail: " << current_tail << ", next_tail: " << next_tail;
 
@@ -165,6 +164,8 @@ auto DemuxWriter<M, N, B>::next_() noexcept -> M* {
   }
 
   // TODO(Leonid): find a way to avoid checking all readers every time, cache the slowest reader position?
+  //               this isn't a bottlneck at the moment!!!
+
   // Check every active reader's head
   for (size_t i = 0; i < active_readers_.size(); ++i) {
     if (active_readers_[i]) {
@@ -177,7 +178,7 @@ auto DemuxWriter<M, N, B>::next_() noexcept -> M* {
 
   this->next_tail_ = next_tail;
 
-  return &((*buffer_)[current_tail]);
+  return this->buffer_->data() + current_tail;
 }
 
 template <typename M, size_t N, bool B>

@@ -1,9 +1,9 @@
+# cspell:disable
 # pylint: disable=missing-module-docstring,missing-class-docstring,missing-function-docstring,line-too-long
 import os
 from conan import ConanFile
 from conan.tools.cmake import CMakeToolchain, CMake, CMakeDeps, cmake_layout
 from conan.tools.files import copy
-
 
 class DemuxCppRecipe(ConanFile):
     name = "demux-cpp"
@@ -12,7 +12,6 @@ class DemuxCppRecipe(ConanFile):
 
     # Optional metadata
     license = "Apache-2.0"
-    #url = "<Package recipe repository url here, for issues about the package>"
     url = "https://github.com/lshlyapnikov/demux-cpp"
     homepage = "https://github.com/lshlyapnikov/demux-cpp"
     description = "C++ Lock-free Demultiplexer Queue"
@@ -27,7 +26,7 @@ class DemuxCppRecipe(ConanFile):
     exports_sources = "CMakeLists.txt", "src/*", "include/*", "test/*"
 
     def requirements(self):
-        if self.settings.build_type == "RelWithDebInfo":
+        if self.settings.build_type == "RelWithDebInfo": # pylint: disable=no-member
             self.requires("gperftools/2.17.2")
         self.requires("boost/1.88.0")
         self.requires("xxhash/0.8.3")
@@ -39,7 +38,7 @@ class DemuxCppRecipe(ConanFile):
         if self.options.shared:
             self.options.rm_safe("fPIC")
 
-        if self.settings.build_type == "RelWithDebInfo":
+        if self.settings.build_type == "RelWithDebInfo": # pylint: disable=no-member
             self.options["gperftools"].build_cpu_profiler = True
             self.options["gperftools"].build_heap_profiler = True
 

@@ -42,11 +42,32 @@ struct alignas(CACHE_LINE_SIZE) CacheLinePaddedAtomic {
 
 template <typename M, size_t N>
 struct alignas(CACHE_LINE_SIZE) CacheLinePaddedArray {
-  static_assert((N & (N - 1)) == 0, "N must be a power of 2 for optimization");
+  static_assert(N % 2 == 0, "N must be a power of 2 for optimization");
   std::array<M, N> value{};
 };
 
-template <typename M, size_t N>
+template <typename M, size_t N, size_t R>
+struct ShmData {
+  static_assert(N % 2 == 0, "N must be a power of 2 for optimization");
+
+  // SECTION 1: WRITER HOT (Reader Cold)
+  alignas(CACHE_LINE_SIZE) std::atomic<size_t> tail;
+
+  // SECTION 2: THE DATA (Shared Hot)
+  // Keep this aligned so it starts on a fresh cache line
+  alignas(CACHE_LINE_SIZE) std::array<M, N> buffer;
+
+  // TODO(Leonid): does this gap really improve anything???
+  // SECTION 3: THE GAP (Critical)
+  // Prevents the Prefetcher from crossing between Buffer and Reader state
+  alignas(2 * CACHE_LINE_SIZE) std::array<uint8_t, 2 * CACHE_LINE_SIZE> unused_padding_{};
+
+  // SECTION 4: READER HOT (Writer Cold)
+  // Each Reader gets its own isolated cache line
+  alignas(CACHE_LINE_SIZE) std::array<CacheLinePaddedAtomic<size_t>, R> heads{};
+};
+
+template <typename M, size_t N, size_t R>
 class ShmManager {
  private:
   std::optional<ShmRemover> remover_;  // needed for create_only mode to remove shared memory on destruction
@@ -66,15 +87,16 @@ class ShmManager {
         segment_(bipc::create_only, name.c_str(), segment_size),
         readers_num_(readers_num) {
     LOG_INFO << "[startup] created managed_shared_memory segment: " << this->name_ << ", BUFFER_SIZE: " << N
-             << ", readers_num: " << this->readers_num_ << ", requested segment_size: " << segment_size
-             << ", segment.size: " << this->segment_.get_size()
+             << ", readers_num: " << static_cast<int>(this->readers_num_) << ", R: " << R
+             << ", requested segment_size: " << segment_size << ", segment.size: " << this->segment_.get_size()
              << ", segment.free_memory: " << this->segment_.get_free_memory();
   }
 
   explicit ShmManager(bipc::open_only_t /*unused*/, const std::string& name)
       : remover_(std::nullopt), name_(name), segment_(bipc::open_only, name.c_str()), readers_num_(0) {
     LOG_INFO << "[startup] opened managed_shared_memory segment: " << this->name_ << ", BUFFER_SIZE: " << N
-             << ", readers_num: " << this->readers_num_ << ", segment.size: " << this->segment_.get_size()
+             << ", readers_num: " << static_cast<int>(this->readers_num_)
+             << ", segment.size: " << this->segment_.get_size()
              << ", segment.free_memory: " << this->segment_.get_free_memory();
   }
 
@@ -84,6 +106,25 @@ class ShmManager {
   auto operator=(const ShmManager&) -> ShmManager& = delete;      // copy assignment
   ShmManager(ShmManager&&) noexcept = delete;                     // move constructor
   auto operator=(ShmManager&&) noexcept -> ShmManager& = delete;  // move assignment
+
+  [[nodiscard]] auto construct_shm_data() noexcept(false) -> ShmData<M, N, R>* {
+    auto* result = segment_.construct<ShmData<M, N, R>>("shm_data")();
+    if (result == nullptr) {
+      throw std::runtime_error("can't construct in shared memory: shm_data");
+    }
+    LOG_INFO << "[construct_shm_data] buffer allocated, segment.free_memory: " << this->segment_.get_free_memory()
+             << " cache line aligned: " << is_cache_line_aligned(result);
+    return result;
+  }
+
+  [[nodiscard]] auto find_shm_data() noexcept(false) -> ShmData<M, N, R>* {
+    auto* result = segment_.template find<ShmData<M, N, R>>("shm_data").first;
+    if (result == nullptr) {
+      throw std::runtime_error("can't find in shared memory: shm_data");
+    }
+    LOG_INFO << "[find_shm_data] buffer found" << ", cache line aligned: " << is_cache_line_aligned(result);
+    return result;
+  }
 
   [[nodiscard]] auto construct_buffer() noexcept(false) -> std::array<M, N>* {
     auto* result = segment_.template construct<CacheLinePaddedArray<M, N>>("buffer")();
