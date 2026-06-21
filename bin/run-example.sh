@@ -12,12 +12,15 @@ __root="$(cd "$(dirname "${__dir}")" && pwd)"
 
 cd "${__root}"
 
-zero_copy=${1:-"false"}
-msg_num=${2:-10000000}
+msg_num=${1:-10000000}
+use_emplace=${2:-"false"}
+calculate_hash=${3:-"true"}
 
 # start writer expecting 2 readers
-#CPUPROFILE=shm_demux_writer.prof CPUPROFILE_FREQUENCY=1000 \
-./build/shm_demux writer 2 "${msg_num}" "${zero_copy}" > ./example-writer.log 2>&1 &
+# CPUPROFILE=example-writer.prof CPUPROFILE_FREQUENCY=1000 \
+# perf stat \
+taskset -c 3 \
+./build/shm_demux writer 2 "${msg_num}" "${use_emplace}" "${calculate_hash}" > ./example-writer.log 2>&1 &
 writer_pid="$!"
 
 # let the writer start and initialize all shared memory objects, it will wait for both readers
@@ -25,8 +28,21 @@ sleep 2s
 
 # start 2 readers
 
-./build/shm_demux reader 1 "${msg_num}" "${zero_copy}" &> ./example-reader-1.log &
-./build/shm_demux reader 2 "${msg_num}" "${zero_copy}" &> ./example-reader-2.log &
+# CPUPROFILE=example-reader-0.prof CPUPROFILE_FREQUENCY=1000 \
+# perf record -e task-clock,context-switches,cpu-migrations,page-faults,instructions,cycles,branches,branch-misses \
+# perf record -e branches,branch-misses \
+# perf stat \
+# perf record -e L1-dcache-load-misses,L1-icache-load-misses,LLC-load-misses \
+# perf stat -e instructions,cycles,branches,branch-misses,cache-references,cache-misses,L1-dcache-load-misses \
+# perf record -e L1-dcache-load-misses:u -g \
+# perf stat \
+taskset -c 4 \
+./build/shm_demux reader 0 "${msg_num}" "${use_emplace}" "${calculate_hash}" &> ./example-reader-0.log &
+
+#CPUPROFILE=example-reader-1.prof CPUPROFILE_FREQUENCY=1000 \
+# perf stat \
+taskset -c 5 \
+./build/shm_demux reader 1 "${msg_num}" "${use_emplace}" "${calculate_hash}" &> ./example-reader-1.log &
 
 # report the state
 #ps -ef|grep -F "./build/shm_demux"
@@ -58,7 +74,7 @@ done
 if $all_equal; then
   echo "All Write and Read hash codes are equal: " "${hash_codes[@]}"
 else
-  echo "Found unequals hash codes: " "${hash_codes[@]}"
+  echo "Found unequal hash codes: " "${hash_codes[@]}"
   exit 100
 fi
 

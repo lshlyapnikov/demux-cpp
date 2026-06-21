@@ -1,4 +1,6 @@
-cmake_minimum_required(VERSION 3.20)
+# cspell:disable
+
+cmake_minimum_required(VERSION 3.24)
 project(demux-cpp LANGUAGES CXX)
 
 set(CMAKE_VERBOSE_MAKEFILE ON) # verbose CMake output
@@ -20,19 +22,17 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # generate a compile_commands.json file, n
 #set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wconversion -Wsign-conversion -Werror")
 set(MY_CXX_FLAGS -Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wconversion -Wsign-conversion -Werror)
 
-# set in conan profile
-#set(CMAKE_CXX_FLAGS_DEBUG "-gdwarf-4 -O0") # valgrind needs `-gdwarf-4`
-#set(CMAKE_CXX_FLAGS_DEBUG "-g -gdwarf-4 -O3 -DNDEBUG") # `-03 -DNDEBUG` for gperftools
-
 #
 # tools
 #
 
-find_program(CCACHE_PROGRAM ccache)
-if(CCACHE_PROGRAM)
-    message("Found ccache: ${CCACHE_PROGRAM}")
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
-endif()
+# disabled, I think it didn't recompile some of my perf tuning, I had call `ccache -C` every time.
+#
+# find_program(CCACHE_PROGRAM ccache)
+# if(CCACHE_PROGRAM)
+#     message("Found ccache: ${CCACHE_PROGRAM}")
+#     set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+# endif()
 
 #
 # dependencies
@@ -40,6 +40,7 @@ endif()
 
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost REQUIRED COMPONENTS log)
+find_package(Boost REQUIRED COMPONENTS stacktrace)
 
 # example uses this to compute hash digest of sent and received messages
 find_package(xxHash REQUIRED)
@@ -70,25 +71,27 @@ target_link_libraries(${PROJECT_NAME}
   PRIVATE reader_id  # TODO(Leonid): should these two be PUBLIC, so other projects can get the automatically
 )
 
-##
-## TODO(Leonid): example is disabled temporarily, enable it back
-## add_executable(shm_demux
-#   src/demux/example/shm_demux.cpp
-#   src/demux/example/market_data.cpp
-# )
-# target_link_libraries(shm_demux
-#   PRIVATE reader_id
-#   PRIVATE hdr_histogram::hdr_histogram_static
-#   PRIVATE Boost::log
-#   PRIVATE Boost::stacktrace_backtrace
-#   PRIVATE Boost::stacktrace_from_exception
-# )
-# if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-#     target_link_libraries(shm_demux PRIVATE profiler)
-# endif()
-# target_compile_options(shm_demux
-#   PRIVATE ${MY_CXX_FLAGS}
-# )
+add_executable(shm_demux
+  src/demux/example/shm_demux.cpp
+)
+target_link_libraries(shm_demux
+  PRIVATE market_event
+  PRIVATE reader_id
+  PRIVATE hdr_histogram::hdr_histogram_static
+  PRIVATE Boost::log
+  PRIVATE Boost::stacktrace_backtrace
+  PRIVATE Boost::stacktrace_from_exception
+)
+if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+    message(STATUS "gperftools is being linked!")
+    find_package(gperftools REQUIRED)
+    target_link_libraries(shm_demux PRIVATE gperftools::profiler)
+    # require ProfilerStart and IsHeapProfilerRunning, so linker does not optimize it out
+    target_link_options(shm_demux PRIVATE "LINKER:-u,ProfilerStart")
+endif()
+target_compile_options(shm_demux
+  PRIVATE ${MY_CXX_FLAGS}
+)
 
 add_library(reader_id
   OBJECT src/demux/core/reader_id.cpp
@@ -107,7 +110,17 @@ target_compile_options(operators
 add_library(test_message
   OBJECT src/demux/test/test_message.cpp
 )
+target_link_libraries(test_message
+  PRIVATE rapidcheck::rapidcheck
+)
 target_compile_options(test_message
+  PRIVATE ${MY_CXX_FLAGS}
+)
+
+add_library(market_event
+  src/demux/example/market_event.cpp
+)
+target_compile_options(market_event
   PRIVATE ${MY_CXX_FLAGS}
 )
 
@@ -140,11 +153,12 @@ target_compile_options(message_buffer_test
 )
 gtest_discover_tests(message_buffer_test)
 
-add_executable(demultiplexer_test
-  src/demux/test/demultiplexer_test.cpp
+add_executable(demux_test
+  src/demux/test/demux_test.cpp
 )
-target_link_libraries(demultiplexer_test
+target_link_libraries(demux_test
   PRIVATE operators
+  PRIVATE market_event
   PRIVATE test_message
   PRIVATE reader_id
   PRIVATE gtest::gtest
@@ -152,10 +166,10 @@ target_link_libraries(demultiplexer_test
   PRIVATE Boost::log
   PRIVATE atomic
 )
-target_compile_options(demultiplexer_test
+target_compile_options(demux_test
   PRIVATE ${MY_CXX_FLAGS}
 )
-gtest_discover_tests(demultiplexer_test)
+gtest_discover_tests(demux_test)
 
 add_executable(shm_manager_test
   src/demux/test/shm_manager_test.cpp
@@ -172,3 +186,47 @@ target_compile_options(shm_manager_test
   PRIVATE ${MY_CXX_FLAGS}
 )
 gtest_discover_tests(shm_manager_test)
+
+add_executable(emplace_variant_test
+  src/demux/test/emplace_variant_test.cpp
+)
+target_link_libraries(emplace_variant_test
+  PRIVATE market_event
+  PRIVATE operators
+  PRIVATE gtest::gtest
+  PRIVATE rapidcheck::rapidcheck
+  PRIVATE Boost::log
+)
+target_compile_options(emplace_variant_test
+  PRIVATE ${MY_CXX_FLAGS}
+)
+gtest_discover_tests(emplace_variant_test)
+
+add_executable(util_test
+  src/demux/test/util_test.cpp
+)
+target_link_libraries(util_test
+  PRIVATE gtest::gtest
+  PRIVATE rapidcheck::rapidcheck
+  PRIVATE Boost::log
+)
+target_compile_options(util_test
+  PRIVATE ${MY_CXX_FLAGS}
+)
+gtest_discover_tests(util_test)
+
+# add_executable(${xyz}_test
+#   src/demux/test/${xyz}_test.cpp
+# )
+# target_link_libraries(${xyz}_test
+#   PRIVATE operators
+#   PRIVATE reader_id
+#   PRIVATE gtest::gtest
+#   PRIVATE rapidcheck::rapidcheck
+#   PRIVATE Boost::log
+#   PRIVATE atomic
+# )
+# target_compile_options(${xyz}_test
+#   PRIVATE ${MY_CXX_FLAGS}
+# )
+# gtest_discover_tests(${xyz}_test)

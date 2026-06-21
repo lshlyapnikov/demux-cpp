@@ -8,10 +8,13 @@
 #include <span>
 #include "../core/demux_reader.h"
 #include "../core/demux_writer.h"
-#include "../util/xxhash_util.h"
-#include "./market_data.h"
+#include "./market_event.h"
 
 namespace lshl::demux::example {
+
+constexpr size_t READER_NUM = 2;
+constexpr bool BLOCKING = false;
+constexpr size_t BUFFER_SIZE = 8;
 
 using lshl::demux::core::DemuxReader;
 using lshl::demux::core::DemuxWriter;
@@ -24,30 +27,34 @@ auto init_logging() noexcept -> void;
 
 auto main_(std::span<char*> args) noexcept(false) -> int;
 
-template <uint8_t R, size_t L, uint16_t M>
-auto start_writer(uint8_t total_reader_num, uint64_t msg_num, bool zero_copy) noexcept(false) -> void;
+auto wait_for_readers(const std::atomic<size_t>* startup_reader_counter, const uint8_t total_reader_num) -> void;
 
-template <uint8_t R, size_t L, uint16_t M>
-auto run_writer_loop(DemuxWriter<R, L, M, false>* writer, uint64_t msg_num) noexcept(false) -> void;
+template <typename M, size_t N>
+auto start_writer(uint8_t total_reader_num, uint64_t msg_num, const bool emplace, const bool calculate_hash) noexcept(
+    false
+) -> void;
 
-template <class T, uint8_t R, size_t L, uint16_t M>
-[[nodiscard]] inline auto write(DemuxWriter<R, L, M, false>* writer, const T& md) noexcept -> bool;
+template <typename M, size_t N, typename WriteFn>
+auto run_writer_loop(
+    DemuxWriter<M, N, false>* writer,
+    const uint64_t msg_num,
+    const bool calculate_hash,
+    WriteFn write_fn
+) noexcept(false) -> void;
 
-template <uint8_t R, size_t L, uint16_t M>
-auto run_writer_loop_zero_copy(DemuxWriter<R, L, M, false>* writer, uint64_t msg_num) noexcept(false) -> void;
+template <typename M, size_t N>
+[[nodiscard]] inline auto write(DemuxWriter<M, N, false>* writer, const M& md) noexcept -> bool;
 
-template <uint8_t R, size_t L, uint16_t M>
-[[nodiscard]] inline auto write_zero_copy(
-    DemuxWriter<R, L, M, false>* writer,
-    MarketDataUpdateGenerator* md_gen,
-    lshl::demux::util::XXH64_util* hash
-) noexcept(false) -> bool;
+template <typename M, size_t N>
+[[nodiscard]] inline auto write_with_emplace(DemuxWriter<M, N, false>* writer, const M& md) noexcept -> bool;
 
-template <size_t L, uint16_t M>
-auto start_reader(uint8_t reader_num, uint64_t msg_num) noexcept(false) -> void;
+template <typename M, size_t N, bool B>
+auto start_reader(const core::ReaderId& reader_id, const uint64_t msg_num, const bool calculate_hash) noexcept(false)
+    -> void;
 
-template <size_t L, uint16_t M>
-auto run_reader_loop(DemuxReader<L, M>* reader, uint64_t msg_num) noexcept(false) -> void;
+template <typename M, size_t N, bool B>
+auto run_reader_loop(DemuxReader<M, N, B>* reader, const uint64_t msg_num, const bool calculate_hash) noexcept(false)
+    -> void;
 
 auto inline calculate_latency(uint64_t x0) -> int64_t;
 

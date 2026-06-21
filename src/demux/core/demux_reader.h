@@ -3,22 +3,22 @@
 
 #pragma once
 
+#include <immintrin.h>
+#include <array>
 #include <atomic>
 #include <cassert>
-#include <concepts>
 #include <cstdint>
 #include <cstring>
-#include <optional>
+#include <ostream>
 #include <span>
-#include <tuple>
-#include <utility>
-#include <vector>
 #include "../util/boost_log_util.h"
+#include "../util/fast_math.h"
 #include "./message_buffer.h"
 #include "./reader_id.h"
 
 namespace lshl::demux::core {
 
+using std::array;
 using std::atomic;
 using std::size_t;
 using std::span;
@@ -27,130 +27,134 @@ using std::uint8_t;
 
 /**
  * @brief Demultiplexer reader. Should be mapped into shared memory allocated by DemuxWriter.
- * @tparam `L` The size of the circular buffer in bytes.
- * @tparam `M` The max message size in bytes.
+ *
+ * @tparam M The type of the messages.
+ * @tparam N The number of messages/positions in the circular buffer.
  */
-template <size_t L, uint16_t M>
-  requires(L >= M + 2 && M > 0)
+template <typename M, size_t N, bool B>
+
 class DemuxReader {
  private:
-  const ReaderId id_;
+  ReaderId id_;
 
-  const MessageBuffer<L> buffer_;  // read only buffer
-  const atomic<uint64_t>* atomic_writer_sequence_;
-  atomic<size_t>* atomic_reader_position_;
+  /// @brief Circular buffer for reading messages.
+  array<M, N>* buffer_;
 
-  size_t reader_position_;
-  uint64_t writer_sequence_;
-  uint64_t reader_sequence_;
+  /// @brief Tail is the Writer's position, the position of the last written message. Const because Reader does not
+  /// write.
+  const atomic<size_t>* tail_;
+
+  size_t last_tail_;
+
+  /// @brief Reader's head, the positions of the last read message.
+  atomic<size_t>* head_;
+
+  uint64_t message_count_{0};
 
  public:
-  DemuxReader(
-      const ReaderId& reader_id,
-      const span<uint8_t, L> buffer,
-      const atomic<uint64_t>* writer_sequence,
-      atomic<size_t>* reader_position
-  ) noexcept
-      : id_(reader_id),
-        buffer_(buffer),
-        atomic_writer_sequence_(writer_sequence),
-        atomic_reader_position_(reader_position),
-        reader_position_(reader_position->load(std::memory_order_relaxed)),
-        writer_sequence_(writer_sequence->load(std::memory_order_relaxed)),
-        reader_sequence_(writer_sequence_) {
-    LOG_INFO << "[DemuxReader::constructor] L: " << L << ", M: " << M << " " << *this;
+  DemuxReader(const ReaderId& reader_id, array<M, N>* buffer, const atomic<size_t>* tail, atomic<size_t>* head) noexcept
+      : id_(reader_id), buffer_(buffer), tail_(tail), last_tail_(tail_->load(std::memory_order_relaxed)), head_(head) {
+    LOG_INFO << "[DemuxReader::constructor] M: " << typeid(M).name() << ", N: " << N << ", B: " << B
+             << ", state: " << *this;
   }
 
   ~DemuxReader() = default;
-  DemuxReader(const DemuxReader&) = delete;                     // no copy constructor, no reason to copy it
-  auto operator=(const DemuxReader&) -> DemuxReader& = delete;  // no copy assignment
-  DemuxReader(DemuxReader&&) = delete;                          // no move constructor
-  auto operator=(DemuxReader&&) -> DemuxReader& = delete;       // no move assignment
+
+  DemuxReader(const DemuxReader&) = delete;
+  auto operator=(const DemuxReader&) -> DemuxReader& = delete;
+
+  DemuxReader(DemuxReader&&) = default;
+  auto operator=(DemuxReader&&) -> DemuxReader& = delete;
+
+  [[nodiscard]] auto id() const noexcept -> const ReaderId& { return id_; }
+
+  [[nodiscard]] auto tail() const noexcept -> size_t { return this->tail_->load(std::memory_order_relaxed); }
+
+  [[nodiscard]] auto head() const noexcept -> size_t { return this->head_->load(std::memory_order_relaxed); }
+
+  [[nodiscard]] auto message_count() const noexcept -> uint64_t { return this->message_count_; }
 
   /**
-   * @brief Does not block. Calls `has_next`. Returns a `span` pointing to the object in the circular buffer.
-   *   Do not keep the reference to the returned `span` between `next` calls, the underlying bytes can be overriden
-   *   when circular buffer wraps around. Copy the content of the returned span if you need to keep the reference.
-   * @return message or empty span if no data available.
+   * @brief Returns an `optional` pointing to the object in the circular buffer.
+   *   Do not keep the reference to the returned `optional` between `next` calls, the underlying object can and will be
+   *    overriden when circular buffer wraps around. Copy the content of the returned `optional` if you need to keep a
+   *    reference.
+   * @return `optional` message.
    */
-  [[nodiscard]] auto next() noexcept -> span<const uint8_t>;
+  [[nodiscard]] auto next() noexcept -> const M*;
 
-  /**
-   * @brief Receives a reference to the next message in the circular buffer and deserializes the raw bytes into the
-   * object of type `T` using `reinterpret_cast`. `T` must be a simple, flat class without references to other
-   * objects; otherwise, behavior is unspecified. Consider using custom serialization/deserialization with `write`
-   * and `next` that take and return `span`.
-   * @see reinterpret_cast documentation
-   * @tparam T
-   * @return optional `T`.
-   */
-  template <class T>
-  [[nodiscard]] auto next_unsafe() noexcept -> std::optional<const T*>;
-
-  [[nodiscard]] auto id() const noexcept -> const ReaderId& { return this->id_; }
-
-  [[nodiscard]] auto has_next() noexcept -> bool;
-
-  [[nodiscard]] auto sequence() const noexcept -> uint64_t { return this->reader_sequence_; }
-
-  [[nodiscard]] auto position() const noexcept -> size_t { return this->reader_position_; }
-
-  template <size_t L1, uint16_t M1>
-  friend auto operator<<(std::ostream& os, const DemuxReader<L1, M1>& reader) -> std::ostream&;
+  template <typename M0, size_t N0, bool B0>
+  friend auto operator<<(std::ostream& os, const DemuxReader<M0, N0, B0>& reader) -> std::ostream&;
 };
 
-template <size_t L, uint16_t M>
-  requires(L >= M + 2 && M > 0)
-[[nodiscard]] auto DemuxReader<L, M>::next() noexcept -> span<const uint8_t> {
-  LOG_DEBUG << "[DemuxReader::next()] state0: " << *this;
+/*
+template <typename M, size_t N, bool B>
+auto DemuxReader<M, N, B>::next() noexcept -> const M* {
+  size_t head = this->head_->load(std::memory_order_relaxed);
+  size_t tail = this->tail_->load(std::memory_order_acquire);
 
-  if (!this->has_next()) {
-    return {};
+  if (head == tail) {
+    if constexpr (B) {
+      while (head == tail) {
+        _mm_pause();
+        tail = this->tail_->load(std::memory_order_acquire);
+      }
+    } else {
+      _mm_pause();
+      return nullptr;
+    }
   }
 
-  const span<uint8_t>& result = this->buffer_.read(this->reader_position_);
-  const size_t result_size = result.size();
-  assert(result_size <= M);
+  const M* ptr = &(*buffer_)[head];
+  const size_t next_head = (head + 1) & (N - 1);
+  this->head_->store(next_head, std::memory_order_release);
+  this->message_count_ += 1;
 
-  this->reader_sequence_ += 1;
+  return ptr;
+}
+*/
 
-  if (result_size > 0) {
-    this->reader_position_ += (sizeof(message_length_t) + result_size);
+template <typename M, size_t N, bool B>
+auto DemuxReader<M, N, B>::next() noexcept -> const M* {
+  size_t head = this->head_->load(std::memory_order_relaxed);
+  // size_t tail = this->tail_->load(std::memory_order_acquire);
+
+  bool empty = (head == last_tail_);
+
+  if constexpr (B) {
+    while (empty) {
+      // busy-spin
+      _mm_pause();
+      last_tail_ = this->tail_->load(std::memory_order_acquire);
+      empty = (head == last_tail_);
+    }
   } else {
-    this->reader_position_ = 0;  // wraparound
+    if (empty) {
+      last_tail_ = this->tail_->load(std::memory_order_acquire);
+      empty = (head == last_tail_);
+    }
   }
-  this->atomic_reader_position_->store(this->reader_position_, std::memory_order_release);
 
-  LOG_DEBUG << "[DemuxReader::next()] state1: " << *this << ", result_size: " << result_size;
-  assert(this->reader_position_ <= L);
-  return result;
-}
+  // branchless optimization
 
-template <size_t L, uint16_t M>
-  requires(L >= M + 2 && M > 0)
-template <class T>
-[[nodiscard]] auto DemuxReader<L, M>::next_unsafe() noexcept -> std::optional<const T*> {
-  const span<uint8_t> raw = this->next();
-  if (raw.empty()) {
-    return std::nullopt;
-  } else {
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-    const T* x = reinterpret_cast<const T*>(raw.data());
-    return std::make_optional(std::move(x));
+  const bool has_data = !empty;
+
+  const M* ptr = this->buffer_->data() + head;
+  const size_t next_head = util::fast_modulo<N>(head + static_cast<size_t>(has_data));  // (head + 1) % N
+  this->head_->store(next_head, std::memory_order_release);
+  this->message_count_ += static_cast<uint64_t>(has_data);  // += 1
+
+  if (!has_data) {
+    _mm_pause();
   }
+
+  return has_data ? ptr : nullptr;
 }
 
-template <size_t L, uint16_t M>
-  requires(L >= M + 2 && M > 0)
-[[nodiscard]] auto DemuxReader<L, M>::has_next() noexcept -> bool {
-  this->writer_sequence_ = this->atomic_writer_sequence_->load(std::memory_order_acquire);
-  return this->reader_sequence_ < this->writer_sequence_;
-}
-
-template <size_t L, uint16_t M>
-auto operator<<(std::ostream& os, const DemuxReader<L, M>& reader) -> std::ostream& {
-  os << "DemuxReader{id: " << reader.id() << ", writer_sequence_: " << reader.writer_sequence_
-     << ", reader_sequence: " << reader.reader_sequence_ << ", position: " << reader.reader_position_;
+template <typename M, size_t N, bool B>
+auto operator<<(std::ostream& os, const DemuxReader<M, N, B>& reader) -> std::ostream& {
+  os << "DemuxReader{id:" << reader.id_ << ", head:" << reader.head_->load(std::memory_order_relaxed)
+     << ", tail:" << reader.tail_->load(std::memory_order_relaxed) << ", last_tail_:" << reader.last_tail_ << "}";
   return os;
 }
 

@@ -25,8 +25,6 @@ class ReaderId {
 
   [[nodiscard]] auto value() const noexcept -> uint8_t { return this->value_; }
 
-  [[nodiscard]] auto index() const noexcept -> size_t { return this->value_; }
-
   auto operator==(const ReaderId& x) const noexcept -> bool { return this->value_ == x.value_; }
 
   auto operator<(const ReaderId& x) const noexcept -> bool { return this->value_ < x.value_; }

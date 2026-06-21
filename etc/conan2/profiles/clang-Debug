@@ -1,6 +1,6 @@
 # code: language=toml
+# cspell:disable
 # shellcheck disable=all
-# cSpell: disable
 
 include(clang-Common)
 

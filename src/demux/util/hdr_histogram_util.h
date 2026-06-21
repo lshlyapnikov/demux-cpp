@@ -5,9 +5,7 @@
 
 #include <hdr/hdr_histogram.h>
 #include <cstdint>
-#include <cstdio>
 #include <stdexcept>
-#include <string>
 
 namespace lshl::demux::util {
 
@@ -31,10 +29,9 @@ struct HDR_histogram_util {
   HDR_histogram_util(HDR_histogram_util&&) noexcept = delete;                     // move constructor
   auto operator=(HDR_histogram_util&&) noexcept -> HDR_histogram_util& = delete;  // move assignment
 
-  auto record_value(std::int64_t value) noexcept(false) -> void {
-    if (!hdr_record_value(this->histogram_, value)) {
-      throw std::domain_error(std::string("hdr_record_value failed: ") + std::to_string(value));
-    }
+  auto record_value(std::int64_t value) noexcept -> bool { return hdr_record_value(this->histogram_, value); }
+  auto record_value(std::uint64_t value) noexcept -> bool {
+    return hdr_record_value(this->histogram_, static_cast<std::int64_t>(value));
   }
 
   auto print_report() { hdr_percentiles_print(this->histogram_, stdout, 2, 1.0, format_type::CLASSIC); }
