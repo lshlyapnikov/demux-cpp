@@ -1,0 +1,11 @@
+# Enable all rules by default
+default: true
+
+# MD014 - Dollar signs used before commands without showing output
+MD014: false
+
+# MD040 - Fenced code blocks should have a language specified
+MD040: false
+
+# MD013 - Line length
+MD013: false
