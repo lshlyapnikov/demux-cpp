@@ -21,6 +21,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <thread>
 #include "../core/demultiplexer.h"
 #include "../core/reader_id.h"
@@ -63,8 +64,8 @@ auto main(int argc, char* argv[]) noexcept -> int {
 
 namespace lshl::demux::example {
 
-constexpr std::string BUFFER_SHARED_MEM_NAME{"lshl_demux_buf"};
-constexpr std::string UTIL_SHARED_MEM_NAME{"lshl_demux_util"};
+constexpr std::array<char, 15> BUFFER_SHARED_MEM_NAME{"lshl_demux_buf"};
+constexpr std::array<char, 16> UTIL_SHARED_MEM_NAME{"lshl_demux_util"};
 
 constexpr int REPORT_PROGRESS = 1000000;
 
@@ -134,18 +135,18 @@ auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool z
       L, lshl::demux::util::BOOST_IPC_INTERNAL_METADATA_SIZE, lshl::demux::util::LINUX_PAGE_SIZE
   );
 
-  LOG_INFO << "start_writer " << BUFFER_SHARED_MEM_NAME << ", size: " << SHM_SIZE << ", L: " << L << ", M: " << M
+  LOG_INFO << "start_writer " << BUFFER_SHARED_MEM_NAME.data() << ", size: " << SHM_SIZE << ", L: " << L << ", M: " << M
            << ", total_reader_num: " << static_cast<int>(total_reader_num) << ", zero_copy: " << zero_copy;
 
-  const ShmRemover remover1(BUFFER_SHARED_MEM_NAME.c_str());
-  const ShmRemover remover2(UTIL_SHARED_MEM_NAME.c_str());
+  const ShmRemover remover1(BUFFER_SHARED_MEM_NAME.data());
+  const ShmRemover remover2(UTIL_SHARED_MEM_NAME.data());
 
   const uint64_t all_readers_mask = ReaderId::all_readers_mask(total_reader_num);
 
   // segment for the circular buffer and message counter, written by writer, read by readers
   // NOLINTNEXTLINE(misc-include-cleaner)
-  bipc::managed_shared_memory segment1(bipc::create_only, BUFFER_SHARED_MEM_NAME.c_str(), SHM_SIZE);
-  LOG_INFO << "created shared_memory_object segment1: " << BUFFER_SHARED_MEM_NAME
+  bipc::managed_shared_memory segment1(bipc::create_only, BUFFER_SHARED_MEM_NAME.data(), SHM_SIZE);
+  LOG_INFO << "created shared_memory_object segment1: " << BUFFER_SHARED_MEM_NAME.data()
            << ", segment1.free_memory: " << segment1.get_free_memory();
 
   array<uint8_t, L>* buffer = segment1.construct<array<uint8_t, L>>("buffer")();
@@ -156,9 +157,9 @@ auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool z
 
   // segment for synchronization
   bipc::managed_shared_memory segment2(
-      bipc::create_only, UTIL_SHARED_MEM_NAME.c_str(), lshl::demux::util::LINUX_PAGE_SIZE
+      bipc::create_only, UTIL_SHARED_MEM_NAME.data(), lshl::demux::util::LINUX_PAGE_SIZE
   );
-  LOG_INFO << "created shared_memory_object segment2: " << UTIL_SHARED_MEM_NAME
+  LOG_INFO << "created shared_memory_object segment2: " << UTIL_SHARED_MEM_NAME.data()
            << ", segment2.free_memory: " << segment2.get_free_memory();
 
   atomic<uint64_t>* wraparound_sync = segment2.construct<atomic<uint64_t>>("wraparound_sync")(0);
@@ -289,13 +290,13 @@ auto start_reader(const uint8_t reader_num, const uint64_t msg_num) noexcept(fal
   using lshl::demux::example::BUFFER_SHARED_MEM_NAME;
   using std::atomic;
 
-  LOG_INFO << "reader BUFFER_SHARED_MEM_NAME: " << BUFFER_SHARED_MEM_NAME << ", L: " << L << ", M: " << M
+  LOG_INFO << "reader BUFFER_SHARED_MEM_NAME: " << BUFFER_SHARED_MEM_NAME.data() << ", L: " << L << ", M: " << M
            << ", reader_num: " << static_cast<int>(reader_num);
 
   // read-only segment for the circular buffer and message counter
   // NOLINTNEXTLINE(misc-include-cleaner)
-  bipc::managed_shared_memory segment1(bipc::open_read_only, BUFFER_SHARED_MEM_NAME.c_str());
-  LOG_INFO << "opened shared_memory_object segment1: " << BUFFER_SHARED_MEM_NAME
+  bipc::managed_shared_memory segment1(bipc::open_read_only, BUFFER_SHARED_MEM_NAME.data());
+  LOG_INFO << "opened shared_memory_object segment1: " << BUFFER_SHARED_MEM_NAME.data()
            << ", segment1.free_memory: " << segment1.get_free_memory();
 
   array<uint8_t, L>* buffer = segment1.find<array<uint8_t, L>>("buffer").first;
@@ -306,8 +307,8 @@ auto start_reader(const uint8_t reader_num, const uint64_t msg_num) noexcept(fal
 
   // read-write segment for atomic variables
   // NOLINTNEXTLINE(misc-include-cleaner)
-  bipc::managed_shared_memory segment2(bipc::open_only, UTIL_SHARED_MEM_NAME.c_str());
-  LOG_INFO << "opened shared_memory_object segment2: " << UTIL_SHARED_MEM_NAME
+  bipc::managed_shared_memory segment2(bipc::open_only, UTIL_SHARED_MEM_NAME.data());
+  LOG_INFO << "opened shared_memory_object segment2: " << UTIL_SHARED_MEM_NAME.data()
            << ", segment2.free_memory: " << segment2.get_free_memory();
 
   atomic<uint64_t>* wraparound_sync = segment2.find<atomic<uint64_t>>("wraparound_sync").first;

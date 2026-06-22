@@ -37,3 +37,6 @@ Testing/
 .vscode/numbered-bookmarks.json
 CMakeUserPresets.json
 .cache/
+
+perf.data
+perf.data.old

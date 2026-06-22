@@ -7,12 +7,12 @@
 
 #include "../core/message_buffer.h"
 #include <gtest/gtest.h>
-#include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
+#include <rapidcheck.h>
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <iostream>
-#include <memory>
 #include <span>
 #include <tuple>
 #include <vector>
@@ -85,18 +85,22 @@ TEST(MessageBufferTest, WriteToSharedMemory) {
     std::array<uint8_t, BUF_SIZE> data{0};
     MessageBuffer<BUF_SIZE> buf(span<uint8_t, BUF_SIZE>{data});
 
+    using lshl::demux::core::message_length_t;
     using lshl::demux::util::operator<<;
     std::cout << "data:    " << data << '\n';
 
     // write message to the buffer
     const size_t written = buf.write(0, message);
 
+    std::cout << "message: " << message << '\n';
+    std::cout << "buffer:  " << buf.data() << '\n';
+
     if (message.size() + 2 <= BUF_SIZE) {
       EXPECT_EQ(written, message.size() + 2);
 
       // copy 2 byte length field and check it
-      uint16_t length = 0;
-      std::copy_n(data.data(), sizeof(uint16_t), &length);
+      message_length_t length = 0;
+      std::memcpy(&length, data.data(), sizeof(message_length_t));
       EXPECT_EQ(length, message.size());
 
       // read message from the buffer
@@ -104,9 +108,7 @@ TEST(MessageBufferTest, WriteToSharedMemory) {
       EXPECT_EQ(read.size(), message.size());
 
       using lshl::demux::util::operator<<;
-      std::cout << "message: " << message << '\n';
-      std::cout << "data:    " << data << '\n';
-      std::cout << "buffer:  " << buf.data() << '\n';
+
       std::cout << "read:    " << read << '\n';
       std::cout << '\n';
 
