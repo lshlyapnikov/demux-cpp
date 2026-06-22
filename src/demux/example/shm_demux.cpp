@@ -21,7 +21,6 @@
 #include <optional>
 #include <span>
 #include <string>
-#include <string_view>
 #include <thread>
 #include "../core/demultiplexer.h"
 #include "../core/reader_id.h"
