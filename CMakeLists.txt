@@ -1,3 +1,4 @@
+# cspell: disable
 cmake_minimum_required(VERSION 3.20)
 project(demux-cpp LANGUAGES CXX)
 
@@ -68,7 +69,6 @@ add_library(${PROJECT_NAME}
 )
 target_link_libraries(${PROJECT_NAME}
   PRIVATE reader_id  # TODO(Leonid): should these two be PUBLIC, so other projects can get the automatically
-  PRIVATE demultiplexer
 )
 
 add_executable(shm_demux
@@ -91,13 +91,6 @@ add_library(reader_id
   OBJECT src/demux/core/reader_id.cpp
 )
 target_compile_options(reader_id
-  PRIVATE ${MY_CXX_FLAGS}
-)
-
-add_library(demultiplexer
-  OBJECT src/demux/core/demultiplexer.cpp
-)
-target_compile_options(demultiplexer
   PRIVATE ${MY_CXX_FLAGS}
 )
 
@@ -130,37 +123,35 @@ target_compile_options(message_buffer_test
 )
 gtest_discover_tests(message_buffer_test)
 
-add_executable(demultiplexer_test
-  src/demux/test/demultiplexer_test.cpp
+add_executable(demux_test
+  src/demux/test/demux_test.cpp
 )
-target_link_libraries(demultiplexer_test
-  PRIVATE demultiplexer
+target_link_libraries(demux_test
   PRIVATE reader_id
   PRIVATE gtest::gtest
   PRIVATE rapidcheck::rapidcheck
   PRIVATE Boost::log
   PRIVATE atomic
 )
-target_compile_options(demultiplexer_test
+target_compile_options(demux_test
   PRIVATE ${MY_CXX_FLAGS}
 )
-gtest_discover_tests(demultiplexer_test)
+gtest_discover_tests(demux_test)
 
-add_executable(demultiplexer_allocate_test
-  src/demux/test/demultiplexer_allocate_test.cpp
+add_executable(demux_allocate_test
+  src/demux/test/demux_allocate_test.cpp
 )
-target_link_libraries(demultiplexer_allocate_test
-  PRIVATE demultiplexer
+target_link_libraries(demux_allocate_test
   PRIVATE reader_id
   PRIVATE gtest::gtest
   PRIVATE rapidcheck::rapidcheck
   PRIVATE Boost::log
   PRIVATE atomic
 )
-target_compile_options(demultiplexer_allocate_test
+target_compile_options(demux_allocate_test
   PRIVATE ${MY_CXX_FLAGS}
 )
-gtest_discover_tests(demultiplexer_allocate_test)
+gtest_discover_tests(demux_allocate_test)
 
 add_executable(shm_util_test
   src/demux/test/shm_util_test.cpp

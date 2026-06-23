@@ -22,7 +22,8 @@
 #include <span>
 #include <string>
 #include <thread>
-#include "../core/demultiplexer.h"
+#include "../core/demux_reader.h"
+#include "../core/demux_writer.h"
 #include "../core/reader_id.h"
 #include "../util/boost_log_util.h"
 #include "../util/hdr_histogram_util.h"

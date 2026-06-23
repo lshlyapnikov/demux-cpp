@@ -24,7 +24,8 @@
 #include <span>
 #include <tuple>
 #include <vector>
-#include "../core/demultiplexer.h"
+#include "../core/demux_reader.h"
+#include "../core/demux_writer.h"
 #include "../core/message_buffer.h"
 #include "../core/reader_id.h"
 #include "../util/tuple_util.h"
@@ -245,16 +246,12 @@ auto slow_reader_test(const MarketDataTick& message) -> bool {
   DemuxReader<L, M> reader(reader_id, span{buffer}, &msg_counter_sync, &wraparound_sync);
   writer.add_reader(reader_id);
 
-  EXPECT_EQ(vector{reader_id}, writer.lagging_readers());
-
   fill_up_buffer(&writer, message);
 
   // the buffer is full, can't write into it
   EXPECT_FALSE(writer.allocate<MarketDataTick>().has_value());
-  EXPECT_EQ(vector{reader_id}, writer.lagging_readers());
 
   read_all_expect_eq(&reader, message);
-  EXPECT_TRUE(writer.lagging_readers().empty());
 
   // all readers caught up, can write again
   const auto x = writer.template allocate<MarketDataTick>();

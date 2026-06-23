@@ -6,7 +6,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
-#include "../core/demultiplexer.h"
+#include "../core/demux_reader.h"
+#include "../core/demux_writer.h"
 #include "../util/xxhash_util.h"
 #include "./market_data.h"
 

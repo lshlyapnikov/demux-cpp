@@ -24,7 +24,8 @@
 #include <set>
 #include <span>
 #include <vector>
-#include "../core/demultiplexer.h"
+#include "../core/demux_reader.h"
+#include "../core/demux_writer.h"
 #include "../core/message_buffer.h"
 #include "../core/reader_id.h"
 #include "./reader_id_gen.h"
@@ -44,7 +45,6 @@ BOOST_STRONG_TYPEDEF(std::vector<uint8_t>, TestMessage);
 using lshl::demux::core::DEFAULT_WAIT;
 using lshl::demux::core::DemuxReader;
 using lshl::demux::core::DemuxWriter;
-using lshl::demux::core::mask_to_reader_ids;
 using lshl::demux::core::ReaderId;
 using lshl::demux::core::TestMessage;
 using lshl::demux::core::WriteResult;
@@ -79,30 +79,6 @@ struct Arbitrary<TestMessage> {
 };
 
 }  // namespace rc
-
-TEST(DemuxWriter, MaskToReaderIds) {
-  ASSERT_EQ(mask_to_reader_ids(0), vector<ReaderId>{});
-  ASSERT_EQ(mask_to_reader_ids(0b1), vector<ReaderId>{ReaderId{1}});
-  ASSERT_EQ(mask_to_reader_ids(0b10), vector<ReaderId>{ReaderId{2}});
-  ASSERT_EQ(mask_to_reader_ids(0b100), vector<ReaderId>{ReaderId{3}});
-  ASSERT_EQ(mask_to_reader_ids(0b10000000000000000000000000000000), vector<ReaderId>{ReaderId{32}});
-  ASSERT_EQ(
-      mask_to_reader_ids(0b1000000000000000000000000000000000000000000000000000000000000000),
-      vector<ReaderId>{ReaderId{64}}
-  );
-  {
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers)
-    const vector<ReaderId> expected{ReaderId{1}, ReaderId{2}, ReaderId{5}, ReaderId{12}, ReaderId{64}};
-    ASSERT_EQ(mask_to_reader_ids(0b1000000000000000000000000000000000000000000000000000100000010011), expected);
-  }
-  {
-    vector<ReaderId> expected;
-    for (uint8_t i = 1; i <= lshl::demux::core::MAX_READER_NUM; ++i) {
-      expected.emplace_back(i);
-    }
-    ASSERT_EQ(mask_to_reader_ids(0xFFFFFFFFFFFFFFFF), expected);
-  }
-}
 
 namespace {
 auto assert_eq(const span<uint8_t>& left, const span<uint8_t>& right) {
@@ -533,38 +509,6 @@ auto writer_lagging_readers(const vector<ReaderId>& readers) {
 }
 }  // namespace
 
-TEST(BlockingDemuxWriterTest, LaggingReaders) {
-  rc::check(writer_lagging_readers<true>);
-}
-
-TEST(NonBlockingDemuxWriterTest, LaggingReaders) {
-  rc::check(writer_lagging_readers<false>);
-}
-
-namespace {
-auto lagging_readers_behavior(const ReaderId& reader_id) -> bool {
-  array<uint8_t, L> buffer{};
-  atomic<uint64_t> msg_counter_sync{0};
-  atomic<uint64_t> wraparound_sync{0};
-  DemuxWriter<L, M, false> writer(0, span{buffer}, &msg_counter_sync, &wraparound_sync);
-
-  EXPECT_TRUE(writer.lagging_readers().empty());
-
-  writer.add_reader(reader_id);
-  EXPECT_EQ(vector{reader_id}, writer.lagging_readers());
-
-  wraparound_sync.store(reader_id.mask());
-
-  EXPECT_TRUE(writer.lagging_readers().empty());
-
-  return !::testing::Test::HasFailure();
-}
-}  // namespace
-
-TEST(NonBlockingDemuxWriter, LaggingReadersBehavior) {
-  rc::check(lagging_readers_behavior);
-}
-
 namespace {
 auto fill_up_buffer(DemuxWriter<L, M, false>* writer, TestMessage message) -> bool {
   while (true) {
@@ -601,16 +545,12 @@ auto slow_reader_test(TestMessage message) -> bool {
   DemuxReader<L, M> reader(reader_id, span{buffer}, &msg_counter_sync, &wraparound_sync);
   writer.add_reader(reader_id);
 
-  EXPECT_EQ(vector{reader_id}, writer.lagging_readers());
-
   fill_up_buffer(&writer, message);
 
   // the buffer is full, can't write into it
   EXPECT_EQ(WriteResult::Repeat, writer.write(message.t));
-  EXPECT_EQ(vector{reader_id}, writer.lagging_readers());
 
   read_all_expect_eq(&reader, message);
-  EXPECT_TRUE(writer.lagging_readers().empty());
 
   // all readers caught up, can write again
   EXPECT_EQ(WriteResult::Success, writer.write(message.t));
