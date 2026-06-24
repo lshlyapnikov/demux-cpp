@@ -58,7 +58,7 @@ done
 if $all_equal; then
   echo "All Write and Read hash codes are equal: " "${hash_codes[@]}"
 else
-  echo "Found unequals hash codes: " "${hash_codes[@]}"
+  echo "Found unequal hash codes: " "${hash_codes[@]}"
   exit 100
 fi
 
