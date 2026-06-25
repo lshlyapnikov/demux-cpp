@@ -153,17 +153,17 @@ target_compile_options(demux_allocate_test
 )
 gtest_discover_tests(demux_allocate_test)
 
-add_executable(shm_util_test
-  src/demux/test/shm_util_test.cpp
+add_executable(shm_manager_test
+  src/demux/test/shm_manager_test.cpp
 )
-target_link_libraries(shm_util_test
+target_link_libraries(shm_manager_test
   PRIVATE reader_id
   PRIVATE gtest::gtest
   PRIVATE rapidcheck::rapidcheck
   PRIVATE Boost::log
   PRIVATE atomic
 )
-target_compile_options(shm_util_test
+target_compile_options(shm_manager_test
   PRIVATE ${MY_CXX_FLAGS}
 )
-gtest_discover_tests(shm_util_test)
+gtest_discover_tests(shm_manager_test)

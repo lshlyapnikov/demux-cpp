@@ -27,8 +27,8 @@
 #include "../core/reader_id.h"
 #include "../util/boost_log_util.h"
 #include "../util/hdr_histogram_util.h"
+#include "../util/shm_manager.h"
 #include "../util/shm_remover.h"
-#include "../util/shm_util.h"
 #include "../util/xxhash_util.h"
 #include "./market_data.h"
 

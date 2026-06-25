@@ -16,7 +16,7 @@
 #include <span>
 #include <tuple>
 #include <vector>
-#include "../util/shm_util.h"
+#include "../util/operators.h"
 #include "../util/tuple_util.h"
 
 using lshl::demux::core::MessageBuffer;
