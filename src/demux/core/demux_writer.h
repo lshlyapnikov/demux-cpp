@@ -12,8 +12,8 @@
 #include <span>
 #include <tuple>
 #include <utility>
-#include <vector>
 #include "../util/boost_log_util.h"
+#include "../util/fast_math.h"
 #include "./message_buffer.h"
 #include "./reader_id.h"
 
@@ -24,6 +24,8 @@ using std::size_t;
 using std::span;
 using std::uint64_t;
 using std::uint8_t;
+
+using lshl::demux::util::is_power_of_2;
 
 enum WriteResult : std::uint8_t {
   Success,  // message sent
@@ -39,8 +41,11 @@ enum WriteResult : std::uint8_t {
 /// @tparam `B` If `true`, `write` will block/busy-spin while waiting for all readers to catch up during a
 /// wraparound synchronization. If `false`, it will return immediately with `WriteResult::Repeat`.
 template <size_t L, uint16_t M, bool B>
-  requires(L >= M + 2 && M > 0)
 class DemuxWriter {
+  static_assert(L >= M + 2, "Buffer size L must be at least M + 2");
+  static_assert(M > 0, "M must be greater than 0");
+  static_assert(is_power_of_2(L), "Buffer size L must be a power of 2");
+
  public:
   DemuxWriter(
       uint64_t all_readers_mask,
@@ -195,7 +200,6 @@ class DemuxWriter {
 };
 
 template <size_t L, uint16_t M, bool B>
-  requires(L >= M + 2 && M > 0)
 auto DemuxWriter<L, M, B>::write_blocking(const span<uint8_t>& source, uint8_t recursion_level) noexcept
     -> WriteResult {
   // it either writes the entire message or nothing
@@ -216,7 +220,6 @@ auto DemuxWriter<L, M, B>::write_blocking(const span<uint8_t>& source, uint8_t r
 }
 
 template <size_t L, uint16_t M, bool B>
-  requires(L >= M + 2 && M > 0)
 auto DemuxWriter<L, M, B>::write_non_blocking(const span<uint8_t>& source) noexcept -> WriteResult {
   const size_t n = source.size();
 
@@ -245,7 +248,6 @@ auto DemuxWriter<L, M, B>::write_non_blocking(const span<uint8_t>& source) noexc
   }
 }
 template <size_t L, uint16_t M, bool B>
-  requires(L >= M + 2 && M > 0)
 template <class A>
   requires(std::default_initializable<A> && sizeof(A) != 0 && sizeof(A) <= M)
 [[nodiscard]] inline auto DemuxWriter<L, M, B>::allocate_blocking(uint8_t recursion_level) noexcept
@@ -265,7 +267,6 @@ template <class A>
 }
 
 template <size_t L, uint16_t M, bool B>
-  requires(L >= M + 2 && M > 0)
 template <class A>
   requires(std::default_initializable<A> && sizeof(A) != 0 && sizeof(A) <= M)
 [[nodiscard]] inline auto DemuxWriter<L, M, B>::allocate_non_blocking() noexcept -> std::optional<A*> {
@@ -285,7 +286,6 @@ template <class A>
 }
 
 template <size_t L, uint16_t M, bool B>
-  requires(L >= M + 2 && M > 0)
 auto DemuxWriter<L, M, B>::wait_for_readers_to_catch_up_and_wraparound() noexcept -> void {
   this->initiate_wraparound();
 
@@ -300,7 +300,6 @@ auto DemuxWriter<L, M, B>::wait_for_readers_to_catch_up_and_wraparound() noexcep
 }
 
 template <size_t L, uint16_t M, bool B>
-  requires(L >= M + 2 && M > 0)
 inline auto DemuxWriter<L, M, B>::initiate_wraparound() noexcept -> void {
   // see doc/adr/ADR003.md for more details
   this->wraparound_ = true;
@@ -310,14 +309,12 @@ inline auto DemuxWriter<L, M, B>::initiate_wraparound() noexcept -> void {
 }
 
 template <size_t L, uint16_t M, bool B>
-  requires(L >= M + 2 && M > 0)
 inline auto DemuxWriter<L, M, B>::complete_wraparound() noexcept -> void {
   this->position_ = 0;
   this->wraparound_ = false;
 }
 
 template <size_t L, uint16_t M, bool B>
-  requires(L >= M + 2 && M > 0)
 inline auto DemuxWriter<L, M, B>::all_readers_caught_up() noexcept -> bool {
   const uint64_t x = this->wraparound_sync_->load();
   return x == this->all_readers_mask_;

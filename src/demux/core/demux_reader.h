@@ -11,6 +11,7 @@
 #include <span>
 #include <utility>
 #include "../util/boost_log_util.h"
+#include "../util/fast_math.h"
 #include "./message_buffer.h"
 #include "./reader_id.h"
 
@@ -22,12 +23,17 @@ using std::span;
 using std::uint64_t;
 using std::uint8_t;
 
+using lshl::demux::util::is_power_of_2;
+
 /// @brief Demultiplexer reader. Should be mapped into shared memory allocated by DemuxWriter.
 /// @tparam `L` The size of the circular buffer in bytes.
 /// @tparam `M` The max message size in bytes.
 template <size_t L, uint16_t M>
-  requires(L >= M + 2 && M > 0)
 class DemuxReader {
+  static_assert(L >= M + 2, "Buffer size L must be at least M + 2");
+  static_assert(M > 0, "M must be greater than 0");
+  static_assert(is_power_of_2(L), "Buffer size L must be a power of 2");
+
  public:
   DemuxReader(
       const ReaderId& reader_id,
@@ -98,7 +104,6 @@ class DemuxReader {
 };
 
 template <size_t L, uint16_t M>
-  requires(L >= M + 2 && M > 0)
 // NOLINTNEXTLINE(readability-const-return-type)
 [[nodiscard]] auto DemuxReader<L, M>::next() noexcept -> const span<uint8_t> {
   LOG_DEBUG << "[DemuxReader::next()] " << this->id_ << ", read_message_count_: " << this->read_message_count_
@@ -133,7 +138,6 @@ template <size_t L, uint16_t M>
 }
 
 template <size_t L, uint16_t M>
-  requires(L >= M + 2 && M > 0)
 [[nodiscard]] auto DemuxReader<L, M>::has_next() noexcept -> bool {
   if (this->read_message_count_ < this->available_message_count_) {
     return true;

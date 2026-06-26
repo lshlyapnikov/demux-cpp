@@ -69,9 +69,7 @@ constexpr std::array<char, 16> UTIL_SHARED_MEM_NAME{"lshl_demux_util"};
 
 constexpr int REPORT_PROGRESS = 1000000;
 
-// circular buffer size in bytes
-constexpr std::size_t BUFFER_SIZE =
-    (16 * lshl::demux::util::LINUX_PAGE_SIZE) - lshl::demux::util::BOOST_IPC_INTERNAL_METADATA_SIZE;
+constexpr std::size_t BUFFER_SIZE = 16 * lshl::demux::util::LINUX_PAGE_SIZE;
 
 // max message size that would be allowed
 constexpr std::uint16_t MAX_MESSAGE_SIZE = 256;

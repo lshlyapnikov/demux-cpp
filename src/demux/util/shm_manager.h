@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <string>
 #include "./boost_log_util.h"
+#include "./fast_math.h"
 #include "./shm_remover.h"
 
 namespace lshl::demux::util {
@@ -63,8 +64,19 @@ struct alignas(CACHE_LINE_SIZE) CacheLinePaddedAtomic {
 
 template <typename M, size_t N>
 struct alignas(CACHE_LINE_SIZE) CacheLinePaddedArray {
-  static_assert(N % 2 == 0, "N must be a power of 2 for optimization");
+  static_assert(is_power_of_2(N), "N must be a power of 2 for optimization");
   std::array<M, N> value{};
+};
+
+template <size_t L>
+struct alignas(CACHE_LINE_SIZE) WriterShmData {
+  CacheLinePaddedAtomic<size_t> downstream_sequence;
+  CacheLinePaddedArray<uint8_t, L> buffer;
+};
+
+template <uint8_t R>
+struct alignas(CACHE_LINE_SIZE) ReadersShmData {
+  CacheLinePaddedArray<CacheLinePaddedAtomic<size_t>, R> upstream_sequences{};
 };
 
 template <typename M, size_t N, size_t R>

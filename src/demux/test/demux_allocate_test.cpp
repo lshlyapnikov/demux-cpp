@@ -12,6 +12,7 @@
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
 #include <array>
 #include <atomic>
+#include <bit>
 #include <boost/log/core.hpp>         // NOLINT(misc-include-cleaner)
 #include <boost/log/expressions.hpp>  // NOLINT(misc-include-cleaner)
 #include <boost/serialization/strong_typedef.hpp>
@@ -89,7 +90,7 @@ struct rc::Arbitrary<Symbol> {
 };
 
 constexpr uint16_t M = sizeof(MarketDataTick);
-constexpr size_t L = 4 * lshl::demux::core::MessageBuffer<0>::required<MarketDataTick>();
+constexpr size_t L = std::bit_ceil(4 * lshl::demux::core::MessageBuffer<0>::required<MarketDataTick>());
 
 namespace {
 template <size_t L, uint16_t M, bool B>
