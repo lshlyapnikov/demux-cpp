@@ -25,6 +25,7 @@
 #include "../core/demux_reader.h"
 #include "../core/demux_writer.h"
 #include "../core/reader_id.h"
+#include "../util/atomic_util.h"
 #include "../util/boost_log_util.h"
 #include "../util/hdr_histogram_util.h"
 #include "../util/operators.h"
@@ -151,16 +152,10 @@ auto start_writer(
 
   DemuxWriter<L, M, false> writer(buffer, downstream_sequence, upstream_sequences);
 
-  LOG_INFO << "waiting for all readers ...";
-  while (true) {
-    // const uint64_t x = startup_sync->load();
-    // if (x == all_readers_mask) {
-    //   break;
-    // } else {
-    //   using namespace std::chrono_literals;
-    //   std::this_thread::sleep_for(1s);  // NOLINT(misc-include-cleaner)
-    // }
-  }
+  const atomic<size_t>* reader_count = &reader_data->active_reader_count.value;
+
+  LOG_INFO << "waiting for all readers: " << total_reader_num << "...";
+  util::wait_for_count<size_t>(reader_count, total_reader_num);
   LOG_INFO << "all readers connected";
 
   // if (zero_copy) {
