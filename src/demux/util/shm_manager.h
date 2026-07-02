@@ -8,10 +8,12 @@
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <new>
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <vector>
 #include "./boost_log_util.h"
 #include "./fast_math.h"
 #include "./shm_remover.h"
@@ -33,24 +35,6 @@ constexpr size_t LINUX_PAGE_SIZE = 4096;
 
 constexpr size_t CACHE_LINE_SIZE = std::hardware_destructive_interference_size;
 
-// TODO(Leonid): do you still need this?
-constexpr auto calculate_required_shared_mem_size(
-    const std::size_t data_size,
-    const std::size_t metadata_size,
-    const std::size_t page_size
-) noexcept -> std::size_t {
-  // names take some space in the managed_shared_memory, this is why BOOST_IPC_INTERNAL_METADATA_SIZE is added
-  // total shared memory size, should be  a multiple of the page size (4kB on Linux). Because the operating system
-  // performs mapping operations over whole pages. So, you don't waste memory.
-  const std::size_t quotient = (data_size + metadata_size) / page_size;
-  const std::size_t reminder = (data_size + metadata_size) % page_size;
-  if (reminder > 0) {
-    return (quotient + 1) * page_size;
-  } else {
-    return quotient * page_size;
-  }
-}
-
 template <typename T>
 auto is_cache_line_aligned(const T* ptr) noexcept -> bool {
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
@@ -64,73 +48,64 @@ struct alignas(CACHE_LINE_SIZE) CacheLinePaddedAtomic {
 
 template <typename M, size_t N>
 struct alignas(CACHE_LINE_SIZE) CacheLinePaddedArray {
-  static_assert(is_power_of_2(N), "N must be a power of 2 for optimization");
   std::array<M, N> value{};
 };
 
 template <size_t L>
-struct alignas(CACHE_LINE_SIZE) WriterShmData {
-  CacheLinePaddedAtomic<size_t> downstream_sequence;
+struct alignas(CACHE_LINE_SIZE) ShmWriterData {
+  CacheLinePaddedAtomic<uint64_t> downstream_sequence;
   CacheLinePaddedArray<uint8_t, L> buffer;
 };
 
-template <uint8_t R>
-struct alignas(CACHE_LINE_SIZE) ReadersShmData {
-  CacheLinePaddedArray<CacheLinePaddedAtomic<size_t>, R> upstream_sequences{};
+template <size_t R>
+struct alignas(CACHE_LINE_SIZE) ShmReaderData {
+  CacheLinePaddedArray<CacheLinePaddedAtomic<uint64_t>, R> upstream_sequences{};
+  CacheLinePaddedAtomic<size_t> active_reader_count{};
 };
 
-template <typename M, size_t N, size_t R>
-struct ShmData {
-  static_assert(N % 2 == 0, "N must be a power of 2 for optimization");
+template <size_t R>
+auto to_upstream_sequence_pointers(CacheLinePaddedArray<CacheLinePaddedAtomic<uint64_t>, R>& array) noexcept
+    -> std::vector<atomic<uint64_t>*> {
+  std::vector<std::atomic<uint64_t>*> result;
+  result.reserve(R);
+  std::array<CacheLinePaddedAtomic<uint64_t>, R>& tmp_array = array.value;
 
-  // SECTION 1: WRITER HOT (Reader Cold)
-  alignas(CACHE_LINE_SIZE) std::atomic<size_t> tail;
+  for (size_t i = 0; i < R; ++i) {
+    CacheLinePaddedAtomic<uint64_t>& x = tmp_array[i];
+    result.push_back(&x.value);
+  }
 
-  // SECTION 2: THE DATA (Shared Hot)
-  // Keep this aligned so it starts on a fresh cache line
-  alignas(CACHE_LINE_SIZE) std::array<M, N> buffer;
+  return result;
+}
 
-  // TODO(Leonid): does this gap really improve anything???
-  // SECTION 3: THE GAP (Critical)
-  // Prevents the Prefetcher from crossing between Buffer and Reader state
-  alignas(2 * CACHE_LINE_SIZE) std::array<uint8_t, 2 * CACHE_LINE_SIZE> unused_padding_{};
+template <size_t L, size_t R>
+constexpr auto calculate_shared_mem_size() noexcept -> std::size_t {
+  const std::size_t min_size = sizeof(ShmWriterData<L>) + sizeof(ShmReaderData<R>) + BOOST_IPC_INTERNAL_METADATA_SIZE;
+  const std::size_t quotient = min_size / LINUX_PAGE_SIZE;
+  const std::size_t reminder = min_size % LINUX_PAGE_SIZE;
+  if (reminder > 0) {
+    return (quotient + 1) * LINUX_PAGE_SIZE;
+  } else {
+    return quotient * LINUX_PAGE_SIZE;
+  }
+}
 
-  // SECTION 4: READER HOT (Writer Cold)
-  // Each Reader gets its own isolated cache line
-  alignas(CACHE_LINE_SIZE) std::array<CacheLinePaddedAtomic<size_t>, R> heads{};
-};
-
-template <typename M, size_t N, size_t R>
+template <size_t L, size_t R>
 class ShmManager {
  private:
   std::optional<ShmRemover> remover_;  // needed for create_only mode to remove shared memory on destruction
   const std::string name_;
   bipc::managed_shared_memory segment_;
-  const uint8_t readers_num_;
 
  public:
-  explicit ShmManager(
-      bipc::create_only_t /*unused*/,
-      const std::string& name,
-      const size_t segment_size,
-      const uint8_t readers_num
-  )
-      : remover_(std::in_place, name.c_str()),
-        name_(name),
-        segment_(bipc::create_only, name.c_str(), segment_size),
-        readers_num_(readers_num) {
-    LOG_INFO << "[startup] created managed_shared_memory segment: " << this->name_ << ", BUFFER_SIZE: " << N
-             << ", readers_num: " << static_cast<int>(this->readers_num_) << ", R: " << R
-             << ", requested segment_size: " << segment_size << ", segment.size: " << this->segment_.get_size()
-             << ", segment.free_memory: " << this->segment_.get_free_memory();
+  explicit ShmManager(bipc::create_only_t /*unused*/, const std::string& name, const size_t segment_size)
+      : remover_(std::in_place, name.c_str()), name_(name), segment_(bipc::create_only, name.c_str(), segment_size) {
+    log_startup_state("created");
   }
 
   explicit ShmManager(bipc::open_only_t /*unused*/, const std::string& name)
-      : remover_(std::nullopt), name_(name), segment_(bipc::open_only, name.c_str()), readers_num_(0) {
-    LOG_INFO << "[startup] opened managed_shared_memory segment: " << this->name_ << ", BUFFER_SIZE: " << N
-             << ", readers_num: " << static_cast<int>(this->readers_num_)
-             << ", segment.size: " << this->segment_.get_size()
-             << ", segment.free_memory: " << this->segment_.get_free_memory();
+      : remover_(std::nullopt), name_(name), segment_(bipc::open_only, name.c_str()) {
+    log_startup_state("opened");
   }
 
   ~ShmManager() = default;
@@ -140,101 +115,55 @@ class ShmManager {
   ShmManager(ShmManager&&) noexcept = delete;                     // move constructor
   auto operator=(ShmManager&&) noexcept -> ShmManager& = delete;  // move assignment
 
-  [[nodiscard]] auto construct_shm_data() noexcept(false) -> ShmData<M, N, R>* {
-    auto* result = segment_.construct<ShmData<M, N, R>>("shm_data")();
-    if (result == nullptr) {
-      throw std::runtime_error("can't construct in shared memory: shm_data");
-    }
-    LOG_INFO << "[construct_shm_data] buffer allocated, segment.free_memory: " << this->segment_.get_free_memory()
-             << " cache line aligned: " << is_cache_line_aligned(result);
-    return result;
+  [[nodiscard]] auto construct_shm_writer_data() noexcept(false) -> ShmWriterData<L>* {
+    return construct_object<ShmWriterData<L>>(SHM_WRITER_DATA);
   }
 
-  [[nodiscard]] auto find_shm_data() noexcept(false) -> ShmData<M, N, R>* {
-    auto* result = segment_.template find<ShmData<M, N, R>>("shm_data").first;
-    if (result == nullptr) {
-      throw std::runtime_error("can't find in shared memory: shm_data");
-    }
-    LOG_INFO << "[find_shm_data] buffer found" << ", cache line aligned: " << is_cache_line_aligned(result);
-    return result;
+  [[nodiscard]] auto find_shm_writer_data() noexcept(false) -> ShmWriterData<L>* {
+    return find_object<ShmWriterData<L>>(SHM_WRITER_DATA);
   }
 
-  [[nodiscard]] auto construct_buffer() noexcept(false) -> std::array<M, N>* {
-    auto* result = segment_.template construct<CacheLinePaddedArray<M, N>>("buffer")();
-    if (result == nullptr) {
-      throw std::runtime_error("can't construct in shared memory: buffer");
-    }
-    LOG_INFO << "[construct_buffer] buffer allocated, segment.free_memory: " << this->segment_.get_free_memory()
-             << " cache line aligned: " << is_cache_line_aligned(result);
-    return &result->value;
+  [[nodiscard]] auto construct_shm_reader_data() noexcept(false) -> ShmReaderData<R>* {
+    return construct_object<ShmReaderData<R>>(SHM_READER_DATA);
   }
 
-  [[nodiscard]] auto construct_writer_tail() noexcept -> atomic<size_t>* {
-    return construct_atomic<size_t>("writer_tail");
-  }
-
-  [[nodiscard]] auto construct_all_reader_heads() noexcept -> std::vector<const atomic<size_t>*> {
-    std::vector<const atomic<size_t>*> result;
-    result.reserve(this->readers_num_);
-    for (uint8_t i = 0; i < this->readers_num_; ++i) {
-      result.push_back(this->construct_reader_head(i));
-    }
-    return result;
-  }
-
-  [[nodiscard]] auto construct_reader_head(uint8_t reader_id) noexcept -> atomic<size_t>* {
-    const std::string name = "reader_head_" + std::to_string(reader_id);
-    return construct_atomic<size_t>(name);
-  }
-
-  [[nodiscard]] auto construct_startup_reader_counter() noexcept -> atomic<size_t>* {
-    return construct_atomic<uint64_t>("startup_reader_counter");
-  }
-
-  [[nodiscard]] auto find_buffer() noexcept(false) -> std::array<M, N>* {
-    auto* result = segment_.template find<CacheLinePaddedArray<M, N>>("buffer").first;
-    if (result == nullptr) {
-      throw std::runtime_error("can't find in shared memory: buffer");
-    }
-    LOG_INFO << "[find_buffer] buffer found" << ", cache line aligned: " << is_cache_line_aligned(result);
-    return &result->value;
-  }
-
-  [[nodiscard]] auto find_writer_tail() noexcept -> atomic<size_t>* { return find_atomic<size_t>("writer_tail"); }
-
-  [[nodiscard]] auto find_reader_head(uint8_t reader_id) noexcept -> atomic<size_t>* {
-    const std::string name = "reader_head_" + std::to_string(reader_id);
-    return find_atomic<size_t>(name);
-  }
-
-  [[nodiscard]] auto find_startup_reader_counter() noexcept -> atomic<size_t>* {
-    return find_atomic<uint64_t>("startup_reader_counter");
+  [[nodiscard]] auto find_shm_reader_data() noexcept(false) -> ShmReaderData<R>* {
+    return find_object<ShmReaderData<R>>(SHM_READER_DATA);
   }
 
   [[nodiscard]] auto get_free_memory() const noexcept -> size_t { return this->segment_.get_free_memory(); }
 
  private:
-  template <typename T>
-  [[nodiscard]] auto construct_atomic(const std::string& name) noexcept(false) -> atomic<T>* {
-    LOG_INFO << "[construct_atomic] " << name << " ...";
-    auto* result = segment_.template construct<CacheLinePaddedAtomic<T>>(name.c_str())();
-    if (result == nullptr) {
-      throw std::runtime_error("can't construct in shared memory:" + name);
-    }
-    LOG_INFO << "[construct_atomic] " << name << " allocated, segment.free_memory: " << this->segment_.get_free_memory()
-             << " cache line aligned: " << is_cache_line_aligned(result);
-    return &result->value;
+  static constexpr std::string SHM_WRITER_DATA = "shm_writer";
+  static constexpr std::string SHM_READER_DATA = "shm_reader";
+
+  auto log_startup_state(const std::string& context) -> auto {
+    LOG_INFO << "[startup] " << context << " managed_shared_memory segment: " << this->name_
+             << ", buffer size (L): " << L << ", max readers num (R): " << R
+             << ", segment.size: " << this->segment_.get_size()
+             << ", segment.free_memory: " << this->segment_.get_free_memory();
   }
 
   template <typename T>
-  [[nodiscard]] auto find_atomic(const std::string& name) noexcept(false) -> atomic<T>* {
-    LOG_INFO << "[find_atomic] " << name << " ...";
-    auto* result = segment_.template find<CacheLinePaddedAtomic<T>>(name.c_str()).first;
+  [[nodiscard]] auto construct_object(const std::string& name) noexcept(false) -> T* {
+    T* result = segment_.construct<T>(name.c_str())();
     if (result == nullptr) {
-      throw std::runtime_error("can't find in shared memory:" + name);
+      throw std::runtime_error(std::format("cannot construct object in shared memory: {}", name));
     }
-    LOG_INFO << "[find_atomic] " << name << " success, cache line aligned: " << is_cache_line_aligned(result);
-    return &result->value;
+    LOG_INFO << "object allocated in shared memory: " << name
+             << ", cache line aligned: " << is_cache_line_aligned(result)
+             << ", segment.free_memory : " << this->segment_.get_free_memory();
+    return result;
+  }
+
+  template <typename T>
+  [[nodiscard]] auto find_object(const char* name) noexcept(false) -> T* {
+    T* result = segment_.template find<T>(name).first;
+    if (result == nullptr) {
+      throw std::runtime_error(std::format("cannot find object in shared memory: {}", name));
+    }
+    LOG_INFO << "object found in shared memory: " << name << ", cache line aligned: " << is_cache_line_aligned(result);
+    return result;
   }
 };
 

@@ -15,6 +15,11 @@
 namespace lshl::demux::util {
 
 template <typename T>
+[[nodiscard]] auto to_const_pointer_vector(const std::vector<T*>& src) -> std::vector<const T*> {
+  return std::vector<const T*>(src.begin(), src.end());
+}
+
+template <typename T>
 concept OutputStreamConcept = requires(T os) {
   { os << std::declval<std::string>() };  // Stream should support the << operator for strings
 };

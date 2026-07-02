@@ -167,3 +167,16 @@ target_compile_options(shm_manager_test
   PRIVATE ${MY_CXX_FLAGS}
 )
 gtest_discover_tests(shm_manager_test)
+
+add_executable(util_test
+  src/demux/test/util_test.cpp
+)
+target_link_libraries(util_test
+  PRIVATE gtest::gtest
+  PRIVATE rapidcheck::rapidcheck
+  PRIVATE Boost::log
+)
+target_compile_options(util_test
+  PRIVATE ${MY_CXX_FLAGS}
+)
+gtest_discover_tests(util_test)

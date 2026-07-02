@@ -34,24 +34,38 @@ class DemuxReader {
   static_assert(M > 0, "M must be greater than 0");
   static_assert(is_power_of_2(L), "Buffer size L must be a power of 2");
 
+ private:
+  // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
+  const ReaderId id_;
+
+  size_t position_{0};
+  uint64_t available_message_count_{0};
+  uint64_t read_message_count_{0};
+
+  const MessageBuffer<L> buffer_;  // read only buffer
+  const atomic<uint64_t>* downstream_sequence_;
+  atomic<uint64_t>* upstream_sequence_;
+  // NOLINTEND(cppcoreguidelines-avoid-const-or-ref-data-members)
+
  public:
   DemuxReader(
       const ReaderId& reader_id,
       const span<uint8_t, L> buffer,
-      const atomic<uint64_t>* message_count_sync,
-      atomic<uint64_t>* wraparound_sync
+      const atomic<uint64_t>* downstream_sequence,
+      atomic<uint64_t>* upstream_sequence
   ) noexcept
       : id_(reader_id),
-        mask_(reader_id.mask()),
         buffer_(buffer),
-        message_count_sync_(message_count_sync),
-        wraparound_sync_(wraparound_sync) {
+        downstream_sequence_(downstream_sequence),
+        upstream_sequence_(upstream_sequence) {
     LOG_INFO << "[DemuxReader::constructor] L: " << L << ", M: " << M << ", " << this->id_;
   }
 
   ~DemuxReader() = default;
+
   DemuxReader(const DemuxReader&) = delete;                     // no copy constructor, no reason to copy it
   auto operator=(const DemuxReader&) -> DemuxReader& = delete;  // no copy assignment
+                                                                //
   DemuxReader(DemuxReader&&) = default;                         // movable, can be used with vector.emplace_back
   auto operator=(DemuxReader&&) -> DemuxReader& = delete;       // no move assignment
 
@@ -80,27 +94,13 @@ class DemuxReader {
     }
   }
 
-  [[nodiscard]] auto is_id(const ReaderId& id) const noexcept -> bool { return this->mask_ == id.mask(); }
+  [[nodiscard]] auto is_id(const ReaderId& id) const noexcept -> bool { return this->id_ == id; }
 
   [[nodiscard]] auto id() const noexcept -> const ReaderId& { return this->id_; }
 
   [[nodiscard]] auto has_next() noexcept -> bool;
 
   [[nodiscard]] auto message_count() const noexcept -> uint64_t { return this->read_message_count_; }
-
- private:
-  // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
-  const ReaderId id_;
-  const uint64_t mask_;  // micro-optimization
-
-  size_t position_{0};
-  uint64_t available_message_count_{0};
-  uint64_t read_message_count_{0};
-
-  const MessageBuffer<L> buffer_;  // read only buffer
-  const atomic<uint64_t>* message_count_sync_;
-  atomic<uint64_t>* wraparound_sync_;
-  // NOLINTEND(cppcoreguidelines-avoid-const-or-ref-data-members)
 };
 
 template <size_t L, uint16_t M>
@@ -124,25 +124,27 @@ template <size_t L, uint16_t M>
               << ", read_message_count_: " << this->read_message_count_
               << ", available_message_count_: " << this->available_message_count_ << ", position_: " << this->position_;
     assert(this->position_ <= L);
-    return result;
   } else {
     LOG_DEBUG << "[DemuxReader::next()] wrapping up, " << this->id_
               << ", read_message_count_: " << this->read_message_count_
               << ", available_message_count_: " << this->available_message_count_ << ", position_: " << this->position_;
-    // signal that it is ready to wraparound, see doc/adr/ADR003.md for more details
+    // signal received that we reached the end of buffer and need to wrap around
     assert(this->read_message_count_ == this->available_message_count_);
     this->position_ = 0;
-    this->wraparound_sync_->fetch_or(this->mask_);
-    return {};
   }
+
+  this->upstream_sequence_->store(read_message_count_, std::memory_order_release);
+  return result;
 }
 
 template <size_t L, uint16_t M>
 [[nodiscard]] auto DemuxReader<L, M>::has_next() noexcept -> bool {
+  // TODO(Leonid): maybe you should not use the cached values, keep reading from downstream_sequence_ to keep it hot
+  //  Gemini says keep using cached value instead of polling the std:atomic, cache eviction is unlikely -- PROVE THIS!
   if (this->read_message_count_ < this->available_message_count_) {
     return true;
   } else {
-    const uint64_t x = this->message_count_sync_->load();
+    const uint64_t x = this->downstream_sequence_->load(std::memory_order_acquire);
     if (x > this->available_message_count_) {
       this->available_message_count_ = x;
       return true;

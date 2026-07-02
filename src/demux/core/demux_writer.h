@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <emmintrin.h>
 #include <atomic>
 #include <cassert>
 #include <concepts>
@@ -12,6 +13,7 @@
 #include <span>
 #include <tuple>
 #include <utility>
+#include <vector>
 #include "../util/boost_log_util.h"
 #include "../util/fast_math.h"
 #include "./message_buffer.h"
@@ -24,6 +26,7 @@ using std::size_t;
 using std::span;
 using std::uint64_t;
 using std::uint8_t;
+using std::vector;
 
 using lshl::demux::util::is_power_of_2;
 
@@ -46,19 +49,23 @@ class DemuxWriter {
   static_assert(M > 0, "M must be greater than 0");
   static_assert(is_power_of_2(L), "Buffer size L must be a power of 2");
 
+ private:
+  size_t position_{0};
+  uint64_t message_count_{0};
+  MessageBuffer<L> buffer_;
+  bool wraparound_{false};
+  atomic<uint64_t>* downstream_sequence_;
+  vector<const atomic<uint64_t>*> upstream_sequences_;
+
  public:
   DemuxWriter(
-      uint64_t all_readers_mask,
       span<uint8_t, L> buffer,
-      atomic<uint64_t>* message_count_sync,
-      atomic<uint64_t>* wraparound_sync
+      atomic<uint64_t>* downstream_sequence,
+      const vector<const atomic<uint64_t>*>& upstream_sequences
   ) noexcept
-      : all_readers_mask_(all_readers_mask),
-        buffer_(buffer),
-        message_count_sync_(message_count_sync),
-        wraparound_sync_(wraparound_sync) {
+      : buffer_(buffer), downstream_sequence_(downstream_sequence), upstream_sequences_(upstream_sequences) {
     LOG_INFO << "[DemuxWriter::constructor] L: " << L << ", M: " << M << ", B: " << B
-             << ", all_readers_mask_: " << this->all_readers_mask_;
+             << ", reader_num: " << this->upstream_sequences_.size();
   }
 
   ~DemuxWriter() = default;
@@ -135,19 +142,20 @@ class DemuxWriter {
 
   [[nodiscard]] auto message_count() const noexcept -> uint64_t { return this->message_count_; }
 
-  [[nodiscard]] auto is_registered_reader(const ReaderId& id) const noexcept -> bool {
-    return this->all_readers_mask_ & id.mask();
-  }
-
-  auto add_reader(const ReaderId& id) noexcept -> void { this->all_readers_mask_ |= id.mask(); }
-
-  auto remove_reader(const ReaderId& id) noexcept -> void { this->all_readers_mask_ &= ~id.mask(); }
-
 #ifdef UNIT_TEST
 
   auto position() const noexcept -> size_t { return this->position_; }
 
-  auto all_readers_mask() const noexcept -> uint64_t { return this->all_readers_mask_; }
+  [[nodiscard]] auto downstream_sequence() const noexcept -> uint64_t {
+    return this->downstream_sequence_->load(std::memory_order_relaxed);
+  }
+
+  auto upstream_sequences(vector<uint64_t>* result) const noexcept -> void {
+    result->clear();
+    for (const atomic<uint64_t>* x : this->upstream_sequences_) {
+      result->push_back(x->load(std::memory_order_relaxed));
+    }
+  }
 
 #endif  // UNIT_TEST
 
@@ -182,21 +190,12 @@ class DemuxWriter {
 
   inline auto complete_wraparound() noexcept -> void;
 
-  [[nodiscard]] auto all_readers_caught_up() noexcept -> bool;
+  [[nodiscard]] auto all_readers_caught_up() const noexcept -> bool;
 
   auto increment_message_count() noexcept -> void {
     this->message_count_ += 1;
-    this->message_count_sync_->store(this->message_count_);
+    this->downstream_sequence_->store(this->message_count_, std::memory_order_release);
   }
-
-  uint64_t all_readers_mask_;
-
-  size_t position_{0};
-  uint64_t message_count_{0};
-  MessageBuffer<L> buffer_;
-  bool wraparound_{false};
-  atomic<uint64_t>* message_count_sync_;
-  atomic<uint64_t>* wraparound_sync_;
 };
 
 template <size_t L, uint16_t M, bool B>
@@ -294,6 +293,7 @@ auto DemuxWriter<L, M, B>::wait_for_readers_to_catch_up_and_wraparound() noexcep
 
   // busy-wait
   while (!this->all_readers_caught_up()) {
+    _mm_pause();
   }
 
   this->complete_wraparound();
@@ -301,9 +301,8 @@ auto DemuxWriter<L, M, B>::wait_for_readers_to_catch_up_and_wraparound() noexcep
 
 template <size_t L, uint16_t M, bool B>
 inline auto DemuxWriter<L, M, B>::initiate_wraparound() noexcept -> void {
-  // see doc/adr/ADR003.md for more details
+  // to mark wrap-around: write empty message if there is enough space (2); increment sequence number.
   this->wraparound_ = true;
-  this->wraparound_sync_->store(0);
   std::ignore = this->buffer_.write(this->position_, {});
   this->increment_message_count();
 }
@@ -315,9 +314,10 @@ inline auto DemuxWriter<L, M, B>::complete_wraparound() noexcept -> void {
 }
 
 template <size_t L, uint16_t M, bool B>
-inline auto DemuxWriter<L, M, B>::all_readers_caught_up() noexcept -> bool {
-  const uint64_t x = this->wraparound_sync_->load();
-  return x == this->all_readers_mask_;
+inline auto DemuxWriter<L, M, B>::all_readers_caught_up() const noexcept -> bool {
+  return std::ranges::all_of(this->upstream_sequences_, [this](const auto* x) {
+    return x->load(std::memory_order_acquire) == this->message_count_;
+  });
 }
 
 }  // namespace lshl::demux::core

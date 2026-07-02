@@ -12,7 +12,6 @@
 
 namespace lshl::demux::util {
 
-using lshl::demux::util::calculate_required_shared_mem_size;
 using std::size_t;
 
 struct DummyCacheAlignedStruct {
@@ -34,6 +33,15 @@ static_assert(
     "CriticalData size is not sufficient to prevent false sharing"
 );
 
+static_assert(is_power_of_2(2));
+static_assert(is_power_of_2(4));
+static_assert(is_power_of_2(16));
+static_assert(is_power_of_2(65536));
+static_assert(!is_power_of_2(3));
+static_assert(!is_power_of_2(5));
+static_assert(!is_power_of_2(17));
+static_assert(!is_power_of_2(65537));
+
 TEST(LearningTest, CheckAlignAs) {
   EXPECT_EQ(sizeof(DummyCacheAlignedStruct), 64);
   EXPECT_EQ(sizeof(CriticalData), 128);
@@ -42,17 +50,6 @@ TEST(LearningTest, CheckAlignAs) {
 TEST(ShmUtilTest, ConstantsTest) {
   ASSERT_EQ(lshl::demux::util::BOOST_IPC_INTERNAL_METADATA_SIZE, 512);
   ASSERT_EQ(lshl::demux::util::LINUX_PAGE_SIZE, 4096);
-}
-
-TEST(ShmUtilTest, CalculateRequiredSharedMemSize) {
-  constexpr size_t actual0 = calculate_required_shared_mem_size(10, 3, 4);
-  ASSERT_EQ(actual0, 16);
-
-  constexpr size_t actual1 = calculate_required_shared_mem_size(10, 4, 3);
-  ASSERT_EQ(actual1, 15);
-
-  constexpr size_t actual3 = calculate_required_shared_mem_size(10, 4, 2);
-  ASSERT_EQ(actual3, 14);
 }
 
 static_assert(

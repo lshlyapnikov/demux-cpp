@@ -27,6 +27,7 @@
 #include "../core/reader_id.h"
 #include "../util/boost_log_util.h"
 #include "../util/hdr_histogram_util.h"
+#include "../util/operators.h"
 #include "../util/shm_manager.h"
 #include "../util/shm_remover.h"
 #include "../util/xxhash_util.h"
@@ -38,7 +39,7 @@ auto print_usage(const char* prog) -> void {
             << " | [reader <unique-reader-number> <number-of-messages> <zero-copy>]\n"
             << "  where\n"
             << "    <number-of-readers> and <unique-reader-number> are within the interval [1, "
-            << static_cast<int>(lshl::demux::core::MAX_READER_NUM) << "]\n"
+            << static_cast<int>(std::numeric_limits<std::uint8_t>::max()) << "]\n"
             << "    <number-of-messages> is within the interval [1, " << std::numeric_limits<uint64_t>::max()
             << "] (uint64_t)\n"
             << "    <zero-copy> true/false\n";
@@ -64,8 +65,7 @@ auto main(int argc, char* argv[]) noexcept -> int {
 
 namespace lshl::demux::example {
 
-constexpr std::array<char, 15> BUFFER_SHARED_MEM_NAME{"lshl_demux_buf"};
-constexpr std::array<char, 16> UTIL_SHARED_MEM_NAME{"lshl_demux_util"};
+constexpr std::size_t MAX_READER_NUM = 6;
 
 constexpr int REPORT_PROGRESS = 1000000;
 
@@ -88,6 +88,7 @@ using std::atomic;
 using std::size_t;
 using std::span;
 using std::uint16_t;
+using std::vector;
 
 auto main_(const span<char*> args) noexcept(false) -> int {
   constexpr int ERROR = 200;
@@ -102,7 +103,7 @@ auto main_(const span<char*> args) noexcept(false) -> int {
 
   const std::string command(args[1]);
   const auto num16 = boost::lexical_cast<uint16_t>(args[2]);
-  if (num16 < 1 || num16 > lshl::demux::core::MAX_READER_NUM) {
+  if (num16 < 1 || num16 > std::numeric_limits<std::uint8_t>::max()) {
     print_usage(args[0]);
     return ERROR;
   }
@@ -110,10 +111,13 @@ auto main_(const span<char*> args) noexcept(false) -> int {
   const auto msg_num = boost::lexical_cast<uint64_t>(args[3]);
   const auto zero_copy = std::string("true") == args[4];
 
+  // TODO(Leonid): pass it as a command line argument
+  const std::string shared_memory_name = "lshl_demux_buf";
+
   if (command == "writer") {
-    start_writer<BUFFER_SIZE, MAX_MESSAGE_SIZE>(num8, msg_num, zero_copy);
+    start_writer<BUFFER_SIZE, MAX_MESSAGE_SIZE, MAX_READER_NUM>(shared_memory_name, num8, msg_num, zero_copy);
   } else if (command == "reader") {
-    start_reader<BUFFER_SIZE, MAX_MESSAGE_SIZE>(num8, msg_num);
+    start_reader<BUFFER_SIZE, MAX_MESSAGE_SIZE>(shared_memory_name, num8, msg_num);
   } else {
     print_usage(args[0]);
     return ERROR;
@@ -127,68 +131,45 @@ auto init_logging() noexcept -> void {
   boost::log::core::get()->set_filter(boost::log::trivial::severity >= boost::log::trivial::info);
 }
 
-template <size_t L, uint16_t M>
-auto start_writer(const uint8_t total_reader_num, const uint64_t msg_num, bool zero_copy) noexcept(false) -> void {
-  const size_t SHM_SIZE = lshl::demux::util::calculate_required_shared_mem_size(
-      L, lshl::demux::util::BOOST_IPC_INTERNAL_METADATA_SIZE, lshl::demux::util::LINUX_PAGE_SIZE
-  );
+template <size_t L, uint16_t M, size_t R>
+auto start_writer(
+    const string& shared_memory_name,
+    [[maybe_unused]] const uint8_t total_reader_num,
+    [[maybe_unused]] const uint64_t msg_num,
+    [[maybe_unused]] bool zero_copy
+) noexcept(false) -> void {
+  constexpr size_t SHM_SIZE = lshl::demux::util::calculate_shared_mem_size<L, R>();
+  util::ShmManager<L, R> shm_manager{bipc::create_only, shared_memory_name, SHM_SIZE};
 
-  LOG_INFO << "start_writer " << BUFFER_SHARED_MEM_NAME.data() << ", size: " << SHM_SIZE << ", L: " << L << ", M: " << M
-           << ", total_reader_num: " << static_cast<int>(total_reader_num) << ", zero_copy: " << zero_copy;
+  util::ShmWriterData<L>* writer_data = shm_manager.construct_shm_writer_data();
+  util::ShmReaderData<R>* reader_data = shm_manager.construct_shm_reader_data();
 
-  const ShmRemover remover1(BUFFER_SHARED_MEM_NAME.data());
-  const ShmRemover remover2(UTIL_SHARED_MEM_NAME.data());
+  span<uint8_t, L> buffer = writer_data->buffer.value;
+  atomic<uint64_t>* downstream_sequence = &writer_data->downstream_sequence.value;
+  const vector<const atomic<uint64_t>*>& upstream_sequences =
+      util::to_const_pointer_vector(util::to_upstream_sequence_pointers(reader_data->upstream_sequences));
 
-  const uint64_t all_readers_mask = ReaderId::all_readers_mask(total_reader_num);
-
-  // segment for the circular buffer and message counter, written by writer, read by readers
-  // NOLINTNEXTLINE(misc-include-cleaner)
-  bipc::managed_shared_memory segment1(bipc::create_only, BUFFER_SHARED_MEM_NAME.data(), SHM_SIZE);
-  LOG_INFO << "created shared_memory_object segment1: " << BUFFER_SHARED_MEM_NAME.data()
-           << ", segment1.free_memory: " << segment1.get_free_memory();
-
-  array<uint8_t, L>* buffer = segment1.construct<array<uint8_t, L>>("buffer")();
-  LOG_INFO << "buffer allocated, segment1.free_memory: " << segment1.get_free_memory();
-
-  atomic<uint64_t>* message_count_sync = segment1.construct<atomic<uint64_t>>("message_count_sync")(0);
-  LOG_INFO << "message_count_sync allocated, segment1.free_memory: " << segment1.get_free_memory();
-
-  // segment for synchronization
-  bipc::managed_shared_memory segment2(
-      bipc::create_only, UTIL_SHARED_MEM_NAME.data(), lshl::demux::util::LINUX_PAGE_SIZE
-  );
-  LOG_INFO << "created shared_memory_object segment2: " << UTIL_SHARED_MEM_NAME.data()
-           << ", segment2.free_memory: " << segment2.get_free_memory();
-
-  atomic<uint64_t>* wraparound_sync = segment2.construct<atomic<uint64_t>>("wraparound_sync")(0);
-  LOG_INFO << "wraparound_sync allocated, segment2.free_memory: " << segment2.get_free_memory();
-
-  atomic<uint64_t>* startup_sync = segment2.construct<atomic<uint64_t>>("startup_sync")(0);
-  LOG_INFO << "startup_sync allocated, segment2.free_memory: " << segment2.get_free_memory();
-
-  DemuxWriter<L, M, false> writer(all_readers_mask, span{*buffer}, message_count_sync, wraparound_sync);
-  LOG_INFO << "DemuxWriter created, segment1.free_memory: " << segment1.get_free_memory()
-           << ", segment2.free_memory: " << segment2.get_free_memory();
+  DemuxWriter<L, M, false> writer(buffer, downstream_sequence, upstream_sequences);
 
   LOG_INFO << "waiting for all readers ...";
   while (true) {
-    const uint64_t x = startup_sync->load();
-    if (x == all_readers_mask) {
-      break;
-    } else {
-      using namespace std::chrono_literals;
-      std::this_thread::sleep_for(1s);  // NOLINT(misc-include-cleaner)
-    }
+    // const uint64_t x = startup_sync->load();
+    // if (x == all_readers_mask) {
+    //   break;
+    // } else {
+    //   using namespace std::chrono_literals;
+    //   std::this_thread::sleep_for(1s);  // NOLINT(misc-include-cleaner)
+    // }
   }
   LOG_INFO << "all readers connected";
 
-  if (zero_copy) {
-    run_writer_loop_zero_copy(&writer, msg_num);
-  } else {
-    run_writer_loop(&writer, msg_num);
-  }
-  LOG_INFO << "DemuxWriter completed, segment1.free_memory: " << segment1.get_free_memory()
-           << ", segment2.free_memory: " << segment2.get_free_memory();
+  // if (zero_copy) {
+  //   run_writer_loop_zero_copy(&writer, msg_num);
+  // } else {
+  //   run_writer_loop(&writer, msg_num);
+  // }
+  // LOG_INFO << "DemuxWriter completed, segment1.free_memory: " << segment1.get_free_memory()
+  //          << ", segment2.free_memory: " << segment2.get_free_memory();
 }
 
 template <size_t L, uint16_t M>
@@ -284,48 +265,51 @@ write_zero_copy(DemuxWriter<L, M, false>* writer, MarketDataUpdateGenerator* md_
 }
 
 template <size_t L, uint16_t M>
-auto start_reader(const uint8_t reader_num, const uint64_t msg_num) noexcept(false) -> void {
-  using lshl::demux::example::BUFFER_SHARED_MEM_NAME;
+auto start_reader(
+    [[maybe_unused]] const string& shared_memory_name,
+    [[maybe_unused]] const uint8_t reader_num,
+    [[maybe_unused]] const uint64_t msg_num
+) noexcept(false) -> void {
   using std::atomic;
 
-  LOG_INFO << "reader BUFFER_SHARED_MEM_NAME: " << BUFFER_SHARED_MEM_NAME.data() << ", L: " << L << ", M: " << M
-           << ", reader_num: " << static_cast<int>(reader_num);
+  // LOG_INFO << "reader BUFFER_SHARED_MEM_NAME: " << BUFFER_SHARED_MEM_NAME.data() << ", L: " << L << ", M: " << M
+  //          << ", reader_num: " << static_cast<int>(reader_num);
 
-  // read-only segment for the circular buffer and message counter
-  // NOLINTNEXTLINE(misc-include-cleaner)
-  bipc::managed_shared_memory segment1(bipc::open_read_only, BUFFER_SHARED_MEM_NAME.data());
-  LOG_INFO << "opened shared_memory_object segment1: " << BUFFER_SHARED_MEM_NAME.data()
-           << ", segment1.free_memory: " << segment1.get_free_memory();
+  // // read-only segment for the circular buffer and message counter
+  // // NOLINTNEXTLINE(misc-include-cleaner)
+  // bipc::managed_shared_memory segment1(bipc::open_read_only, BUFFER_SHARED_MEM_NAME.data());
+  // LOG_INFO << "opened shared_memory_object segment1: " << BUFFER_SHARED_MEM_NAME.data()
+  //          << ", segment1.free_memory: " << segment1.get_free_memory();
 
-  array<uint8_t, L>* buffer = segment1.find<array<uint8_t, L>>("buffer").first;
-  LOG_INFO << "buffer found, segment1.free_memory: " << segment1.get_free_memory();
+  // array<uint8_t, L>* buffer = segment1.find<array<uint8_t, L>>("buffer").first;
+  // LOG_INFO << "buffer found, segment1.free_memory: " << segment1.get_free_memory();
 
-  atomic<uint64_t>* message_count_sync = segment1.find<atomic<uint64_t>>("message_count_sync").first;
-  LOG_INFO << "message_count_sync found, segment1.free_memory: " << segment1.get_free_memory();
+  // atomic<uint64_t>* message_count_sync = segment1.find<atomic<uint64_t>>("message_count_sync").first;
+  // LOG_INFO << "message_count_sync found, segment1.free_memory: " << segment1.get_free_memory();
 
   // read-write segment for atomic variables
   // NOLINTNEXTLINE(misc-include-cleaner)
-  bipc::managed_shared_memory segment2(bipc::open_only, UTIL_SHARED_MEM_NAME.data());
-  LOG_INFO << "opened shared_memory_object segment2: " << UTIL_SHARED_MEM_NAME.data()
-           << ", segment2.free_memory: " << segment2.get_free_memory();
+  // bipc::managed_shared_memory segment2(bipc::open_only, UTIL_SHARED_MEM_NAME.data());
+  // LOG_INFO << "opened shared_memory_object segment2: " << UTIL_SHARED_MEM_NAME.data()
+  //          << ", segment2.free_memory: " << segment2.get_free_memory();
 
-  atomic<uint64_t>* wraparound_sync = segment2.find<atomic<uint64_t>>("wraparound_sync").first;
-  LOG_INFO << "wraparound_sync found, segment2.free_memory: " << segment2.get_free_memory();
+  // atomic<uint64_t>* wraparound_sync = segment2.find<atomic<uint64_t>>("wraparound_sync").first;
+  // LOG_INFO << "wraparound_sync found, segment2.free_memory: " << segment2.get_free_memory();
 
-  atomic<uint64_t>* startup_sync = segment2.find<atomic<uint64_t>>("startup_sync").first;
-  LOG_INFO << "startup_sync found, segment2.free_memory: " << segment2.get_free_memory();
+  // atomic<uint64_t>* startup_sync = segment2.find<atomic<uint64_t>>("startup_sync").first;
+  // LOG_INFO << "startup_sync found, segment2.free_memory: " << segment2.get_free_memory();
 
-  const ReaderId id{reader_num};
+  // const ReaderId id{reader_num};
 
-  DemuxReader<L, M> reader(id, span{*buffer}, message_count_sync, wraparound_sync);
-  LOG_INFO << "DemuxReader created, segment1.free_memory: " << segment2.get_free_memory()
-           << ", segment2.free_memory: " << segment2.get_free_memory();
+  // DemuxReader<L, M> reader(id, span{*buffer}, message_count_sync, wraparound_sync);
+  // LOG_INFO << "DemuxReader created, segment1.free_memory: " << segment2.get_free_memory()
+  //          << ", segment2.free_memory: " << segment2.get_free_memory();
 
-  startup_sync->fetch_or(id.mask());
+  // startup_sync->fetch_or(id.mask());
 
-  run_reader_loop(&reader, msg_num);
-  LOG_INFO << "DemuxReader completed, segment1.free_memory: " << segment2.get_free_memory()
-           << ", segment2.free_memory: " << segment2.get_free_memory();
+  // run_reader_loop(&reader, msg_num);
+  // LOG_INFO << "DemuxReader completed, segment1.free_memory: " << segment2.get_free_memory()
+  //          << ", segment2.free_memory: " << segment2.get_free_memory();
 }
 
 template <size_t L, uint16_t M>
