@@ -62,8 +62,20 @@ auto operator<<(OutputStream& os, const std::array<uint8_t, M>& xs) -> OutputStr
   return operator<<(os, std::span{ys});
 }
 
+template <typename T>
+class log_vector {
+ private:
+  std::reference_wrapper<const std::vector<T>> data_;
+
+ public:
+  explicit log_vector(const std::vector<T>& data) : data_(data) {}
+
+  auto get() const -> const std::vector<T>& { return data_; }
+};
+
 template <OutputStreamConcept OutputStream, typename T>
-auto operator<<(OutputStream& os, const std::vector<T>& xs) -> OutputStream& {
+auto operator<<(OutputStream& os, const log_vector<T> log_vec) -> OutputStream& {
+  const auto& xs = log_vec.get();
   os << '[';
   bool first = true;
   for (const auto& x : xs) {

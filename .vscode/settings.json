@@ -18,6 +18,7 @@
     "libstdc",
     "lshl",
     "NOLINTNEXTLINE",
+    "pids",
     "Rapidcheck",
     "rdtscp",
     "Shlyapnikov",

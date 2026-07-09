@@ -15,9 +15,28 @@ cd "${__root}"
 zero_copy=${1:-"false"}
 msg_num=${2:-10000000}
 
+report_state_and_generate_kill_command() {
+    if [ -z "$1" ]; then
+        echo "Usage: report_state_and_generate_kill_command <search_pattern>" >&2
+        return 1
+    fi
+
+    pgrep --full --list-full "$1"
+ 
+    local pids
+    pids=$(pgrep --full "$1" | tr '\n' ' ' | sed 's/ *$//')
+
+    if [ -z "$pids" ]; then
+        echo "No processes found matching: $1" >&2
+        return 0
+    fi
+
+    echo "# to kill, use this command: kill $pids"
+}
+
 # start writer expecting 2 readers
 #CPUPROFILE=shm_demux_writer.prof CPUPROFILE_FREQUENCY=1000 \
-./build/shm_demux writer 2 "${msg_num}" "${zero_copy}" > ./example-writer.log 2>&1 &
+./build/shm_demux writer 0,1 "${msg_num}" "${zero_copy}" > ./example-writer.log 2>&1 &
 writer_pid="$!"
 
 # let the writer start and initialize all shared memory objects, it will wait for both readers
@@ -25,12 +44,13 @@ sleep 2s
 
 # start 2 readers
 
+./build/shm_demux reader 0 "${msg_num}" "${zero_copy}" &> ./example-reader-0.log &
 ./build/shm_demux reader 1 "${msg_num}" "${zero_copy}" &> ./example-reader-1.log &
-./build/shm_demux reader 2 "${msg_num}" "${zero_copy}" &> ./example-reader-2.log &
 
 # report the state
 #ps -ef|grep -F "./build/shm_demux"
-pgrep --full --list-full "./build/shm_demux"
+# pgrep --full --list-full "./build/shm_demux"
+report_state_and_generate_kill_command "./build/shm_demux"
 
 # wait for writer to exit
 wait "$writer_pid"

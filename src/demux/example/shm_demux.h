@@ -15,20 +15,21 @@ namespace lshl::demux::example {
 
 using lshl::demux::core::DemuxReader;
 using lshl::demux::core::DemuxWriter;
+using lshl::demux::core::ReaderId;
 
 using std::size_t;
 using std::string;
 using std::uint16_t;
-
-auto init_logging() noexcept -> void;
+using std::uint8_t;
+using std::vector;
 
 auto main_(std::span<char*> args) noexcept(false) -> int;
 
 template <size_t L, uint16_t M, size_t R>
 auto start_writer(
     const string& shared_memory_name,
-    uint8_t total_reader_num,
-    uint64_t msg_num,
+    const vector<ReaderId>& reader_ids,
+    const uint64_t msg_num,
     bool zero_copy
 ) noexcept(false) -> void;
 
@@ -48,8 +49,9 @@ template <size_t L, uint16_t M>
     lshl::demux::util::XXH64_util* hash
 ) noexcept(false) -> bool;
 
-template <size_t L, uint16_t M>
-auto start_reader(const string& shared_memory_name, uint8_t reader_num, uint64_t msg_num) noexcept(false) -> void;
+template <size_t L, uint16_t M, size_t R>
+auto start_reader(const string& shared_memory_name, const ReaderId& reader_id, uint64_t msg_num) noexcept(false)
+    -> void;
 
 template <size_t L, uint16_t M>
 auto run_reader_loop(DemuxReader<L, M>* reader, uint64_t msg_num) noexcept(false) -> void;

@@ -3,25 +3,32 @@
 
 #define XXH_INLINE_ALL  // <xxhash.h>
 
-#include "./shm_demux.h"
-#include <array>
+// Tell Boost to use the high-performance libbacktrace backend
+// #define BOOST_STACKTRACE_USE_BACKTRACE
+// Tell Boost to user add2line for extracting stack trace, which forks a new process and slow
+// #define BOOST_STACKTRACE_USE_ADDR2LINE
+#include <boost/stacktrace.hpp>  // NOLINT(misc-include-cleaner)
+
 #include <atomic>
 #include <boost/exception/diagnostic_information.hpp>
 #include <boost/exception/exception.hpp>
+#include <boost/interprocess/creation_tags.hpp>
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/log/core.hpp>
 #include <boost/log/expressions.hpp>  // NOLINT(misc-include-cleaner)
+#include <boost/log/trivial.hpp>
+#include <cassert>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
-#include <exception>
 #include <iostream>
 #include <limits>
 #include <optional>
 #include <span>
 #include <string>
-#include <thread>
+#include <vector>
 #include "../core/demux_reader.h"
 #include "../core/demux_writer.h"
 #include "../core/reader_id.h"
@@ -30,9 +37,10 @@
 #include "../util/hdr_histogram_util.h"
 #include "../util/operators.h"
 #include "../util/shm_manager.h"
-#include "../util/shm_remover.h"
+#include "../util/string_util.h"
 #include "../util/xxhash_util.h"
 #include "./market_data.h"
+#include "./shm_demux.h"
 
 namespace {
 auto print_usage(const char* prog) -> void {
@@ -48,18 +56,15 @@ auto print_usage(const char* prog) -> void {
 }  // namespace
 
 auto main(int argc, char* argv[]) noexcept -> int {
+  boost::log::core::get()->set_filter(boost::log::trivial::severity >= boost::log::trivial::info);
+
   constexpr int ERROR = 100;
   try {
     const auto args = std::span<char*>(argv, static_cast<size_t>(argc));
     return lshl::demux::example::main_(args);
-  } catch (const boost::exception& e) {
-    LOG_ERROR << "boost::exception: " << boost::diagnostic_information(e);
-    return ERROR;
-  } catch (const std::exception& e) {
-    LOG_ERROR << "std::exception: " << e.what();
-    return ERROR;
   } catch (...) {
-    LOG_ERROR << "unexpected exception";
+    boost::stacktrace::stacktrace trace = boost::stacktrace::stacktrace::from_current_exception();
+    LOG_ERROR << "exception: " << boost::current_exception_diagnostic_information(true) << ", trace: " << trace;
     return ERROR;
   }
 }
@@ -82,9 +87,7 @@ using lshl::demux::core::DemuxWriter;
 using lshl::demux::core::ReaderId;
 using lshl::demux::core::WriteResult;
 using lshl::demux::util::HDR_histogram_util;
-using lshl::demux::util::ShmRemover;
 using lshl::demux::util::XXH64_util;
-using std::array;
 using std::atomic;
 using std::size_t;
 using std::span;
@@ -95,20 +98,13 @@ auto main_(const span<char*> args) noexcept(false) -> int {
   constexpr int ERROR = 200;
   constexpr size_t EXPECTED_ARG_NUM = 5;
 
-  init_logging();
-
   if (args.size() != EXPECTED_ARG_NUM) {
     print_usage(args[0]);
     return ERROR;
   }
 
   const std::string command(args[1]);
-  const auto num16 = boost::lexical_cast<uint16_t>(args[2]);
-  if (num16 < 1 || num16 > std::numeric_limits<std::uint8_t>::max()) {
-    print_usage(args[0]);
-    return ERROR;
-  }
-  const auto num8 = static_cast<uint8_t>(num16);
+
   const auto msg_num = boost::lexical_cast<uint64_t>(args[3]);
   const auto zero_copy = std::string("true") == args[4];
 
@@ -116,9 +112,16 @@ auto main_(const span<char*> args) noexcept(false) -> int {
   const std::string shared_memory_name = "lshl_demux_buf";
 
   if (command == "writer") {
-    start_writer<BUFFER_SIZE, MAX_MESSAGE_SIZE, MAX_READER_NUM>(shared_memory_name, num8, msg_num, zero_copy);
+    const vector<uint16_t> ids = util::parse_vector<uint16_t>(std::string(args[2]));
+    vector<ReaderId> reader_ids{};
+    reader_ids.reserve(ids.size());
+    for (const auto& x : ids) {
+      reader_ids.emplace_back(static_cast<uint8_t>(x));
+    }
+    start_writer<BUFFER_SIZE, MAX_MESSAGE_SIZE, MAX_READER_NUM>(shared_memory_name, reader_ids, msg_num, zero_copy);
   } else if (command == "reader") {
-    start_reader<BUFFER_SIZE, MAX_MESSAGE_SIZE>(shared_memory_name, num8, msg_num);
+    const auto id = static_cast<uint8_t>(boost::lexical_cast<uint16_t>(args[2]));
+    start_reader<BUFFER_SIZE, MAX_MESSAGE_SIZE, MAX_READER_NUM>(shared_memory_name, ReaderId(id), msg_num);
   } else {
     print_usage(args[0]);
     return ERROR;
@@ -127,19 +130,14 @@ auto main_(const span<char*> args) noexcept(false) -> int {
   return 0;
 }
 
-auto init_logging() noexcept -> void {
-  // NOLINTNEXTLINE(misc-include-cleaner)
-  boost::log::core::get()->set_filter(boost::log::trivial::severity >= boost::log::trivial::info);
-}
-
 template <size_t L, uint16_t M, size_t R>
 auto start_writer(
     const string& shared_memory_name,
-    [[maybe_unused]] const uint8_t total_reader_num,
-    [[maybe_unused]] const uint64_t msg_num,
-    [[maybe_unused]] bool zero_copy
+    const vector<ReaderId>& reader_ids,
+    const uint64_t msg_num,
+    bool zero_copy
 ) noexcept(false) -> void {
-  constexpr size_t SHM_SIZE = lshl::demux::util::calculate_shared_mem_size<L, R>();
+  constexpr size_t SHM_SIZE = 262144;  // lshl ::demux::util::calculate_shared_mem_size<L, R>();
   util::ShmManager<L, R> shm_manager{bipc::create_only, shared_memory_name, SHM_SIZE};
 
   util::ShmWriterData<L>* writer_data = shm_manager.construct_shm_writer_data();
@@ -147,24 +145,29 @@ auto start_writer(
 
   span<uint8_t, L> buffer = writer_data->buffer.value;
   atomic<uint64_t>* downstream_sequence = &writer_data->downstream_sequence.value;
-  const vector<const atomic<uint64_t>*>& upstream_sequences =
+  const vector<const atomic<uint64_t>*>& all_upstream_sequences =
       util::to_const_pointer_vector(util::to_upstream_sequence_pointers(reader_data->upstream_sequences));
 
-  DemuxWriter<L, M, false> writer(buffer, downstream_sequence, upstream_sequences);
+  vector<const atomic<uint64_t>*> filtered_upstream_sequences{};
+  filtered_upstream_sequences.reserve(reader_ids.size());
+  for (const auto& r : reader_ids) {
+    filtered_upstream_sequences.push_back(all_upstream_sequences.at(r.value()));
+  }
+
+  DemuxWriter<L, M, false> writer(buffer, downstream_sequence, filtered_upstream_sequences);
 
   const atomic<size_t>* reader_count = &reader_data->active_reader_count.value;
 
-  LOG_INFO << "waiting for all readers: " << total_reader_num << "...";
-  util::wait_for_count<size_t>(reader_count, total_reader_num);
+  LOG_INFO << "waiting for all readers: " << util::log_vector(reader_ids) << "...";
+  util::wait_for_count_ipc<size_t>(reader_count, reader_ids.size());
   LOG_INFO << "all readers connected";
 
-  // if (zero_copy) {
-  //   run_writer_loop_zero_copy(&writer, msg_num);
-  // } else {
-  //   run_writer_loop(&writer, msg_num);
-  // }
-  // LOG_INFO << "DemuxWriter completed, segment1.free_memory: " << segment1.get_free_memory()
-  //          << ", segment2.free_memory: " << segment2.get_free_memory();
+  if (zero_copy) {
+    run_writer_loop_zero_copy(&writer, msg_num);
+  } else {
+    run_writer_loop(&writer, msg_num);
+  }
+  LOG_INFO << "DemuxWriter completed";
 }
 
 template <size_t L, uint16_t M>
@@ -195,7 +198,9 @@ auto run_writer_loop(DemuxWriter<L, M, false>* writer, const uint64_t msg_num) n
 
 template <class T, size_t L, uint16_t M>
 [[nodiscard]] inline auto write(DemuxWriter<L, M, false>* writer, const T& md) noexcept -> bool {
+  static vector<uint64_t> upstream_sequences;
   int attempt = 0;
+
   while (true) {
     const WriteResult result = writer->write_safe(md);
     switch (result) {
@@ -206,8 +211,11 @@ template <class T, size_t L, uint16_t M>
       case WriteResult::Repeat:
         attempt += 1;
         if (attempt % REPORT_PROGRESS == 0) {
+          writer->upstream_sequences(&upstream_sequences);
           LOG_WARNING << "one or more readers are lagging, wraparound is blocked, write attempt: " << attempt
-                      << ", writer sequence: " << writer->message_count();
+                      << ", writer sequence: " << writer->message_count()
+                      << ", downstream sequence: " << writer->downstream_sequence()
+                      << ", upstream sequences: " << util::log_vector{upstream_sequences};
         }
         continue;
     }
@@ -259,52 +267,28 @@ write_zero_copy(DemuxWriter<L, M, false>* writer, MarketDataUpdateGenerator* md_
   }
 }
 
-template <size_t L, uint16_t M>
-auto start_reader(
-    [[maybe_unused]] const string& shared_memory_name,
-    [[maybe_unused]] const uint8_t reader_num,
-    [[maybe_unused]] const uint64_t msg_num
-) noexcept(false) -> void {
-  using std::atomic;
+template <size_t L, uint16_t M, size_t R>
+auto start_reader(const string& shared_memory_name, const ReaderId& reader_id, const uint64_t msg_num) noexcept(false)
+    -> void {
+  assert(reader_id.value() < MAX_READER_NUM);
+  util::ShmManager<L, R> shm_manager{bipc::open_only, shared_memory_name};
 
-  // LOG_INFO << "reader BUFFER_SHARED_MEM_NAME: " << BUFFER_SHARED_MEM_NAME.data() << ", L: " << L << ", M: " << M
-  //          << ", reader_num: " << static_cast<int>(reader_num);
+  util::ShmWriterData<L>* writer_data = shm_manager.find_shm_writer_data();
+  util::ShmReaderData<R>* reader_data = shm_manager.find_shm_reader_data();
 
-  // // read-only segment for the circular buffer and message counter
-  // // NOLINTNEXTLINE(misc-include-cleaner)
-  // bipc::managed_shared_memory segment1(bipc::open_read_only, BUFFER_SHARED_MEM_NAME.data());
-  // LOG_INFO << "opened shared_memory_object segment1: " << BUFFER_SHARED_MEM_NAME.data()
-  //          << ", segment1.free_memory: " << segment1.get_free_memory();
+  const span<uint8_t, L> buffer = writer_data->buffer.value;
+  atomic<uint64_t>* downstream_sequence = &writer_data->downstream_sequence.value;
+  vector<atomic<uint64_t>*> upstream_sequences = util::to_upstream_sequence_pointers(reader_data->upstream_sequences);
 
-  // array<uint8_t, L>* buffer = segment1.find<array<uint8_t, L>>("buffer").first;
-  // LOG_INFO << "buffer found, segment1.free_memory: " << segment1.get_free_memory();
+  DemuxReader<L, M> reader(reader_id, buffer, downstream_sequence, upstream_sequences[reader_id.value()]);
 
-  // atomic<uint64_t>* message_count_sync = segment1.find<atomic<uint64_t>>("message_count_sync").first;
-  // LOG_INFO << "message_count_sync found, segment1.free_memory: " << segment1.get_free_memory();
+  atomic<size_t>* reader_count = &reader_data->active_reader_count.value;
 
-  // read-write segment for atomic variables
-  // NOLINTNEXTLINE(misc-include-cleaner)
-  // bipc::managed_shared_memory segment2(bipc::open_only, UTIL_SHARED_MEM_NAME.data());
-  // LOG_INFO << "opened shared_memory_object segment2: " << UTIL_SHARED_MEM_NAME.data()
-  //          << ", segment2.free_memory: " << segment2.get_free_memory();
+  const auto active_reader_count = util::increment_count_ipc<size_t>(reader_count);
+  LOG_INFO << "active_reader_count: " << active_reader_count;
 
-  // atomic<uint64_t>* wraparound_sync = segment2.find<atomic<uint64_t>>("wraparound_sync").first;
-  // LOG_INFO << "wraparound_sync found, segment2.free_memory: " << segment2.get_free_memory();
-
-  // atomic<uint64_t>* startup_sync = segment2.find<atomic<uint64_t>>("startup_sync").first;
-  // LOG_INFO << "startup_sync found, segment2.free_memory: " << segment2.get_free_memory();
-
-  // const ReaderId id{reader_num};
-
-  // DemuxReader<L, M> reader(id, span{*buffer}, message_count_sync, wraparound_sync);
-  // LOG_INFO << "DemuxReader created, segment1.free_memory: " << segment2.get_free_memory()
-  //          << ", segment2.free_memory: " << segment2.get_free_memory();
-
-  // startup_sync->fetch_or(id.mask());
-
-  // run_reader_loop(&reader, msg_num);
-  // LOG_INFO << "DemuxReader completed, segment1.free_memory: " << segment2.get_free_memory()
-  //          << ", segment2.free_memory: " << segment2.get_free_memory();
+  run_reader_loop(&reader, msg_num);
+  LOG_INFO << "DemuxReader completed";
 }
 
 template <size_t L, uint16_t M>

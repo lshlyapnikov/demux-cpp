@@ -17,8 +17,8 @@ build_type=Debug
 ## ASan(address) + UBSan(undefined) + LSan(leak)
 tools.build:cxxflags=["-g", "-O0", "-fno-omit-frame-pointer", "-fsanitize=address,undefined,leak"]
 tools.build:cflags=["-g", "-O0", "-fno-omit-frame-pointer", "-fsanitize=address,undefined,leak"]
-tools.build:sharedlinkflags=["-fsanitize=address,undefined,leak"]
-tools.build:exelinkflags=["-fsanitize=address,undefined,leak"]
+tools.build:sharedlinkflags=["-rdynamic", "-fsanitize=address,undefined,leak"]
+tools.build:exelinkflags=["-rdynamic", "-fsanitize=address,undefined,leak"]
 #
 ## MSan(memory) -- didn't work, looks like GTest doesn't pick up the MSan settings
 # tools.build:cxxflags=["-g", "-O1", "-fno-omit-frame-pointer", "-fsanitize=memory"]

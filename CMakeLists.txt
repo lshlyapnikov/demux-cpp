@@ -41,6 +41,7 @@ endif()
 
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost REQUIRED COMPONENTS log)
+find_package(Boost REQUIRED COMPONENTS stacktrace)
 
 # example uses this to compute hash digest of sent and received messages
 find_package(xxHash REQUIRED)
@@ -79,6 +80,8 @@ target_link_libraries(shm_demux
   PRIVATE reader_id
   PRIVATE hdr_histogram::hdr_histogram_static
   PRIVATE Boost::log
+  PRIVATE Boost::stacktrace_backtrace
+  PRIVATE Boost::stacktrace_from_exception
 )
 if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     target_link_libraries(shm_demux PRIVATE profiler)

@@ -146,6 +146,9 @@ class ShmManager {
 
   template <typename T>
   [[nodiscard]] auto construct_object(const std::string& name) noexcept(false) -> T* {
+    constexpr size_t required = sizeof(T);
+    LOG_INFO << "construct_object: " << name << ", required: " << required
+             << ", segment.free_memory : " << this->segment_.get_free_memory();
     T* result = segment_.construct<T>(name.c_str())();
     if (result == nullptr) {
       throw std::runtime_error(std::format("cannot construct object in shared memory: {}", name));
@@ -157,8 +160,8 @@ class ShmManager {
   }
 
   template <typename T>
-  [[nodiscard]] auto find_object(const char* name) noexcept(false) -> T* {
-    T* result = segment_.template find<T>(name).first;
+  [[nodiscard]] auto find_object(const std::string& name) noexcept(false) -> T* {
+    T* result = segment_.template find<T>(name.c_str()).first;
     if (result == nullptr) {
       throw std::runtime_error(std::format("cannot find object in shared memory: {}", name));
     }

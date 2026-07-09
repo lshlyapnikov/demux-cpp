@@ -11,3 +11,5 @@ build_type=RelWithDebInfo
 # gperftools needs `-gdwarf-4 -03 -DNDEBUG`
 tools.build:cxxflags=["-gdwarf-4", "-fdebug-default-version=4", "-O3", "-DNDEBUG"]
 tools.build:cflags=["-gdwarf-4", "-fdebug-default-version=4", "-O3", "-DNDEBUG"]
+tools.build:sharedlinkflags=["-rdynamic"]
+tools.build:exelinkflags=["-rdynamic"]

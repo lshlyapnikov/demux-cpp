@@ -142,10 +142,6 @@ class DemuxWriter {
 
   [[nodiscard]] auto message_count() const noexcept -> uint64_t { return this->message_count_; }
 
-#ifdef UNIT_TEST
-
-  auto position() const noexcept -> size_t { return this->position_; }
-
   [[nodiscard]] auto downstream_sequence() const noexcept -> uint64_t {
     return this->downstream_sequence_->load(std::memory_order_relaxed);
   }
@@ -156,6 +152,10 @@ class DemuxWriter {
       result->push_back(x->load(std::memory_order_relaxed));
     }
   }
+
+#ifdef UNIT_TEST
+
+  auto position() const noexcept -> size_t { return this->position_; }
 
 #endif  // UNIT_TEST
 

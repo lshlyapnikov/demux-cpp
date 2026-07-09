@@ -18,7 +18,9 @@ enum class Side : std::uint8_t { Bid, Ask };
 auto operator<<(std::ostream& os, const Side& side) -> std::ostream&;
 
 // NOLINTBEGIN(misc-non-private-member-variables-in-classes)
-struct MarketDataUpdate {
+/// gnu::packed to avoid undefined behavior: `runtime error: member access within misaligned address`
+/// reported by sanitizer: `-fsanitize=undefined`
+struct [[gnu::packed]] MarketDataUpdate {
   MarketDataUpdate() = default;   // constructor
   ~MarketDataUpdate() = default;  // destructor
   // guarantees that it is only passed by reference or via a pointer
