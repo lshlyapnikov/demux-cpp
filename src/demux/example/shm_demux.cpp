@@ -11,11 +11,9 @@
 
 #include <atomic>
 #include <boost/exception/diagnostic_information.hpp>
-#include <boost/exception/exception.hpp>
 #include <boost/interprocess/creation_tags.hpp>
-#include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/log/core.hpp>
+#include <boost/log/core.hpp>         // NOLINT(misc-include-cleaner)
 #include <boost/log/expressions.hpp>  // NOLINT(misc-include-cleaner)
 #include <boost/log/trivial.hpp>
 #include <cassert>
@@ -56,6 +54,7 @@ auto print_usage(const char* prog) -> void {
 }  // namespace
 
 auto main(int argc, char* argv[]) noexcept -> int {
+  // NOLINTNEXTLINE(misc-include-cleaner)
   boost::log::core::get()->set_filter(boost::log::trivial::severity >= boost::log::trivial::info);
 
   constexpr int ERROR = 100;
@@ -63,6 +62,7 @@ auto main(int argc, char* argv[]) noexcept -> int {
     const auto args = std::span<char*>(argv, static_cast<size_t>(argc));
     return lshl::demux::example::main_(args);
   } catch (...) {
+    // NOLINTNEXTLINE(misc-include-cleaner)
     boost::stacktrace::stacktrace trace = boost::stacktrace::stacktrace::from_current_exception();
     LOG_ERROR << "exception: " << boost::current_exception_diagnostic_information(true) << ", trace: " << trace;
     return ERROR;
@@ -112,22 +112,32 @@ auto main_(const span<char*> args) noexcept(false) -> int {
   const std::string shared_memory_name = "lshl_demux_buf";
 
   if (command == "writer") {
-    const vector<uint16_t> ids = util::parse_vector<uint16_t>(std::string(args[2]));
-    vector<ReaderId> reader_ids{};
-    reader_ids.reserve(ids.size());
-    for (const auto& x : ids) {
-      reader_ids.emplace_back(static_cast<uint8_t>(x));
-    }
+    const vector<ReaderId> reader_ids = parse_reader_ids(std::string(args[2]));
     start_writer<BUFFER_SIZE, MAX_MESSAGE_SIZE, MAX_READER_NUM>(shared_memory_name, reader_ids, msg_num, zero_copy);
   } else if (command == "reader") {
-    const auto id = static_cast<uint8_t>(boost::lexical_cast<uint16_t>(args[2]));
-    start_reader<BUFFER_SIZE, MAX_MESSAGE_SIZE, MAX_READER_NUM>(shared_memory_name, ReaderId(id), msg_num);
+    const ReaderId id = parse_reader_id(std::string(args[2]));
+    start_reader<BUFFER_SIZE, MAX_MESSAGE_SIZE, MAX_READER_NUM>(shared_memory_name, id, msg_num);
   } else {
     print_usage(args[0]);
     return ERROR;
   }
 
   return 0;
+}
+
+auto parse_reader_ids(const string& comma_separated_list) -> std::vector<ReaderId> {
+  const vector<uint16_t> ids = util::parse_vector<uint16_t>(std::string(comma_separated_list));
+  vector<ReaderId> reader_ids{};
+  reader_ids.reserve(ids.size());
+  for (const auto& x : ids) {
+    reader_ids.emplace_back(static_cast<uint8_t>(x));
+  }
+  return reader_ids;
+}
+
+auto parse_reader_id(const string& str_id) -> ReaderId {
+  auto id = static_cast<uint8_t>(boost::lexical_cast<uint16_t>(str_id));
+  return ReaderId(id);
 }
 
 template <size_t L, uint16_t M, size_t R>
@@ -143,7 +153,7 @@ auto start_writer(
   util::ShmWriterData<L>* writer_data = shm_manager.construct_shm_writer_data();
   util::ShmReaderData<R>* reader_data = shm_manager.construct_shm_reader_data();
 
-  span<uint8_t, L> buffer = writer_data->buffer.value;
+  const span<uint8_t, L> buffer = writer_data->buffer.value;
   atomic<uint64_t>* downstream_sequence = &writer_data->downstream_sequence.value;
   const vector<const atomic<uint64_t>*>& all_upstream_sequences =
       util::to_const_pointer_vector(util::to_upstream_sequence_pointers(reader_data->upstream_sequences));

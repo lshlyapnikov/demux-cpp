@@ -25,6 +25,10 @@ using std::vector;
 
 auto main_(std::span<char*> args) noexcept(false) -> int;
 
+auto parse_reader_ids(const string& comma_separated_list) -> std::vector<ReaderId>;
+
+auto parse_reader_id(const string& str_id) -> ReaderId;
+
 template <size_t L, uint16_t M, size_t R>
 auto start_writer(
     const string& shared_memory_name,
