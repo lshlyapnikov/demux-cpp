@@ -21,10 +21,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # generate a compile_commands.json file, n
 #set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wconversion -Wsign-conversion -Werror")
 set(MY_CXX_FLAGS -Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wconversion -Wsign-conversion -Werror)
 
-# set in conan profile
-#set(CMAKE_CXX_FLAGS_DEBUG "-gdwarf-4 -O0") # valgrind needs `-gdwarf-4`
-#set(CMAKE_CXX_FLAGS_DEBUG "-g -gdwarf-4 -O3 -DNDEBUG") # `-03 -DNDEBUG` for gperftools
-
 #
 # tools
 #
@@ -84,7 +80,7 @@ target_link_libraries(shm_demux
   PRIVATE Boost::stacktrace_from_exception
 )
 if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    target_link_libraries(shm_demux PRIVATE profiler)
+    # target_link_libraries(shm_demux PRIVATE profiler)
 endif()
 target_compile_options(shm_demux
   PRIVATE ${MY_CXX_FLAGS}

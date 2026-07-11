@@ -10,3 +10,5 @@ build_type=Release
 [conf]
 tools.build:cxxflags=["-O3", "-DNDEBUG"]
 tools.build:cflags=["-O3", "-DNDEBUG"]
+tools.build:sharedlinkflags=["-rdynamic"]
+tools.build:exelinkflags=["-rdynamic"]

@@ -12,8 +12,8 @@ __root="$(cd "$(dirname "${__dir}")" && pwd)"
 
 cd "${__root}"
 
-zero_copy=${1:-"false"}
-msg_num=${2:-10000000}
+msg_num=${1:-10000000}
+zero_copy=${2:-"false"}
 
 report_state_and_generate_kill_command() {
     if [ -z "$1" ]; then
