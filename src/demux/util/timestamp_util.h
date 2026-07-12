@@ -18,6 +18,7 @@ constexpr uint64_t SLEEP_TIMEOUT_NS = 1'000'000'000;
 using std::size_t;
 using std::uint64_t;
 
+/*
 [[nodiscard]] inline auto timestamp_ns(clockid_t clock_id) noexcept(false) -> uint64_t {
   timespec ts{};
 
@@ -38,6 +39,19 @@ using std::uint64_t;
     // 4. Second Compiler Barrier
     asm volatile("" ::: "memory");
 
+    return (static_cast<uint64_t>(ts.tv_sec) * NANOS_PER_SECOND) + static_cast<uint64_t>(ts.tv_nsec);
+  } else {
+    const int err = errno;
+    LOG_ERROR << "Failed to get system clock time, system_error: " << std::system_category().message(err);
+    return 0;
+  }
+}
+*/
+
+[[nodiscard]] inline auto timestamp_ns(clockid_t clock_id) noexcept(false) -> uint64_t {
+  timespec ts{};
+
+  if (clock_gettime(clock_id, &ts) == 0) [[likely]] {
     return (static_cast<uint64_t>(ts.tv_sec) * NANOS_PER_SECOND) + static_cast<uint64_t>(ts.tv_nsec);
   } else {
     const int err = errno;

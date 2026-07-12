@@ -17,7 +17,6 @@
 #include <boost/log/expressions.hpp>  // NOLINT(misc-include-cleaner)
 #include <boost/log/trivial.hpp>
 #include <cassert>
-#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -36,6 +35,7 @@
 #include "../util/operators.h"
 #include "../util/shm_manager.h"
 #include "../util/string_util.h"
+#include "../util/timestamp_util.h"
 #include "../util/xxhash_util.h"
 #include "./market_data.h"
 #include "./shm_demux.h"
@@ -185,11 +185,10 @@ auto run_writer_loop(DemuxWriter<L, M, false>* writer, const uint64_t msg_num) n
   LOG_INFO << "sending " << msg_num << " md updates ...";
 
   MarketDataUpdate md{};
-  MarketDataUpdateGenerator md_gen{};
   XXH64_util hash{};
 
   for (uint64_t i = 1; i <= msg_num; ++i) {
-    md_gen.generate_market_data_update(&md);
+    generate_market_data_update(&md);
     LOG_DEBUG << md;
     const bool ok = write(writer, md);
     if (!ok) {
@@ -236,11 +235,10 @@ template <size_t L, uint16_t M>
 auto run_writer_loop_zero_copy(DemuxWriter<L, M, false>* writer, const uint64_t msg_num) noexcept(false) -> void {
   LOG_INFO << "sending " << msg_num << " md updates ...";
 
-  MarketDataUpdateGenerator md_gen{};
   XXH64_util hash{};
 
   for (uint64_t i = 1; i <= msg_num; ++i) {
-    const bool ok = write_zero_copy(writer, &md_gen, &hash);
+    const bool ok = write_zero_copy(writer, &hash);
     if (!ok) {
       LOG_ERROR << "dropped one message, could not write";
       continue;
@@ -255,15 +253,13 @@ auto run_writer_loop_zero_copy(DemuxWriter<L, M, false>* writer, const uint64_t 
 }
 
 template <size_t L, uint16_t M>
-[[nodiscard]] inline auto
-write_zero_copy(DemuxWriter<L, M, false>* writer, MarketDataUpdateGenerator* md_gen, XXH64_util* hash) noexcept(false)
-    -> bool {
+[[nodiscard]] inline auto write_zero_copy(DemuxWriter<L, M, false>* writer, XXH64_util* hash) noexcept(false) -> bool {
   for (int attempt = 0;; ++attempt) {
     const std::optional<MarketDataUpdate*> mo = writer->template allocate<MarketDataUpdate>();
     if (mo.has_value()) {
       MarketDataUpdate* md = mo.value();
       LOG_DEBUG << md;
-      md_gen->generate_market_data_update(md);
+      generate_market_data_update(md);
       writer->template commit<MarketDataUpdate>();
       hash->update(md, sizeof(MarketDataUpdate));
       return true;
@@ -332,9 +328,10 @@ auto run_reader_loop(DemuxReader<L, M>* reader, const uint64_t msg_num) noexcept
 }
 
 auto inline calculate_latency(const uint64_t x0) -> int64_t {
-  const std::chrono::time_point<std::chrono::steady_clock, std::chrono::nanoseconds> now =
-      std::chrono::steady_clock::now();
-  const uint64_t x1 = static_cast<uint64_t>(now.time_since_epoch().count());
+  // const std::chrono::time_point<std::chrono::steady_clock, std::chrono::nanoseconds> now =
+  //     std::chrono::steady_clock::now();
+  // const uint64_t x1 = static_cast<uint64_t>(now.time_since_epoch().count());
+  const uint64_t x1 = util::monotonic_timestamp_ns();
   return static_cast<int64_t>(x1 - x0);
 }
 

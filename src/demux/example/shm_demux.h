@@ -47,11 +47,8 @@ template <size_t L, uint16_t M>
 auto run_writer_loop_zero_copy(DemuxWriter<L, M, false>* writer, uint64_t msg_num) noexcept(false) -> void;
 
 template <size_t L, uint16_t M>
-[[nodiscard]] inline auto write_zero_copy(
-    DemuxWriter<L, M, false>* writer,
-    MarketDataUpdateGenerator* md_gen,
-    lshl::demux::util::XXH64_util* hash
-) noexcept(false) -> bool;
+[[nodiscard]] inline auto
+write_zero_copy(DemuxWriter<L, M, false>* writer, lshl::demux::util::XXH64_util* hash) noexcept(false) -> bool;
 
 template <size_t L, uint16_t M, size_t R>
 auto start_reader(const string& shared_memory_name, const ReaderId& reader_id, uint64_t msg_num) noexcept(false)
