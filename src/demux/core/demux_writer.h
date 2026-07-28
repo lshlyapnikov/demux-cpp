@@ -64,8 +64,7 @@ class DemuxWriter {
       const vector<const atomic<uint64_t>*>& upstream_sequences
   ) noexcept
       : buffer_(buffer), downstream_sequence_(downstream_sequence), upstream_sequences_(upstream_sequences) {
-    LOG_INFO << "[DemuxWriter::constructor] L: " << L << ", M: " << M << ", B: " << B
-             << ", reader_num: " << this->upstream_sequences_.size();
+    LOG_INFO << "[DemuxWriter::constructor] " << *this;
   }
 
   ~DemuxWriter() = default;
@@ -152,6 +151,9 @@ class DemuxWriter {
       result->push_back(x->load(std::memory_order_relaxed));
     }
   }
+
+  template <size_t L0, uint16_t M0, bool B0>
+  friend auto operator<<(std::ostream& os, const DemuxWriter<L0, M0, B0>& writer) -> std::ostream&;
 
 #ifdef UNIT_TEST
 
@@ -318,6 +320,25 @@ inline auto DemuxWriter<L, M, B>::all_readers_caught_up() const noexcept -> bool
   return std::ranges::all_of(this->upstream_sequences_, [this](const auto* x) {
     return x->load(std::memory_order_acquire) == this->message_count_;
   });
+}
+
+template <size_t L0, uint16_t M0, bool B0>
+auto operator<<(std::ostream& os, const DemuxWriter<L0, M0, B0>& writer) -> std::ostream& {
+  os << "DemuxWriter{L: " << L0 << ", M: " << M0 << ", B:" << B0 << ", position: " << writer.position_
+     << ", wraparound: " << writer.wraparound_
+     << ", downstream_sequence: " << writer.downstream_sequence_->load(std::memory_order_relaxed)
+     << ", upstream_sequences: [";
+
+  // atomic<uint64_t>* downstream_sequence_;
+
+  for (size_t i = 0; i < writer.upstream_sequences_.size(); ++i) {
+    if (i > 0) {
+      os << ", ";
+    }
+    os << writer.upstream_sequences_[i]->load(std::memory_order_relaxed);
+  }
+  os << "]}";
+  return os;
 }
 
 }  // namespace lshl::demux::core

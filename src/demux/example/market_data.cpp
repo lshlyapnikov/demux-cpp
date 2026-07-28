@@ -46,6 +46,9 @@ auto operator<<(std::ostream& os, const Side& side) -> std::ostream& {
     case Side::Ask:
       os << "Ask";
       break;
+    default:
+      os << "<invalid side: " << static_cast<uint32_t>(side) << ">";
+      break;
   }
   return os;
 }
@@ -58,7 +61,7 @@ auto operator<<(std::ostream& os, const MarketDataUpdate& md) -> std::ostream& {
 auto generate_market_data_update(MarketDataUpdate* output) -> void {
   const uint64_t x = util::monotonic_timestamp_ns();
   output->timestamp = x;
-  output->instrument_id = x % std::numeric_limits<uint32_t>::max();
+  output->instrument_id = static_cast<uint32_t>(x);
   output->side = generate_side_(x);
   output->level = generate_level_(x);
   output->price = generate_price_(x);

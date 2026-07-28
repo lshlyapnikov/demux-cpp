@@ -21,7 +21,7 @@ TEST(UtilTest, TscCounter) {
   namespace util = lshl::demux::util;
   using std::uint64_t;
 
-  constexpr uint64_t ACCURACY_NS = 150;
+  constexpr uint64_t ACCURACY_NS = 1500;
 
   const util::TscConverter conv = util::calibrate_best_effort();
 

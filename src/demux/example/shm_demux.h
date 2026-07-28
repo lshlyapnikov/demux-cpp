@@ -3,11 +3,13 @@
 
 #pragma once
 
+#include <xxhash.h>
 #include <cstddef>
 #include <cstdint>
 #include <span>
 #include "../core/demux_reader.h"
 #include "../core/demux_writer.h"
+#include "../util/result.h"
 #include "../util/xxhash_util.h"
 #include "./market_data.h"
 
@@ -16,12 +18,44 @@ namespace lshl::demux::example {
 using lshl::demux::core::DemuxReader;
 using lshl::demux::core::DemuxWriter;
 using lshl::demux::core::ReaderId;
+using lshl::demux::util::XXH64_util;
 
 using std::size_t;
 using std::string;
 using std::uint16_t;
 using std::uint8_t;
 using std::vector;
+
+class BaseContext {
+ private:
+  size_t warning_attempt_threshold_;
+  size_t message_limit_;
+  size_t message_counter_{0};
+  XXH64_util hash_;
+
+ public:
+  BaseContext(size_t warning_attempt_threshold, size_t message_limit)
+      : warning_attempt_threshold_(warning_attempt_threshold), message_limit_(message_limit) {};
+
+  [[nodiscard]] auto warning_attempt_threshold() const noexcept -> size_t { return this->warning_attempt_threshold_; };
+  [[nodiscard]] auto message_limit() const noexcept -> size_t { return this->message_limit_; };
+  [[nodiscard]] auto message_counter() const noexcept -> size_t { return this->message_counter_; };
+  auto increment_message_counter() noexcept -> size_t { return ++this->message_counter_; }
+  auto update_hash(const void* input, size_t size) noexcept(false) -> void { this->hash_.update(input, size); }
+  [[nodiscard]] auto hash_digest() const noexcept -> XXH64_hash_t { return this->hash_.digest(); }
+};
+
+class WriterContext : public BaseContext {
+ public:
+  WriterContext(size_t warning_attempt_threshold, size_t message_limit)
+      : BaseContext(warning_attempt_threshold, message_limit) {};
+};
+
+class ReaderContext : public BaseContext {
+ public:
+  ReaderContext(size_t warning_attempt_threshold, size_t message_limit)
+      : BaseContext(warning_attempt_threshold, message_limit) {};
+};
 
 auto main_(std::span<char*> args) noexcept(false) -> int;
 
@@ -34,8 +68,13 @@ auto start_writer(
     const string& shared_memory_name,
     const vector<ReaderId>& reader_ids,
     const uint64_t msg_num,
-    bool zero_copy
+    bool zero_copy,
+    bool calculate_hash
 ) noexcept(false) -> void;
+
+auto supply_market_data(WriterContext* context, MarketDataUpdate* md) -> util::Result<std::string, bool>;
+
+auto supply_market_data_update_hash(WriterContext* context, MarketDataUpdate* md) -> util::Result<std::string, bool>;
 
 template <size_t L, uint16_t M>
 auto run_writer_loop(DemuxWriter<L, M, false>* writer, uint64_t msg_num) noexcept(false) -> void;

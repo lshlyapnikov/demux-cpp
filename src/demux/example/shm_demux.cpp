@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <format>
 #include <iostream>
 #include <limits>
 #include <optional>
@@ -27,12 +28,15 @@
 #include <string>
 #include <vector>
 #include "../core/demux_reader.h"
+// #include "../core/demux_reader_loop.h"
 #include "../core/demux_writer.h"
+#include "../core/demux_writer_loop.h"
 #include "../core/reader_id.h"
 #include "../util/atomic_util.h"
 #include "../util/boost_log_util.h"
 #include "../util/hdr_histogram_util.h"
 #include "../util/operators.h"
+#include "../util/result.h"
 #include "../util/shm_manager.h"
 #include "../util/string_util.h"
 #include "../util/timestamp_util.h"
@@ -42,14 +46,15 @@
 
 namespace {
 auto print_usage(const char* prog) -> void {
-  std::cerr << "Usage: " << prog << " [writer <number-of-readers> <number-of-messages> <zero-copy>]"
-            << " | [reader <unique-reader-number> <number-of-messages> <zero-copy>]\n"
+  std::cerr << "Usage: " << prog << " [writer <number-of-readers> <number-of-messages> <zero-copy> <calculate-hash>]"
+            << " | [reader <unique-reader-id> <number-of-messages> <zero-copy> <calculate-hash>]\n"
             << "  where\n"
-            << "    <number-of-readers> and <unique-reader-number> are within the interval [1, "
+            << "    <number-of-readers> and <unique-reader-id> are within the interval [0, "
             << static_cast<int>(std::numeric_limits<std::uint8_t>::max()) << "]\n"
             << "    <number-of-messages> is within the interval [1, " << std::numeric_limits<uint64_t>::max()
             << "] (uint64_t)\n"
-            << "    <zero-copy> true/false\n";
+            << "    <zero-copy> true/false\n"
+            << "    <calculate-hash> true/false\n";
 }
 }  // namespace
 
@@ -96,7 +101,7 @@ using std::vector;
 
 auto main_(const span<char*> args) noexcept(false) -> int {
   constexpr int ERROR = 200;
-  constexpr size_t EXPECTED_ARG_NUM = 5;
+  constexpr size_t EXPECTED_ARG_NUM = 6;
 
   if (args.size() != EXPECTED_ARG_NUM) {
     print_usage(args[0]);
@@ -107,13 +112,16 @@ auto main_(const span<char*> args) noexcept(false) -> int {
 
   const auto msg_num = boost::lexical_cast<uint64_t>(args[3]);
   const auto zero_copy = std::string("true") == args[4];
+  const auto calculate_hash = std::string("true") == args[5];
 
   // TODO(Leonid): pass it as a command line argument
   const std::string shared_memory_name = "lshl_demux_buf";
 
   if (command == "writer") {
     const vector<ReaderId> reader_ids = parse_reader_ids(std::string(args[2]));
-    start_writer<BUFFER_SIZE, MAX_MESSAGE_SIZE, MAX_READER_NUM>(shared_memory_name, reader_ids, msg_num, zero_copy);
+    start_writer<BUFFER_SIZE, MAX_MESSAGE_SIZE, MAX_READER_NUM>(
+        shared_memory_name, reader_ids, msg_num, zero_copy, calculate_hash
+    );
   } else if (command == "reader") {
     const ReaderId id = parse_reader_id(std::string(args[2]));
     start_reader<BUFFER_SIZE, MAX_MESSAGE_SIZE, MAX_READER_NUM>(shared_memory_name, id, msg_num);
@@ -145,9 +153,15 @@ auto start_writer(
     const string& shared_memory_name,
     const vector<ReaderId>& reader_ids,
     const uint64_t msg_num,
-    bool zero_copy
+    bool zero_copy,
+    bool calculate_hash
 ) noexcept(false) -> void {
-  constexpr size_t SHM_SIZE = 262144;  // lshl ::demux::util::calculate_shared_mem_size<L, R>();
+  LOG_INFO << "[start_writer] shared_memory_name: " << shared_memory_name
+           << ", readers_ids: " << util::log_vector{reader_ids} << ", msg_num: " << msg_num
+           << ", zero_copy: " << zero_copy << ", calculate_hash: " << calculate_hash;
+
+  // TODO(Leonid): your machine has L1d: 192 KiB, consider lowering the below setting
+  constexpr size_t SHM_SIZE = 256L * 1024L;  // lshl ::demux::util::calculate_shared_mem_size<L, R>();
   util::ShmManager<L, R> shm_manager{bipc::create_only, shared_memory_name, SHM_SIZE};
 
   util::ShmWriterData<L>* writer_data = shm_manager.construct_shm_writer_data();
@@ -168,22 +182,54 @@ auto start_writer(
 
   const atomic<size_t>* reader_count = &reader_data->active_reader_count.value;
 
+  WriterContext context{REPORT_PROGRESS, msg_num};
+
   LOG_INFO << "waiting for all readers: " << util::log_vector(reader_ids) << "...";
   util::wait_for_count_ipc<size_t>(reader_count, reader_ids.size());
   LOG_INFO << "all readers connected";
+  LOG_INFO << "sending " << msg_num << " MD updates ...";
 
   if (zero_copy) {
     run_writer_loop_zero_copy(&writer, msg_num);
   } else {
-    run_writer_loop(&writer, msg_num);
+    if (calculate_hash) {
+      core::run_writer_loop<L, M, WriterContext, MarketDataUpdate>(&writer, &context, supply_market_data_update_hash);
+      LOG_INFO << "writer sequence number: " << writer.message_count()
+               << ", XXH64_hash: " << XXH64_util::format(context.hash_digest());
+    } else {
+      core::run_writer_loop<L, M, WriterContext, MarketDataUpdate>(&writer, &context, supply_market_data);
+    }
   }
-  LOG_INFO << "DemuxWriter completed";
 }
 
+auto supply_market_data(WriterContext* context, MarketDataUpdate* md) -> util::Result<std::string, bool> {
+  const size_t counter = context->increment_message_counter();
+  if (counter < context->message_limit()) {
+    generate_market_data_update(md);
+    LOG_DEBUG << *md;
+    return util::true_value;  // generate more updates
+  } else if (counter == context->message_limit()) {
+    generate_market_data_update(md);
+    LOG_DEBUG << *md;
+    return util::false_value;  // done, this is the last update
+  } else {
+    return util::error<std::string, bool>(
+        std::format("message counter: {} exceeds message limit: {}", counter, context->message_limit())
+    );
+  }
+}
+
+auto supply_market_data_update_hash(WriterContext* context, MarketDataUpdate* md) -> util::Result<std::string, bool> {
+  util::Result<std::string, bool> result = supply_market_data(context, md);
+  if (result.is_value()) {
+    context->update_hash(md, sizeof(MarketDataUpdate));
+  }
+  return result;
+}
+
+// TODO(Leonid): remove it when refactoring is complete
 template <size_t L, uint16_t M>
 auto run_writer_loop(DemuxWriter<L, M, false>* writer, const uint64_t msg_num) noexcept(false) -> void {
-  LOG_INFO << "sending " << msg_num << " md updates ...";
-
   MarketDataUpdate md{};
   XXH64_util hash{};
 
@@ -294,7 +340,6 @@ auto start_reader(const string& shared_memory_name, const ReaderId& reader_id, c
   LOG_INFO << "active_reader_count: " << active_reader_count;
 
   run_reader_loop(&reader, msg_num);
-  LOG_INFO << "DemuxReader completed";
 }
 
 template <size_t L, uint16_t M>
@@ -309,8 +354,14 @@ auto run_reader_loop(DemuxReader<L, M>* reader, const uint64_t msg_num) noexcept
       i += 1;
       const MarketDataUpdate* md = read.value();
       // track the latency
-      histogram.record_value(calculate_latency(md->timestamp));
-      LOG_DEBUG << *md;
+      const int64_t x = calculate_latency(md->timestamp);
+      const bool ok = histogram.record_value(x);
+      if (ok) {
+        LOG_DEBUG << *md;
+      } else {
+        LOG_ERROR << "Could not record latency value: " << x << " for md: " << *md << ", i: " << i
+                  << ", reader: " << *reader;
+      }
       // report progress
       if (i % REPORT_PROGRESS == 0) {
         LOG_INFO << "number of messages received: " << i;

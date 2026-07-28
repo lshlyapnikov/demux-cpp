@@ -58,7 +58,7 @@ class DemuxReader {
         buffer_(buffer),
         downstream_sequence_(downstream_sequence),
         upstream_sequence_(upstream_sequence) {
-    LOG_INFO << "[DemuxReader::constructor] L: " << L << ", M: " << M << ", " << this->id_;
+    LOG_INFO << "[DemuxReader::constructor] " << *this;
   }
 
   ~DemuxReader() = default;
@@ -68,6 +68,9 @@ class DemuxReader {
                                                                 //
   DemuxReader(DemuxReader&&) = default;                         // movable, can be used with vector.emplace_back
   auto operator=(DemuxReader&&) -> DemuxReader& = delete;       // no move assignment
+
+  template <size_t L1, uint16_t M1>
+  friend auto operator<<(std::ostream& os, const DemuxReader<L1, M1>& reader) -> std::ostream&;
 
   /// @brief Does not block. Calls `has_next`. Returns a `span` pointing to the object in the circular buffer.
   ///   Do not keep the reference to the returned `span` between `next` calls, the underlying bytes can be overriden
@@ -154,4 +157,13 @@ template <size_t L, uint16_t M>
   }
 }
 
+template <size_t L1, uint16_t M1>
+auto operator<<(std::ostream& os, const DemuxReader<L1, M1>& reader) -> std::ostream& {
+  os << "DemuxReader{L: " << L1 << ", M: " << M1 << ", id: " << reader.id() << ", position: " << reader.position_
+     << ", available_message_count: " << reader.available_message_count_
+     << ", read_message_count: " << reader.read_message_count_
+     << ", downstream_sequence: " << reader.downstream_sequence_->load(std::memory_order_relaxed)
+     << ", upstream_sequence: " << reader.upstream_sequence_->load(std::memory_order_relaxed);
+  return os;
+}
 }  // namespace lshl::demux::core

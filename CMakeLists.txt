@@ -179,3 +179,32 @@ target_compile_options(util_test
   PRIVATE ${MY_CXX_FLAGS}
 )
 gtest_discover_tests(util_test)
+
+add_executable(result_test
+  src/demux/test/result_test.cpp
+)
+target_link_libraries(result_test
+  PRIVATE gtest::gtest
+  PRIVATE rapidcheck::rapidcheck
+  PRIVATE Boost::log
+)
+target_compile_options(result_test
+  PRIVATE ${MY_CXX_FLAGS}
+)
+gtest_discover_tests(result_test)
+
+# add_executable(${xyz}_test
+#   src/demux/test/${xyz}_test.cpp
+# )
+# target_link_libraries(${xyz}_test
+#   PRIVATE operators
+#   PRIVATE reader_id
+#   PRIVATE gtest::gtest
+#   PRIVATE rapidcheck::rapidcheck
+#   PRIVATE Boost::log
+#   PRIVATE atomic
+# )
+# target_compile_options(${xyz}_test
+#   PRIVATE ${MY_CXX_FLAGS}
+# )
+# gtest_discover_tests(${xyz}_test)

@@ -29,13 +29,13 @@ Test conducted on my laptop without CPU isolation or CPU pinning. Refer to the *
 
 ## 2. Development Environment
 
-This project was developed and tested exclusively on Linux using Clang version 17.0.6 and 18.
+This project was developed and tested exclusively on Linux using Clang 20.
 
 ### 2.1. Prerequisites
 
 - **Conan 2.7.0** `pip install conan`
 - **CMake**
-- **Clang 18** Configured in the [.envrc](./.envrc). See <https://apt.llvm.org/>.
+- **Clang 20** Configured in the [.envrc](./.envrc). See <https://apt.llvm.org/>.
 - **libstdc++** with C++20 support, `sudo add-apt-repository ppa:ubuntu-toolchain-r/test`
 - **gperftools** (optional): google-perftools package.
 - **direnv** (optional): An environment variable manager for your shell. More information can be found [here](https://direnv.net/).
@@ -110,7 +110,7 @@ $ ctest --test-dir ./build -R SlowReader -V
 Execute "SlowReader" test using main function:
 
 ```
-$ ./build/demultiplexer_test --gtest_filter=*SlowReader
+$ ./build/demux_test --gtest_filter=*SlowReader
 ```
 
 ## 8. Run Example

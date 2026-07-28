@@ -30,13 +30,13 @@ struct XXH64_util {
   XXH64_util(XXH64_util&&) noexcept = delete;                     // move constructor
   auto operator=(XXH64_util&&) noexcept -> XXH64_util& = delete;  // move assignment
 
-  auto update(const void* input, std::size_t size) noexcept(false) {
+  auto update(const void* input, std::size_t size) noexcept(false) -> void {
     if (XXH64_update(this->state_, input, size) == XXH_ERROR) {
       throw std::domain_error("XXH64_update failed");
     }
   }
 
-  auto digest() -> XXH64_hash_t { return XXH64_digest(this->state_); }
+  [[nodiscard]] auto digest() const noexcept -> XXH64_hash_t { return XXH64_digest(this->state_); }
 
   static auto format(XXH64_hash_t digest) -> std::string {
     constexpr std::size_t INT64_HEX_MAX_CHAR_LEN = 16;
