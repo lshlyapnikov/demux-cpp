@@ -9,6 +9,7 @@
 #include <span>
 #include "../core/demux_reader.h"
 #include "../core/demux_writer.h"
+#include "../util/hdr_histogram_util.h"
 #include "../util/result.h"
 #include "../util/xxhash_util.h"
 #include "./market_data.h"
@@ -52,9 +53,15 @@ class WriterContext : public BaseContext {
 };
 
 class ReaderContext : public BaseContext {
+ private:
+  util::HDR_histogram_util histogram;
+
  public:
   ReaderContext(size_t warning_attempt_threshold, size_t message_limit)
       : BaseContext(warning_attempt_threshold, message_limit) {};
+
+  [[nodiscard]] auto record_latency(std::int64_t value) noexcept -> bool { return this->histogram.record_value(value); }
+  auto print_latency_report() const noexcept { this->histogram.print_report(); }
 };
 
 auto main_(std::span<char*> args) noexcept(false) -> int;
@@ -74,10 +81,12 @@ auto start_writer(
 
 auto supply_market_data(WriterContext* context, MarketDataUpdate* md) -> util::Result<std::string, bool>;
 
-auto supply_market_data_update_hash(WriterContext* context, MarketDataUpdate* md) -> util::Result<std::string, bool>;
+auto supply_market_data_and_calc_hash(WriterContext* context, MarketDataUpdate* md) -> util::Result<std::string, bool>;
 
-template <size_t L, uint16_t M>
-auto run_writer_loop(DemuxWriter<L, M, false>* writer, uint64_t msg_num) noexcept(false) -> void;
+auto consume_market_data(ReaderContext* context, const MarketDataUpdate* md) -> util::Result<std::string, bool>;
+
+auto consume_market_data_and_calc_hash(ReaderContext* context, const MarketDataUpdate* md)
+    -> util::Result<std::string, bool>;
 
 template <class T, size_t L, uint16_t M>
 [[nodiscard]] inline auto write(DemuxWriter<L, M, false>* writer, const T& md) noexcept -> bool;
@@ -90,11 +99,12 @@ template <size_t L, uint16_t M>
 write_zero_copy(DemuxWriter<L, M, false>* writer, lshl::demux::util::XXH64_util* hash) noexcept(false) -> bool;
 
 template <size_t L, uint16_t M, size_t R>
-auto start_reader(const string& shared_memory_name, const ReaderId& reader_id, uint64_t msg_num) noexcept(false)
-    -> void;
-
-template <size_t L, uint16_t M>
-auto run_reader_loop(DemuxReader<L, M>* reader, uint64_t msg_num) noexcept(false) -> void;
+auto start_reader(
+    const string& shared_memory_name,
+    const ReaderId& reader_id,
+    uint64_t msg_num,
+    bool calculate_hash
+) noexcept(false) -> void;
 
 auto inline calculate_latency(uint64_t x0) -> int64_t;
 

@@ -28,7 +28,7 @@
 #include <string>
 #include <vector>
 #include "../core/demux_reader.h"
-// #include "../core/demux_reader_loop.h"
+#include "../core/demux_reader_loop.h"
 #include "../core/demux_writer.h"
 #include "../core/demux_writer_loop.h"
 #include "../core/reader_id.h"
@@ -124,7 +124,7 @@ auto main_(const span<char*> args) noexcept(false) -> int {
     );
   } else if (command == "reader") {
     const ReaderId id = parse_reader_id(std::string(args[2]));
-    start_reader<BUFFER_SIZE, MAX_MESSAGE_SIZE, MAX_READER_NUM>(shared_memory_name, id, msg_num);
+    start_reader<BUFFER_SIZE, MAX_MESSAGE_SIZE, MAX_READER_NUM>(shared_memory_name, id, msg_num, calculate_hash);
   } else {
     print_usage(args[0]);
     return ERROR;
@@ -190,10 +190,11 @@ auto start_writer(
   LOG_INFO << "sending " << msg_num << " MD updates ...";
 
   if (zero_copy) {
+    // TODO(Leonid): replace this call with core::run_writer_loop function
     run_writer_loop_zero_copy(&writer, msg_num);
   } else {
     if (calculate_hash) {
-      core::run_writer_loop<L, M, WriterContext, MarketDataUpdate>(&writer, &context, supply_market_data_update_hash);
+      core::run_writer_loop<L, M, WriterContext, MarketDataUpdate>(&writer, &context, supply_market_data_and_calc_hash);
       LOG_INFO << "writer sequence number: " << writer.message_count()
                << ", XXH64_hash: " << XXH64_util::format(context.hash_digest());
     } else {
@@ -204,51 +205,22 @@ auto start_writer(
 
 auto supply_market_data(WriterContext* context, MarketDataUpdate* md) -> util::Result<std::string, bool> {
   const size_t counter = context->increment_message_counter();
-  if (counter < context->message_limit()) {
-    generate_market_data_update(md);
-    LOG_DEBUG << *md;
-    return util::true_value;  // generate more updates
-  } else if (counter == context->message_limit()) {
-    generate_market_data_update(md);
-    LOG_DEBUG << *md;
-    return util::false_value;  // done, this is the last update
-  } else {
-    return util::error<std::string, bool>(
-        std::format("message counter: {} exceeds message limit: {}", counter, context->message_limit())
-    );
+  const size_t limit = context->message_limit();
+  if (counter > limit) [[unlikely]] {
+    return util::error<std::string, bool>(std::format("message counter: {} exceeds message limit: {}", counter, limit));
   }
+  generate_market_data_update(md);
+  LOG_DEBUG << *md;
+  // `counter == limit` means this is the last update
+  return counter < limit ? util::true_value : util::false_value;
 }
 
-auto supply_market_data_update_hash(WriterContext* context, MarketDataUpdate* md) -> util::Result<std::string, bool> {
+auto supply_market_data_and_calc_hash(WriterContext* context, MarketDataUpdate* md) -> util::Result<std::string, bool> {
   util::Result<std::string, bool> result = supply_market_data(context, md);
   if (result.is_value()) {
     context->update_hash(md, sizeof(MarketDataUpdate));
   }
   return result;
-}
-
-// TODO(Leonid): remove it when refactoring is complete
-template <size_t L, uint16_t M>
-auto run_writer_loop(DemuxWriter<L, M, false>* writer, const uint64_t msg_num) noexcept(false) -> void {
-  MarketDataUpdate md{};
-  XXH64_util hash{};
-
-  for (uint64_t i = 1; i <= msg_num; ++i) {
-    generate_market_data_update(&md);
-    LOG_DEBUG << md;
-    const bool ok = write(writer, md);
-    if (!ok) {
-      LOG_ERROR << "dropping message, could not write: " << md;
-      continue;
-    }
-    if (i % REPORT_PROGRESS == 0) {
-      LOG_INFO << "number of messages sent: " << i;
-    }
-    hash.update(&md, sizeof(MarketDataUpdate));
-  }
-
-  LOG_INFO << "writer sequence number: " << writer->message_count()
-           << ", XXH64_hash: " << XXH64_util::format(hash.digest());
 }
 
 template <class T, size_t L, uint16_t M>
@@ -320,8 +292,15 @@ template <size_t L, uint16_t M>
 }
 
 template <size_t L, uint16_t M, size_t R>
-auto start_reader(const string& shared_memory_name, const ReaderId& reader_id, const uint64_t msg_num) noexcept(false)
-    -> void {
+auto start_reader(
+    const string& shared_memory_name,
+    const ReaderId& reader_id,
+    const uint64_t msg_num,
+    bool calculate_hash
+) noexcept(false) -> void {
+  LOG_INFO << "[start_reader] shared_memory_name: " << shared_memory_name << ", reader_id: " << reader_id
+           << ", msg_num: " << msg_num << ", calculate_hash: " << calculate_hash;
+
   assert(reader_id.value() < MAX_READER_NUM);
   util::ShmManager<L, R> shm_manager{bipc::open_only, shared_memory_name};
 
@@ -336,46 +315,54 @@ auto start_reader(const string& shared_memory_name, const ReaderId& reader_id, c
 
   atomic<size_t>* reader_count = &reader_data->active_reader_count.value;
 
+  ReaderContext context{REPORT_PROGRESS, msg_num};
+
   const auto active_reader_count = util::increment_count_ipc<size_t>(reader_count);
   LOG_INFO << "active_reader_count: " << active_reader_count;
 
-  run_reader_loop(&reader, msg_num);
+  if (calculate_hash) {
+    core::run_reader_loop_unsafe<L, M, ReaderContext, MarketDataUpdate>(
+        &reader, &context, consume_market_data_and_calc_hash
+    );
+    LOG_INFO << "reader sequence number: " << reader.message_count()
+             << ", XXH64_hash: " << XXH64_util::format(context.hash_digest());
+  } else {
+    core::run_reader_loop_unsafe<L, M, ReaderContext, MarketDataUpdate>(&reader, &context, consume_market_data);
+  }
+  LOG_INFO << "message latency, ns:";
+  context.print_latency_report();
 }
 
-template <size_t L, uint16_t M>
-auto run_reader_loop(DemuxReader<L, M>* reader, const uint64_t msg_num) noexcept(false) -> void {
-  XXH64_util hash{};
-  HDR_histogram_util histogram{};
-
-  // consume the expected number of messages
-  for (uint64_t i = 0; i < msg_num;) {
-    const std::optional<const MarketDataUpdate*> read = reader->template next_unsafe<MarketDataUpdate>();
-    if (read.has_value()) {
-      i += 1;
-      const MarketDataUpdate* md = read.value();
-      // track the latency
-      const int64_t x = calculate_latency(md->timestamp);
-      const bool ok = histogram.record_value(x);
-      if (ok) {
-        LOG_DEBUG << *md;
-      } else {
-        LOG_ERROR << "Could not record latency value: " << x << " for md: " << *md << ", i: " << i
-                  << ", reader: " << *reader;
-      }
-      // report progress
-      if (i % REPORT_PROGRESS == 0) {
-        LOG_INFO << "number of messages received: " << i;
-      }
-      // calculate the hash
-      hash.update(md, sizeof(MarketDataUpdate));
-    }
+auto consume_market_data(ReaderContext* context, const MarketDataUpdate* md) -> util::Result<std::string, bool> {
+  const size_t counter = context->increment_message_counter();
+  const size_t limit = context->message_limit();
+  if (counter > limit) [[unlikely]] {
+    return util::error<std::string, bool>(std::format("message counter: {} exceeds message limit: {}", counter, limit));
   }
 
-  LOG_INFO << "reader sequence number: " << reader->message_count()
-           << ", XXH64_hash: " << XXH64_util::format(hash.digest());
+  // track the latency
+  const int64_t x = calculate_latency(md->timestamp);
+  const bool ok = context->record_latency(x);
+  if (ok) {
+    LOG_DEBUG << *md;
+  } else {
+    LOG_ERROR << "Could not record latency value: " << x << " for md: " << *md << ", counter: " << counter;
+  }
 
-  LOG_INFO << "message latency, ns:";
-  histogram.print_report();
+  // report progress
+  if (counter % REPORT_PROGRESS == 0) {
+    LOG_INFO << "number of messages received: " << counter;
+  }
+
+  // `counter == limit` means this is the last update
+  return counter < limit ? util::true_value : util::false_value;
+}
+
+auto consume_market_data_and_calc_hash(ReaderContext* context, const MarketDataUpdate* md)
+    -> util::Result<std::string, bool> {
+  util::Result<std::string, bool> result = consume_market_data(context, md);
+  context->update_hash(md, sizeof(MarketDataUpdate));
+  return result;
 }
 
 auto inline calculate_latency(const uint64_t x0) -> int64_t {

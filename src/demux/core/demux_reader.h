@@ -91,6 +91,7 @@ class DemuxReader {
     if (raw.empty()) {
       return std::nullopt;
     } else {
+      assert(raw.size() == sizeof(T));
       // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
       const T* x = reinterpret_cast<const T*>(raw.data());
       return std::make_optional(std::move(x));

@@ -38,7 +38,7 @@ struct HDR_histogram_util {
     return hdr_record_value(this->histogram_, value);
   }
 
-  auto print_report() { hdr_percentiles_print(this->histogram_, stdout, 2, 1.0, format_type::CLASSIC); }
+  auto print_report() const noexcept { hdr_percentiles_print(this->histogram_, stdout, 2, 1.0, format_type::CLASSIC); }
 
  private:
   hdr_histogram* histogram_{nullptr};

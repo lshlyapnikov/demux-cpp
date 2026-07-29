@@ -78,7 +78,7 @@ class DemuxWriter {
   /// @return
   [[nodiscard]] auto write(const span<uint8_t>& source) noexcept -> WriteResult {
     const size_t n = source.size();
-    if (n == 0 || n > M) {
+    if (n == 0 || n > M) [[unlikely]] {
       LOG_ERROR << "[DemuxWriter::write] invalid message length: " << n;
       return WriteResult::Error;
     }

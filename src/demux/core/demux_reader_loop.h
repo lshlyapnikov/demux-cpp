@@ -43,7 +43,7 @@ auto run_reader_loop_unsafe(DemuxReader<L, M>* reader, Context* context, Message
   LOG_INFO << "started reader loop: " << *reader;
 
   while (true) {
-    const std::optional<const Msg*> opt_msg = reader->template next_unsafe<Msg*>();
+    const std::optional<const Msg*> opt_msg = reader->template next_unsafe<Msg>();
     if (opt_msg.has_value()) {
       const Msg* msg = opt_msg.value();
       const util::Result<std::string, bool> result = consume_msg(context, msg);
