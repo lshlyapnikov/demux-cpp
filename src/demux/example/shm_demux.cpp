@@ -91,7 +91,6 @@ using lshl::demux::core::DemuxReader;
 using lshl::demux::core::DemuxWriter;
 using lshl::demux::core::ReaderId;
 using lshl::demux::core::WriteResult;
-using lshl::demux::util::HDR_histogram_util;
 using lshl::demux::util::XXH64_util;
 using std::atomic;
 using std::size_t;
