@@ -34,7 +34,6 @@
 #include "../core/reader_id.h"
 #include "../util/atomic_util.h"
 #include "../util/boost_log_util.h"
-#include "../util/hdr_histogram_util.h"
 #include "../util/operators.h"
 #include "../util/result.h"
 #include "../util/shm_manager.h"
