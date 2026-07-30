@@ -23,22 +23,22 @@ using std::uint64_t;
 using std::uint8_t;
 
 template <typename A>
-concept ReaderContextConcept = requires(const A& a) {
+concept ReaderStateLike = requires(const A& a) {
   { a.warning_attempt_threshold() } -> std::same_as<std::size_t>;
   //   { a.last_error() } -> std::same_as<const std::optional<std::string>&>;
 };
 
-template <typename Fn, typename Context, typename Msg, typename Ret = void>
-concept MessageConsumerContext =
-    std::invocable<Fn, Context*, const Msg*> && std::same_as<std::invoke_result_t<Fn, Context*, const Msg*>, Ret>;
+template <typename Fn, typename State, typename Msg, typename Ret = void>
+concept MessageConsumerLike =
+    std::invocable<Fn, State*, const Msg*> && std::same_as<std::invoke_result_t<Fn, State*, const Msg*>, Ret>;
 
 template <
     size_t L,
     uint16_t M,
-    ReaderContextConcept Context,
+    ReaderStateLike State,
     typename Msg,
-    MessageConsumerContext<Context, Msg, util::Result<std::string, bool>> MessageConsumerFn>
-auto run_reader_loop_unsafe(DemuxReader<L, M>* reader, Context* context, MessageConsumerFn consume_msg) noexcept
+    MessageConsumerLike<State, Msg, util::Result<std::string, bool>> MessageConsumerFn>
+auto run_reader_loop_unsafe(DemuxReader<L, M>* reader, State* state, MessageConsumerFn consume_msg) noexcept
     -> util::EmptyResult {
   LOG_INFO << "started reader loop: " << *reader;
 
@@ -46,7 +46,7 @@ auto run_reader_loop_unsafe(DemuxReader<L, M>* reader, Context* context, Message
     const std::optional<const Msg*> opt_msg = reader->template next_unsafe<Msg>();
     if (opt_msg.has_value()) {
       const Msg* msg = opt_msg.value();
-      const util::Result<std::string, bool> result = consume_msg(context, msg);
+      const util::Result<std::string, bool> result = consume_msg(state, msg);
       if (result.is_error()) {
         return util::error(result.error());
       } else if (!result.value()) {
@@ -60,16 +60,16 @@ auto run_reader_loop_unsafe(DemuxReader<L, M>* reader, Context* context, Message
 template <
     size_t L,
     uint16_t M,
-    ReaderContextConcept Context,
-    MessageConsumerContext<Context, const span<uint8_t>, util::Result<std::string, bool>> MessageConsumerFn>
-auto run_reader_loop(DemuxReader<L, M>* reader, Context* context, MessageConsumerFn consume_msg) noexcept
+    ReaderStateLike State,
+    MessageConsumerLike<State, const span<uint8_t>, util::Result<std::string, bool>> MessageConsumerFn>
+auto run_reader_loop(DemuxReader<L, M>* reader, State* state, MessageConsumerFn consume_msg) noexcept
     -> util::EmptyResult {
   LOG_INFO << "started reader loop: " << *reader;
 
   while (true) {
     const std::span<uint8_t> msg = reader->next();
     if (!msg.empty()) {
-      const util::Result<std::string, bool> result = consume_msg(context, msg);
+      const util::Result<std::string, bool> result = consume_msg(state, msg);
       if (result.is_error()) {
         return util::error(result.error());
       } else if (!result.value()) {

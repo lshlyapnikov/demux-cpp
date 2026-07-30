@@ -22,35 +22,35 @@ using std::uint64_t;
 using std::uint8_t;
 
 template <typename A>
-concept WriterContextConcept = requires(const A& a) {
+concept WriterStateLike = requires(const A& a) {
   { a.warning_attempt_threshold() } -> std::same_as<std::size_t>;
   //   { a.last_error() } -> std::same_as<const std::optional<std::string>&>;
 };
 
 template <typename Fn, typename Context, typename Msg, typename Ret = void>
-concept MessageSupplierContext =
+concept MessageSupplierLike =
     std::invocable<Fn, Context*, Msg*> && std::same_as<std::invoke_result_t<Fn, Context*, Msg*>, Ret>;
 
 template <
     size_t L,
     uint16_t M,
-    WriterContextConcept Context,
+    WriterStateLike State,
     typename Msg,
-    MessageSupplierContext<Context, Msg, util::Result<std::string, bool>> MessageSupplierFn>
-auto run_writer_loop(DemuxWriter<L, M, false>* writer, Context* context, MessageSupplierFn supply_msg) noexcept
+    MessageSupplierLike<State, Msg, util::Result<std::string, bool>> MessageSupplierFn>
+auto run_writer_loop(DemuxWriter<L, M, false>* writer, State* state, MessageSupplierFn supply_msg) noexcept
     -> util::EmptyResult {
   LOG_INFO << "[run_writer_loop] start: " << *writer;
 
   Msg msg{};
 
   while (true) {
-    const util::Result<std::string, bool> supply_result = supply_msg(context, &msg);
+    const util::Result<std::string, bool> supply_result = supply_msg(state, &msg);
     if (supply_result.is_error()) [[unlikely]] {
       return util::error(supply_result.error());
     }
     const bool last_msg = !supply_result.value();
 
-    util::EmptyResult write_result = write_msg<L, M, Context, Msg>(writer, context, msg);
+    util::EmptyResult write_result = write_msg<L, M, State, Msg>(writer, state, msg);
     if (write_result.is_error()) [[unlikely]] {
       LOG_ERROR << "[run_writer_loop] exit(error): write failed, dropped last message, error=" << supply_result.error()
                 << ", writer=" << writer;
@@ -64,8 +64,8 @@ auto run_writer_loop(DemuxWriter<L, M, false>* writer, Context* context, Message
   }
 }
 
-template <size_t L, uint16_t M, WriterContextConcept Context, typename Msg>
-[[nodiscard]] inline auto write_msg(DemuxWriter<L, M, false>* writer, const Context* context, const Msg& msg) noexcept
+template <size_t L, uint16_t M, WriterStateLike State, typename Msg>
+[[nodiscard]] inline auto write_msg(DemuxWriter<L, M, false>* writer, const State* state, const Msg& msg) noexcept
     -> util::EmptyResult {
   size_t attempt = 0;
 
@@ -78,7 +78,7 @@ template <size_t L, uint16_t M, WriterContextConcept Context, typename Msg>
         return util::error("unrecoverable writer error, check the log");
       case WriteResult::Repeat:
         attempt += 1;
-        if (attempt % context->warning_attempt_threshold() == 0) {
+        if (attempt % state->warning_attempt_threshold() == 0) {
           LOG_WARNING << "one or more readers are lagging, wraparound is blocked(?), write attempt: " << attempt
                       << ", writer: " << writer;
         }
@@ -87,9 +87,9 @@ template <size_t L, uint16_t M, WriterContextConcept Context, typename Msg>
   }
 }
 
-template <class T, size_t L, uint16_t M, WriterContextConcept Context>
+template <class T, size_t L, uint16_t M, WriterStateLike State>
 [[nodiscard]] inline auto
-write_span(DemuxWriter<L, M, false>* writer, const Context* context, const span<uint8_t>& msg) noexcept
+write_span(DemuxWriter<L, M, false>* writer, const State* state, const span<uint8_t>& msg) noexcept
     -> util::EmptyResult {
   static vector<uint64_t> upstream_sequences;
   int attempt = 0;
@@ -103,7 +103,7 @@ write_span(DemuxWriter<L, M, false>* writer, const Context* context, const span<
         return util::error("unrecoverable writer error, check the log");
       case WriteResult::Repeat:
         attempt += 1;
-        if (attempt % context->warning_attempt_threshold == 0) {
+        if (attempt % state->warning_attempt_threshold == 0) {
           writer->upstream_sequences(&upstream_sequences);
           LOG_WARNING << "one or more readers are lagging, wraparound is blocked, write attempt: " << attempt
                       << ", writer sequence: " << writer->message_count()

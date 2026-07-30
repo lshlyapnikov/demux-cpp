@@ -180,7 +180,7 @@ auto start_writer(
 
   const atomic<size_t>* reader_count = &reader_data->active_reader_count.value;
 
-  WriterContext context{REPORT_PROGRESS, msg_num};
+  WriterState context{REPORT_PROGRESS, msg_num};
 
   LOG_INFO << "waiting for all readers: " << util::log_vector(reader_ids) << "...";
   util::wait_for_count_ipc<size_t>(reader_count, reader_ids.size());
@@ -192,16 +192,16 @@ auto start_writer(
     run_writer_loop_zero_copy(&writer, msg_num);
   } else {
     if (calculate_hash) {
-      core::run_writer_loop<L, M, WriterContext, MarketDataUpdate>(&writer, &context, supply_market_data_and_calc_hash);
+      core::run_writer_loop<L, M, WriterState, MarketDataUpdate>(&writer, &context, supply_market_data_and_calc_hash);
       LOG_INFO << "writer sequence number: " << writer.message_count()
                << ", XXH64_hash: " << XXH64_util::format(context.hash_digest());
     } else {
-      core::run_writer_loop<L, M, WriterContext, MarketDataUpdate>(&writer, &context, supply_market_data);
+      core::run_writer_loop<L, M, WriterState, MarketDataUpdate>(&writer, &context, supply_market_data);
     }
   }
 }
 
-auto supply_market_data(WriterContext* context, MarketDataUpdate* md) -> util::Result<std::string, bool> {
+auto supply_market_data(WriterState* context, MarketDataUpdate* md) -> util::Result<std::string, bool> {
   const size_t counter = context->increment_message_counter();
   const size_t limit = context->message_limit();
   if (counter > limit) [[unlikely]] {
@@ -213,7 +213,7 @@ auto supply_market_data(WriterContext* context, MarketDataUpdate* md) -> util::R
   return counter < limit ? util::true_value : util::false_value;
 }
 
-auto supply_market_data_and_calc_hash(WriterContext* context, MarketDataUpdate* md) -> util::Result<std::string, bool> {
+auto supply_market_data_and_calc_hash(WriterState* context, MarketDataUpdate* md) -> util::Result<std::string, bool> {
   util::Result<std::string, bool> result = supply_market_data(context, md);
   if (result.is_value()) {
     context->update_hash(md, sizeof(MarketDataUpdate));
@@ -313,25 +313,25 @@ auto start_reader(
 
   atomic<size_t>* reader_count = &reader_data->active_reader_count.value;
 
-  ReaderContext context{REPORT_PROGRESS, msg_num};
+  ReaderState context{REPORT_PROGRESS, msg_num};
 
   const auto active_reader_count = util::increment_count_ipc<size_t>(reader_count);
   LOG_INFO << "active_reader_count: " << active_reader_count;
 
   if (calculate_hash) {
-    core::run_reader_loop_unsafe<L, M, ReaderContext, MarketDataUpdate>(
+    core::run_reader_loop_unsafe<L, M, ReaderState, MarketDataUpdate>(
         &reader, &context, consume_market_data_and_calc_hash
     );
     LOG_INFO << "reader sequence number: " << reader.message_count()
              << ", XXH64_hash: " << XXH64_util::format(context.hash_digest());
   } else {
-    core::run_reader_loop_unsafe<L, M, ReaderContext, MarketDataUpdate>(&reader, &context, consume_market_data);
+    core::run_reader_loop_unsafe<L, M, ReaderState, MarketDataUpdate>(&reader, &context, consume_market_data);
   }
   LOG_INFO << "message latency, ns:";
   context.print_latency_report();
 }
 
-auto consume_market_data(ReaderContext* context, const MarketDataUpdate* md) -> util::Result<std::string, bool> {
+auto consume_market_data(ReaderState* context, const MarketDataUpdate* md) -> util::Result<std::string, bool> {
   const size_t counter = context->increment_message_counter();
   const size_t limit = context->message_limit();
   if (counter > limit) [[unlikely]] {
@@ -356,7 +356,7 @@ auto consume_market_data(ReaderContext* context, const MarketDataUpdate* md) -> 
   return counter < limit ? util::true_value : util::false_value;
 }
 
-auto consume_market_data_and_calc_hash(ReaderContext* context, const MarketDataUpdate* md)
+auto consume_market_data_and_calc_hash(ReaderState* context, const MarketDataUpdate* md)
     -> util::Result<std::string, bool> {
   util::Result<std::string, bool> result = consume_market_data(context, md);
   context->update_hash(md, sizeof(MarketDataUpdate));

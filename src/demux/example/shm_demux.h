@@ -27,7 +27,7 @@ using std::uint16_t;
 using std::uint8_t;
 using std::vector;
 
-class BaseContext {
+class BaseState {
  private:
   size_t warning_attempt_threshold_;
   size_t message_limit_;
@@ -35,7 +35,7 @@ class BaseContext {
   XXH64_util hash_;
 
  public:
-  BaseContext(size_t warning_attempt_threshold, size_t message_limit)
+  BaseState(size_t warning_attempt_threshold, size_t message_limit)
       : warning_attempt_threshold_(warning_attempt_threshold), message_limit_(message_limit) {};
 
   [[nodiscard]] auto warning_attempt_threshold() const noexcept -> size_t { return this->warning_attempt_threshold_; };
@@ -46,19 +46,19 @@ class BaseContext {
   [[nodiscard]] auto hash_digest() const noexcept -> XXH64_hash_t { return this->hash_.digest(); }
 };
 
-class WriterContext : public BaseContext {
+class WriterState : public BaseState {
  public:
-  WriterContext(size_t warning_attempt_threshold, size_t message_limit)
-      : BaseContext(warning_attempt_threshold, message_limit) {};
+  WriterState(size_t warning_attempt_threshold, size_t message_limit)
+      : BaseState(warning_attempt_threshold, message_limit) {};
 };
 
-class ReaderContext : public BaseContext {
+class ReaderState : public BaseState {
  private:
   util::HDR_histogram_util histogram;
 
  public:
-  ReaderContext(size_t warning_attempt_threshold, size_t message_limit)
-      : BaseContext(warning_attempt_threshold, message_limit) {};
+  ReaderState(size_t warning_attempt_threshold, size_t message_limit)
+      : BaseState(warning_attempt_threshold, message_limit) {};
 
   [[nodiscard]] auto record_latency(std::int64_t value) noexcept -> bool { return this->histogram.record_value(value); }
   auto print_latency_report() const noexcept { this->histogram.print_report(); }
@@ -79,13 +79,13 @@ auto start_writer(
     bool calculate_hash
 ) noexcept(false) -> void;
 
-auto supply_market_data(WriterContext* context, MarketDataUpdate* md) -> util::Result<std::string, bool>;
+auto supply_market_data(WriterState* context, MarketDataUpdate* md) -> util::Result<std::string, bool>;
 
-auto supply_market_data_and_calc_hash(WriterContext* context, MarketDataUpdate* md) -> util::Result<std::string, bool>;
+auto supply_market_data_and_calc_hash(WriterState* context, MarketDataUpdate* md) -> util::Result<std::string, bool>;
 
-auto consume_market_data(ReaderContext* context, const MarketDataUpdate* md) -> util::Result<std::string, bool>;
+auto consume_market_data(ReaderState* context, const MarketDataUpdate* md) -> util::Result<std::string, bool>;
 
-auto consume_market_data_and_calc_hash(ReaderContext* context, const MarketDataUpdate* md)
+auto consume_market_data_and_calc_hash(ReaderState* context, const MarketDataUpdate* md)
     -> util::Result<std::string, bool>;
 
 template <class T, size_t L, uint16_t M>

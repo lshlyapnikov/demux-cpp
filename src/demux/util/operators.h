@@ -20,11 +20,11 @@ template <typename T>
 }
 
 template <typename T>
-concept OutputStreamConcept = requires(T os) {
+concept OutputStreamLike = requires(T os) {
   { os << std::declval<std::string>() };  // Stream should support the << operator for strings
 };
 
-template <OutputStreamConcept OutputStream>
+template <OutputStreamLike OutputStream>
 auto operator<<(OutputStream& os, const std::span<uint8_t>& xs) -> OutputStream& {
   os << "hex:" << std::hex << '[';
   bool first = true;
@@ -40,7 +40,7 @@ auto operator<<(OutputStream& os, const std::span<uint8_t>& xs) -> OutputStream&
   return os;
 }
 
-template <OutputStreamConcept OutputStream>
+template <OutputStreamLike OutputStream>
 auto operator<<(OutputStream& os, const std::vector<uint8_t>& xs) -> OutputStream& {
   os << "hex:" << std::hex << '[';
   bool first = true;
@@ -56,7 +56,7 @@ auto operator<<(OutputStream& os, const std::vector<uint8_t>& xs) -> OutputStrea
   return os;
 }
 
-template <OutputStreamConcept OutputStream, size_t M>
+template <OutputStreamLike OutputStream, size_t M>
 auto operator<<(OutputStream& os, const std::array<uint8_t, M>& xs) -> OutputStream& {
   std::array<uint8_t, M> ys{xs};
   return operator<<(os, std::span{ys});
@@ -73,7 +73,7 @@ class log_vector {
   auto get() const -> const std::vector<T>& { return data_; }
 };
 
-template <OutputStreamConcept OutputStream, typename T>
+template <OutputStreamLike OutputStream, typename T>
 auto operator<<(OutputStream& os, const log_vector<T> log_vec) -> OutputStream& {
   const auto& xs = log_vec.get();
   os << '[';
