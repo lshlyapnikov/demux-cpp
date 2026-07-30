@@ -2,15 +2,38 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "./market_data.h"
-#include <chrono>
+
 #include <cstdint>
 #include <iostream>
 #include <limits>
-#include <random>
+#include "../util/timestamp_util.h"
 #include "market_data.h"
 
-namespace lshl::demux::example {
+namespace {
+using std::uint32_t;
+using std::uint64_t;
+using std::uint8_t;
 
+using lshl::demux::example::Side;
+
+auto generate_side_(uint64_t rnd) -> Side {
+  return static_cast<Side>(rnd % 2);
+}
+
+auto generate_level_(uint64_t rnd) -> uint8_t {
+  return static_cast<uint8_t>(rnd % std::numeric_limits<uint8_t>::max());
+}
+
+auto generate_price_(uint64_t rnd) -> uint64_t {
+  return lshl::demux::example::PRICE_MULTIPLIER * (rnd % std::numeric_limits<uint16_t>::max());
+}
+
+auto generate_size_(uint64_t rnd) -> uint32_t {
+  return lshl::demux::example::SIZE_MULTIPLIER * (rnd % std::numeric_limits<uint16_t>::max());
+}
+}  // namespace
+
+namespace lshl::demux::example {
 using std::uint32_t;
 using std::uint64_t;
 using std::uint8_t;
@@ -23,6 +46,9 @@ auto operator<<(std::ostream& os, const Side& side) -> std::ostream& {
     case Side::Ask:
       os << "Ask";
       break;
+    default:
+      os << "<invalid side: " << static_cast<uint32_t>(side) << ">";
+      break;
   }
   return os;
 }
@@ -32,33 +58,13 @@ auto operator<<(std::ostream& os, const MarketDataUpdate& md) -> std::ostream& {
   return os;
 }
 
-auto MarketDataUpdateGenerator::generate_market_data_update(MarketDataUpdate* output) -> void {
-  const std::chrono::time_point<std::chrono::steady_clock, std::chrono::nanoseconds> now =
-      std::chrono::steady_clock::now();
-  const uint64_t x = static_cast<uint64_t>(now.time_since_epoch().count());
+auto generate_market_data_update(MarketDataUpdate* output) -> void {
+  const uint64_t x = util::monotonic_timestamp_ns();
   output->timestamp = x;
-  output->instrument_id = this->distU32_(engine_);
-  output->side = this->generate_side_();
-  output->level = generate_level_();
-  output->price = generate_price_();
-  output->size = generate_size_();
+  output->instrument_id = static_cast<uint32_t>(x);
+  output->side = generate_side_(x);
+  output->level = generate_level_(x);
+  output->price = generate_price_(x);
+  output->size = generate_size_(x);
 }
-
-inline auto MarketDataUpdateGenerator::generate_side_() -> Side {
-  const uint32_t x = distU32_(engine_) % 2;
-  return static_cast<Side>(x);
-}
-
-inline auto MarketDataUpdateGenerator::generate_level_() -> uint8_t {
-  return this->distU8_(engine_);
-}
-
-inline auto MarketDataUpdateGenerator::generate_price_() -> uint64_t {
-  return MarketDataUpdateGenerator::PRICE_MULTIPLIER * (distU32_(engine_) % std::numeric_limits<uint16_t>::max());
-}
-
-inline auto MarketDataUpdateGenerator::generate_size_() -> uint32_t {
-  return MarketDataUpdateGenerator::SIZE_MULTIPLIER * (distU32_(engine_) % std::numeric_limits<uint16_t>::max());
-}
-
 }  // namespace lshl::demux::example

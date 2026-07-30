@@ -1,6 +1,6 @@
 # code: language=toml
+# cspell:disable
 # shellcheck disable=all
-# cSpell: disable
 
 [settings]
 os=Linux
@@ -8,4 +8,9 @@ arch=x86_64
 compiler=clang
 compiler.version=20
 compiler.cppstd=20
+## GCC stdlib with modern ABI
 compiler.libcxx=libstdc++11
+## GCC stdlib with legacy ABI
+# compiler.libcxx=libstdc++
+## LLVM stdlib
+# compiler.libcxx=libc++

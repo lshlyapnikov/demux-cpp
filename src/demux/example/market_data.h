@@ -5,7 +5,6 @@
 
 #include <cstdint>
 #include <iostream>
-#include <random>
 
 namespace lshl::demux::example {
 
@@ -18,7 +17,9 @@ enum class Side : std::uint8_t { Bid, Ask };
 auto operator<<(std::ostream& os, const Side& side) -> std::ostream&;
 
 // NOLINTBEGIN(misc-non-private-member-variables-in-classes)
-struct MarketDataUpdate {
+/// gnu::packed to avoid undefined behavior: `runtime error: member access within misaligned address`
+/// reported by sanitizer: `-fsanitize=undefined`
+struct [[gnu::packed]] MarketDataUpdate {
   MarketDataUpdate() = default;   // constructor
   ~MarketDataUpdate() = default;  // destructor
   // guarantees that it is only passed by reference or via a pointer
@@ -38,22 +39,8 @@ struct MarketDataUpdate {
 
 auto operator<<(std::ostream& os, const MarketDataUpdate& md) -> std::ostream&;
 
-class MarketDataUpdateGenerator {
- public:
-  auto generate_market_data_update(MarketDataUpdate* output) -> void;
+constexpr uint64_t PRICE_MULTIPLIER = 1'000'000'000;
+constexpr uint32_t SIZE_MULTIPLIER = 100;
 
-  static constexpr uint64_t PRICE_MULTIPLIER = 1000000000;
-  static constexpr uint32_t SIZE_MULTIPLIER = 100;
-
- private:
-  auto generate_side_() -> Side;
-  auto generate_level_() -> uint8_t;
-  auto generate_price_() -> uint64_t;
-  auto generate_size_() -> uint32_t;
-
-  std::mt19937 engine_;
-  std::uniform_int_distribution<uint32_t> distU32_;
-  std::uniform_int_distribution<uint8_t> distU8_;
-};
-
+auto generate_market_data_update(MarketDataUpdate* output) -> void;
 }  // namespace lshl::demux::example

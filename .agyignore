@@ -1,0 +1,15 @@
+# cspell:disable
+
+.git/
+.vscode/
+
+build/
+CMakeUserPresets.json
+
+*.log
+*.out
+*.prof
+
+core
+core.*
+vgcore.*

@@ -12,6 +12,7 @@
 #include <rapidcheck.h>  // NOLINT(misc-include-cleaner)
 #include <array>
 #include <atomic>
+#include <bit>
 #include <boost/log/core.hpp>         // NOLINT(misc-include-cleaner)
 #include <boost/log/expressions.hpp>  // NOLINT(misc-include-cleaner)
 #include <boost/serialization/strong_typedef.hpp>
@@ -24,10 +25,12 @@
 #include <span>
 #include <tuple>
 #include <vector>
-#include "../core/demultiplexer.h"
+#include "../core/demux_reader.h"
+#include "../core/demux_writer.h"
 #include "../core/message_buffer.h"
 #include "../core/reader_id.h"
 #include "../util/tuple_util.h"
+#include "./demux_setup.h"
 
 constexpr std::chrono::seconds DEFAULT_WAIT(5);
 
@@ -64,13 +67,12 @@ using MarketDataTick = std::tuple<
 using lshl::demux::core::DemuxReader;
 using lshl::demux::core::DemuxWriter;
 using lshl::demux::core::ReaderId;
-using std::array;
-using std::atomic;
 using std::optional;
-using std::span;
 using std::uint16_t;
 using std::uint8_t;
 using std::vector;
+
+using lshl::demux::core::test::DemuxSetup;
 
 template <>
 struct rc::Arbitrary<Side> {
@@ -88,20 +90,20 @@ struct rc::Arbitrary<Symbol> {
 };
 
 constexpr uint16_t M = sizeof(MarketDataTick);
-constexpr size_t L = 4 * lshl::demux::core::MessageBuffer<0>::required<MarketDataTick>();
+constexpr size_t L = std::bit_ceil(4 * lshl::demux::core::MessageBuffer<0>::required<MarketDataTick>());
 
 namespace {
 template <size_t L, uint16_t M, bool B>
-auto write_all_with_allocate(const vector<MarketDataTick>& messages, DemuxWriter<L, M, B>& writer) -> size_t {
+auto write_all_with_allocate(const vector<MarketDataTick>& messages, DemuxWriter<L, M, B>* writer) -> size_t {
   using lshl::demux::util::operator<<;
 
   size_t result = 0;
   for (size_t i = 0; i < messages.size();) {
-    const optional<MarketDataTick*> m1_opt = writer.template allocate<MarketDataTick>();
+    const optional<MarketDataTick*> m1_opt = writer->template allocate<MarketDataTick>();
     if (m1_opt.has_value()) {
       MarketDataTick* m1 = m1_opt.value();
       *m1 = messages[i];
-      writer.template commit<MarketDataTick>();
+      writer->template commit<MarketDataTick>();
       std::cout << "written: " << *m1 << "\n";
       i += 1;
       result += 1;
@@ -114,21 +116,21 @@ auto write_all_with_allocate(const vector<MarketDataTick>& messages, DemuxWriter
 }
 
 template <size_t L, uint16_t M>
-auto read_n(const size_t message_num, DemuxReader<L, M>& reader) -> vector<MarketDataTick> {
+auto read_n(const size_t message_num, DemuxReader<L, M>* reader) -> vector<MarketDataTick> {
   using lshl::demux::util::operator<<;
 
   vector<MarketDataTick> result;
   result.reserve(message_num);
 
   while (result.size() < message_num) {
-    const optional<const MarketDataTick*> mo = reader.template next_unsafe<MarketDataTick>();
+    const optional<const MarketDataTick*> mo = reader->template next_unsafe<MarketDataTick>();
     if (mo.has_value()) {
       result.push_back(*mo.value());
     }
   }
 
   // read one more to unblock the reader, which might be waiting for the wraparound unblock
-  const optional<const MarketDataTick*> m = reader.template next_unsafe<MarketDataTick>();
+  const optional<const MarketDataTick*> m = reader->template next_unsafe<MarketDataTick>();
   assert(!m.has_value());
 
   return result;
@@ -152,27 +154,17 @@ auto multiple_readers_read_x(const vector<MarketDataTick>& messages) -> bool {
 
   const size_t message_num = messages.size();
 
-  array<uint8_t, L> buffer{};
-  atomic<uint64_t> msg_counter_sync{0};
-  atomic<uint64_t> wraparound_sync{0};
-  const uint64_t all_readers_mask = ReaderId::all_readers_mask(READER_NUM);
-
-  vector<DemuxReader<L, M>> readers{};
-  readers.reserve(READER_NUM);
-  for (uint8_t i = 1; i <= READER_NUM; ++i) {
-    const ReaderId id(i);
-    readers.emplace_back(id, span{buffer}, &msg_counter_sync, &wraparound_sync);
-  }
-
-  DemuxWriter<L, M, Blocking> writer(all_readers_mask, span{buffer}, &msg_counter_sync, &wraparound_sync);
+  DemuxSetup<L, M, Blocking> setup{READER_NUM};
+  DemuxWriter<L, M, Blocking>* writer = setup.writer();
 
   std::future<size_t> future_writer_result =
-      std::async(std::launch::async, [&messages, &writer] { return write_all_with_allocate(messages, writer); });
+      std::async(std::launch::async, [&messages, writer] { return write_all_with_allocate(messages, writer); });
 
   vector<std::future<vector<MarketDataTick>>> future_reader_results{};
   future_reader_results.reserve(READER_NUM);
-  for (auto& reader : readers) {
-    future_reader_results.emplace_back(std::async(std::launch::async, [message_num, &reader] {
+  for (size_t i = 0; i < READER_NUM; i++) {
+    DemuxReader<L, M>* reader = setup.reader(i);
+    future_reader_results.emplace_back(std::async(std::launch::async, [message_num, reader] {
       return read_n(message_num, reader);
     }));
   }
@@ -236,29 +228,21 @@ auto read_all_expect_eq(DemuxReader<L, M>* reader, const MarketDataTick& expecte
 }
 
 auto slow_reader_test(const MarketDataTick& message) -> bool {
-  array<uint8_t, L> buffer{};
-  atomic<uint64_t> msg_counter_sync{0};
-  atomic<uint64_t> wraparound_sync{0};
-  const ReaderId reader_id{1};
+  DemuxSetup<L, M, false> setup{1};
+  DemuxWriter<L, M, false>* writer = setup.writer();
+  DemuxReader<L, M>* reader = setup.reader(0);
+  const ReaderId reader_id(0);
 
-  DemuxWriter<L, M, false> writer(0, span{buffer}, &msg_counter_sync, &wraparound_sync);
-  DemuxReader<L, M> reader(reader_id, span{buffer}, &msg_counter_sync, &wraparound_sync);
-  writer.add_reader(reader_id);
-
-  EXPECT_EQ(vector{reader_id}, writer.lagging_readers());
-
-  fill_up_buffer(&writer, message);
+  fill_up_buffer(writer, message);
 
   // the buffer is full, can't write into it
-  EXPECT_FALSE(writer.allocate<MarketDataTick>().has_value());
-  EXPECT_EQ(vector{reader_id}, writer.lagging_readers());
+  EXPECT_FALSE(writer->allocate<MarketDataTick>().has_value());
 
-  read_all_expect_eq(&reader, message);
-  EXPECT_TRUE(writer.lagging_readers().empty());
+  read_all_expect_eq(reader, message);
 
   // all readers caught up, can write again
-  const auto x = writer.template allocate<MarketDataTick>();
-  writer.template commit<MarketDataTick>();
+  const auto x = writer->template allocate<MarketDataTick>();
+  writer->template commit<MarketDataTick>();
   EXPECT_TRUE(x.has_value());
 
   return !::testing::Test::HasFailure();

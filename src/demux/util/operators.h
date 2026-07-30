@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <array>
+#include <boost/interprocess/managed_shared_memory.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <iomanip>
@@ -14,35 +14,17 @@
 
 namespace lshl::demux::util {
 
-// names take up some space in the managed_shared_memory
-constexpr std::size_t BOOST_IPC_INTERNAL_METADATA_SIZE = 512;
-
-// Linux memory page size
-constexpr std::size_t LINUX_PAGE_SIZE = 4096;
-
-constexpr auto calculate_required_shared_mem_size(
-    const std::size_t data_size,
-    const std::size_t metadata_size,
-    const std::size_t page_size
-) noexcept -> std::size_t {
-  // names take some space in the managed_shared_memory, this is why BOOST_IPC_INTERNAL_METADATA_SIZE is added
-  // total shared memory size, should be  a multiple of the page size (4kB on Linux). Because the operating system
-  // performs mapping operations over whole pages. So, you don't waste memory.
-  const std::size_t quotient = (data_size + metadata_size) / page_size;
-  const std::size_t reminder = (data_size + metadata_size) % page_size;
-  if (reminder > 0) {
-    return (quotient + 1) * page_size;
-  } else {
-    return quotient * page_size;
-  }
+template <typename T>
+[[nodiscard]] auto to_const_pointer_vector(const std::vector<T*>& src) -> std::vector<const T*> {
+  return std::vector<const T*>(src.begin(), src.end());
 }
 
 template <typename T>
-concept OutputStreamConcept = requires(T os) {
+concept OutputStreamLike = requires(T os) {
   { os << std::declval<std::string>() };  // Stream should support the << operator for strings
 };
 
-template <OutputStreamConcept OutputStream>
+template <OutputStreamLike OutputStream>
 auto operator<<(OutputStream& os, const std::span<uint8_t>& xs) -> OutputStream& {
   os << "hex:" << std::hex << '[';
   bool first = true;
@@ -58,7 +40,7 @@ auto operator<<(OutputStream& os, const std::span<uint8_t>& xs) -> OutputStream&
   return os;
 }
 
-template <OutputStreamConcept OutputStream>
+template <OutputStreamLike OutputStream>
 auto operator<<(OutputStream& os, const std::vector<uint8_t>& xs) -> OutputStream& {
   os << "hex:" << std::hex << '[';
   bool first = true;
@@ -74,10 +56,38 @@ auto operator<<(OutputStream& os, const std::vector<uint8_t>& xs) -> OutputStrea
   return os;
 }
 
-template <OutputStreamConcept OutputStream, size_t M>
+template <OutputStreamLike OutputStream, size_t M>
 auto operator<<(OutputStream& os, const std::array<uint8_t, M>& xs) -> OutputStream& {
   std::array<uint8_t, M> ys{xs};
   return operator<<(os, std::span{ys});
+}
+
+template <typename T>
+class log_vector {
+ private:
+  std::reference_wrapper<const std::vector<T>> data_;
+
+ public:
+  explicit log_vector(const std::vector<T>& data) : data_(data) {}
+
+  auto get() const -> const std::vector<T>& { return data_; }
+};
+
+template <OutputStreamLike OutputStream, typename T>
+auto operator<<(OutputStream& os, const log_vector<T> log_vec) -> OutputStream& {
+  const auto& xs = log_vec.get();
+  os << '[';
+  bool first = true;
+  for (const auto& x : xs) {
+    if (first) {
+      first = false;
+    } else {
+      os << ", ";
+    }
+    os << x;
+  }
+  os << ']';
+  return os;
 }
 
 }  // namespace lshl::demux::util

@@ -1,6 +1,6 @@
 # code: language=toml
+# cspell:disable
 # shellcheck disable=all
-# cSpell: disable
 
 include(clang-Common)
 
@@ -8,7 +8,8 @@ include(clang-Common)
 build_type=RelWithDebInfo
 
 [conf]
-# valgrind needs `-gdwarf-4`
-# gperftools needs `-03 -DNDEBUG`
-tools.build:cxxflags=["-g", "-gdwarf-4", "-O3", "-DNDEBUG"]
-tools.build:cflags=["-g", "-gdwarf-4", "-O3", "-DNDEBUG"]
+# gperftools needs `-gdwarf-4 -03 -DNDEBUG`
+tools.build:cxxflags=["-g", "-O3", "-DNDEBUG", "-fno-omit-frame-pointer",]
+tools.build:cflags=["-g", "-O3", "-DNDEBUG", "-fno-omit-frame-pointer",]
+tools.build:sharedlinkflags=["-rdynamic"]
+tools.build:exelinkflags=["-rdynamic"]

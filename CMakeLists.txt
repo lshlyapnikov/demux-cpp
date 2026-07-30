@@ -1,3 +1,4 @@
+# cspell: disable
 cmake_minimum_required(VERSION 3.20)
 project(demux-cpp LANGUAGES CXX)
 
@@ -20,10 +21,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # generate a compile_commands.json file, n
 #set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wconversion -Wsign-conversion -Werror")
 set(MY_CXX_FLAGS -Wall -Wextra -Wshadow -Wnon-virtual-dtor -pedantic -Wconversion -Wsign-conversion -Werror)
 
-# set in conan profile
-#set(CMAKE_CXX_FLAGS_DEBUG "-gdwarf-4 -O0") # valgrind needs `-gdwarf-4`
-#set(CMAKE_CXX_FLAGS_DEBUG "-g -gdwarf-4 -O3 -DNDEBUG") # `-03 -DNDEBUG` for gperftools
-
 #
 # tools
 #
@@ -40,6 +37,7 @@ endif()
 
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost REQUIRED COMPONENTS log)
+find_package(Boost REQUIRED COMPONENTS stacktrace)
 
 # example uses this to compute hash digest of sent and received messages
 find_package(xxHash REQUIRED)
@@ -68,7 +66,6 @@ add_library(${PROJECT_NAME}
 )
 target_link_libraries(${PROJECT_NAME}
   PRIVATE reader_id  # TODO(Leonid): should these two be PUBLIC, so other projects can get the automatically
-  PRIVATE demultiplexer
 )
 
 add_executable(shm_demux
@@ -79,9 +76,11 @@ target_link_libraries(shm_demux
   PRIVATE reader_id
   PRIVATE hdr_histogram::hdr_histogram_static
   PRIVATE Boost::log
+  PRIVATE Boost::stacktrace_backtrace
+  PRIVATE Boost::stacktrace_from_exception
 )
 if(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    target_link_libraries(shm_demux PRIVATE profiler)
+    # target_link_libraries(shm_demux PRIVATE profiler)
 endif()
 target_compile_options(shm_demux
   PRIVATE ${MY_CXX_FLAGS}
@@ -91,13 +90,6 @@ add_library(reader_id
   OBJECT src/demux/core/reader_id.cpp
 )
 target_compile_options(reader_id
-  PRIVATE ${MY_CXX_FLAGS}
-)
-
-add_library(demultiplexer
-  OBJECT src/demux/core/demultiplexer.cpp
-)
-target_compile_options(demultiplexer
   PRIVATE ${MY_CXX_FLAGS}
 )
 
@@ -130,49 +122,89 @@ target_compile_options(message_buffer_test
 )
 gtest_discover_tests(message_buffer_test)
 
-add_executable(demultiplexer_test
-  src/demux/test/demultiplexer_test.cpp
+add_executable(demux_test
+  src/demux/test/demux_test.cpp
 )
-target_link_libraries(demultiplexer_test
-  PRIVATE demultiplexer
+target_link_libraries(demux_test
   PRIVATE reader_id
   PRIVATE gtest::gtest
   PRIVATE rapidcheck::rapidcheck
   PRIVATE Boost::log
   PRIVATE atomic
 )
-target_compile_options(demultiplexer_test
+target_compile_options(demux_test
   PRIVATE ${MY_CXX_FLAGS}
 )
-gtest_discover_tests(demultiplexer_test)
+gtest_discover_tests(demux_test)
 
-add_executable(demultiplexer_allocate_test
-  src/demux/test/demultiplexer_allocate_test.cpp
+add_executable(demux_allocate_test
+  src/demux/test/demux_allocate_test.cpp
 )
-target_link_libraries(demultiplexer_allocate_test
-  PRIVATE demultiplexer
+target_link_libraries(demux_allocate_test
   PRIVATE reader_id
   PRIVATE gtest::gtest
   PRIVATE rapidcheck::rapidcheck
   PRIVATE Boost::log
   PRIVATE atomic
 )
-target_compile_options(demultiplexer_allocate_test
+target_compile_options(demux_allocate_test
   PRIVATE ${MY_CXX_FLAGS}
 )
-gtest_discover_tests(demultiplexer_allocate_test)
+gtest_discover_tests(demux_allocate_test)
 
-add_executable(shm_util_test
-  src/demux/test/shm_util_test.cpp
+add_executable(shm_manager_test
+  src/demux/test/shm_manager_test.cpp
 )
-target_link_libraries(shm_util_test
+target_link_libraries(shm_manager_test
   PRIVATE reader_id
   PRIVATE gtest::gtest
   PRIVATE rapidcheck::rapidcheck
   PRIVATE Boost::log
   PRIVATE atomic
 )
-target_compile_options(shm_util_test
+target_compile_options(shm_manager_test
   PRIVATE ${MY_CXX_FLAGS}
 )
-gtest_discover_tests(shm_util_test)
+gtest_discover_tests(shm_manager_test)
+
+add_executable(util_test
+  src/demux/test/util_test.cpp
+)
+target_link_libraries(util_test
+  PRIVATE gtest::gtest
+  PRIVATE rapidcheck::rapidcheck
+  PRIVATE Boost::log
+)
+target_compile_options(util_test
+  PRIVATE ${MY_CXX_FLAGS}
+)
+gtest_discover_tests(util_test)
+
+add_executable(result_test
+  src/demux/test/result_test.cpp
+)
+target_link_libraries(result_test
+  PRIVATE gtest::gtest
+  PRIVATE rapidcheck::rapidcheck
+  PRIVATE Boost::log
+)
+target_compile_options(result_test
+  PRIVATE ${MY_CXX_FLAGS}
+)
+gtest_discover_tests(result_test)
+
+# add_executable(${xyz}_test
+#   src/demux/test/${xyz}_test.cpp
+# )
+# target_link_libraries(${xyz}_test
+#   PRIVATE operators
+#   PRIVATE reader_id
+#   PRIVATE gtest::gtest
+#   PRIVATE rapidcheck::rapidcheck
+#   PRIVATE Boost::log
+#   PRIVATE atomic
+# )
+# target_compile_options(${xyz}_test
+#   PRIVATE ${MY_CXX_FLAGS}
+# )
+# gtest_discover_tests(${xyz}_test)
