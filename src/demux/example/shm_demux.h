@@ -79,13 +79,13 @@ auto start_writer(
     bool calculate_hash
 ) noexcept(false) -> void;
 
-auto supply_market_data(WriterState* context, MarketDataUpdate* md) -> util::Result<std::string, bool>;
+auto supply_market_data(WriterState* state, MarketDataUpdate* md) -> util::Result<std::string, bool>;
 
-auto supply_market_data_and_calc_hash(WriterState* context, MarketDataUpdate* md) -> util::Result<std::string, bool>;
+auto supply_market_data_and_calc_hash(WriterState* state, MarketDataUpdate* md) -> util::Result<std::string, bool>;
 
-auto consume_market_data(ReaderState* context, const MarketDataUpdate* md) -> util::Result<std::string, bool>;
+auto consume_market_data(ReaderState* state, const MarketDataUpdate* md) -> util::Result<std::string, bool>;
 
-auto consume_market_data_and_calc_hash(ReaderState* context, const MarketDataUpdate* md)
+auto consume_market_data_and_calc_hash(ReaderState* state, const MarketDataUpdate* md)
     -> util::Result<std::string, bool>;
 
 template <class T, size_t L, uint16_t M>
